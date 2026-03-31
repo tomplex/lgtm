@@ -354,7 +354,7 @@ def main():
     )
     ReviewHandler.session = session
 
-    server = http.server.HTTPServer(('127.0.0.1', port), ReviewHandler)
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', port), ReviewHandler)
     url = f'http://127.0.0.1:{port}'
 
     print(f"REVIEW_URL={url}", flush=True)
