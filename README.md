@@ -8,30 +8,51 @@ Make it easy for a human and Claude to have a structured review conversation. Cl
 
 ## Architecture
 
-Two files, no build step, no dependencies beyond Python 3 and a browser:
+A Vite + vanilla TypeScript frontend with a Python backend:
 
 ```
-server.py     -- Python HTTP server (369 lines)
-review.html   -- Single-file UI: HTML + CSS + JS (1928 lines)
+server.py              -- Python HTTP server, serves API + built frontend
+git_ops.py             -- Git operations (diff, commits, file context, branch detection)
+frontend/
+  src/
+    main.ts            -- Entry point
+    api.ts             -- HTTP client for server API
+    state.ts           -- Shared application state
+    utils.ts           -- Helpers (escaping, debounce, syntax detection)
+    diff.ts            -- Diff parsing, rendering, context expansion
+    document.ts        -- Markdown document view with block commenting
+    comments.ts        -- Comment creation, display, navigation
+    ui.ts              -- Sidebar, tabs, header, keyboard shortcuts
+  index.html           -- Shell HTML
+  style.css            -- All styles
+  vite.config.ts       -- Vite config with dev proxy to Python server
+  package.json
+frontend/dist/         -- Production build output (served by server.py)
 ```
 
-### Server (`server.py`)
+### Backend (`server.py` + `git_ops.py`)
 
 A `http.server`-based Python server that:
 
 - Manages a **session** with multiple **review items** (always starts with "Code Changes" diff)
-- Serves the HTML UI and a JSON API
-- Runs git commands to produce diffs, read file context, detect branches
+- In production, serves the built frontend from `frontend/dist/`
+- Exposes a JSON API for diffs, commits, file context, comments, and review submission
 - Stores Claude's comments in memory, writes user feedback to disk
 - Auto-detects base branch (master/main), computes stable port from repo path hash
 
-### UI (`review.html`)
+Git operations (running git commands, parsing output) are in `git_ops.py`.
 
-A single self-contained HTML file with inline CSS and JS. External CDN deps: highlight.js (syntax highlighting), marked.js (markdown rendering).
+### Frontend (`frontend/`)
+
+A Vite + vanilla TypeScript application. No framework — just typed modules and direct DOM manipulation. External deps: highlight.js (syntax highlighting), marked.js (markdown rendering).
 
 Two view modes, switchable via tabs:
 - **Diff view**: file sidebar, syntax-highlighted unified diff, line-level commenting
 - **Document view**: rendered markdown with per-block commenting
+
+**Dev mode**: `npm run dev` inside `frontend/` starts Vite's dev server with HMR. API requests are proxied to the Python backend (start it separately).
+
+**Production mode**: `npm run build` outputs to `frontend/dist/`. The Python server serves these static files directly — no separate frontend process needed.
 
 ## API
 
@@ -130,7 +151,6 @@ cat /tmp/claude-review/<branch-slug>.md
 ## Future work
 
 - **MCP server**: wrap the HTTP API in MCP tools for cleaner Claude integration
-- **Vite + TypeScript port**: the HTML file is ~1900 lines; proper modules would help maintainability
 - **Notification on submit**: auto-notify the Claude session when the user submits feedback
 - **Side-by-side diff**: optional two-column diff view
 - **Persistent state**: save comments to disk so they survive page refresh
