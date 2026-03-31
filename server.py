@@ -156,6 +156,13 @@ class Session:
 
 app = FastAPI()
 session: Session  # set in main() before uvicorn.run
+_open_url: str = ''  # set in main(), opened on startup
+
+
+@app.on_event('startup')
+async def on_startup():
+    if _open_url:
+        webbrowser.open(_open_url)
 
 
 # --- GET routes ---
@@ -270,7 +277,7 @@ def stable_port_for_path(path: str) -> int:
 
 
 def main():
-    global session
+    global session, _open_url
 
     parser = argparse.ArgumentParser(description='Claude Code Review Server')
     parser.add_argument('--repo', default='', help='Path to git repository')
@@ -310,7 +317,7 @@ def main():
     print(f"REVIEW_OUTPUT={output_path}", flush=True)
     print(f"REVIEW_PID={os.getpid()}", flush=True)
 
-    webbrowser.open(url)
+    _open_url = url
     uvicorn.run(app, host='127.0.0.1', port=port, log_level='warning')
 
 
