@@ -1,11 +1,12 @@
 import {
-  comments, files, activeFileIdx,
+  comments, files, activeFileIdx, claudeComments, resolvedComments,
   sessionItems,
   lineIdToKey,
 } from './state';
 import { escapeHtml } from './utils';
 import { renderDiff } from './diff';
 import { renderFileList } from './ui';
+import { saveState } from './persistence';
 
 export function toggleComment(lineId: string): void {
   const lineKey = lineIdToKey(lineId);
@@ -84,6 +85,7 @@ function saveComment(lineId: string): void {
   const text = row.querySelector('textarea')?.value?.trim();
   if (!text) { deleteComment(lineId); return; }
   comments[lineKey] = text;
+  saveState();
   renderDiff(activeFileIdx);
   renderFileList();
 }
@@ -96,6 +98,7 @@ function cancelComment(lineId: string): void {
 function deleteComment(lineId: string): void {
   const lineKey = lineIdToKey(lineId);
   if (lineKey) delete comments[lineKey];
+  saveState();
   renderDiff(activeFileIdx);
   renderFileList();
 }
@@ -121,7 +124,7 @@ export function jumpToComment(direction: 'next' | 'prev'): void {
 function formatDiffComments(): string {
   const byFile: Record<string, { lineNum: number | string; lineType: string; lineContent: string; comment: string }[]> = {};
   for (const [key, text] of Object.entries(comments)) {
-    if (key.startsWith('doc:') || key.startsWith('md::')) continue;
+    if (key.startsWith('doc:') || key.startsWith('md::') || key.startsWith('claude:')) continue;
     const sepIdx = key.lastIndexOf('::');
     const filePath = key.substring(0, sepIdx);
     const lineIdxStr = key.substring(sepIdx + 2);
@@ -148,10 +151,78 @@ function formatDiffComments(): string {
   return output;
 }
 
+function formatClaudeInteractions(): string {
+  const byFile: Record<string, { lineNum: number | string; comment: string; reply?: string; resolved: boolean }[]> = {};
+
+  for (const cc of claudeComments) {
+    if (cc.file == null || cc._item !== 'diff') continue;
+    const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
+    const reply = comments[ccKey];
+    const resolved = resolvedComments.has(ccKey);
+
+    if (!reply && !resolved) continue;
+
+    const filePath = cc.file;
+    if (!byFile[filePath]) byFile[filePath] = [];
+    byFile[filePath].push({
+      lineNum: cc.line ?? '?',
+      comment: cc.comment,
+      reply,
+      resolved,
+    });
+  }
+
+  let output = '';
+  for (const [filePath, interactions] of Object.entries(byFile)) {
+    output += `## ${filePath}\n\n`;
+    for (const c of interactions.sort((a, b) => Number(a.lineNum) - Number(b.lineNum))) {
+      output += `**Claude:** ${c.comment}\n`;
+      if (c.reply) {
+        output += `**Reply:** ${c.reply}\n`;
+      } else if (c.resolved) {
+        output += `**Status:** Resolved\n`;
+      }
+      output += '\n';
+    }
+  }
+  return output;
+}
+
+function formatDocClaudeInteractions(): string {
+  let output = '';
+  for (const item of sessionItems) {
+    if (item.id === 'diff') continue;
+    const itemComments = claudeComments.filter(cc => cc._item === item.id);
+    const interactions: { block: number; comment: string; reply?: string; resolved: boolean }[] = [];
+
+    for (const cc of itemComments) {
+      const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
+      const reply = comments[ccKey];
+      const resolved = resolvedComments.has(ccKey);
+      if (!reply && !resolved) continue;
+      interactions.push({ block: cc.block ?? 0, comment: cc.comment, reply, resolved });
+    }
+
+    if (interactions.length === 0) continue;
+    output += `## ${item.title}\n\n`;
+    for (const c of interactions.sort((a, b) => a.block - b.block)) {
+      output += `**Claude:** ${c.comment}\n`;
+      if (c.reply) output += `**Reply:** ${c.reply}\n`;
+      else if (c.resolved) output += `**Status:** Resolved\n`;
+      output += '\n';
+    }
+  }
+  return output;
+}
+
 export function formatAllComments(): string {
   let output = '';
+
   const diffOutput = formatDiffComments();
   if (diffOutput) output += diffOutput;
+
+  const claudeDiffOutput = formatClaudeInteractions();
+  if (claudeDiffOutput) output += claudeDiffOutput;
 
   for (const item of sessionItems) {
     if (item.id === 'diff') continue;
@@ -171,5 +242,9 @@ export function formatAllComments(): string {
       output += `> ${text}\n\n`;
     }
   }
+
+  const claudeDocOutput = formatDocClaudeInteractions();
+  if (claudeDocOutput) output += claudeDocOutput;
+
   return output || 'No comments (LGTM).';
 }
