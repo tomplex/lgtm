@@ -6,16 +6,15 @@ import {
 } from './state';
 import { escapeHtml } from './utils';
 
-const marked = new Marked({
-  renderer: {
-    code({ text, lang }: { text: string; lang?: string }) {
-      const highlighted = lang && hljs.getLanguage(lang)
-        ? hljs.highlight(text, { language: lang, ignoreIllegals: true }).value
-        : hljs.highlightAuto(text).value;
-      return `<pre><code class="hljs">${highlighted}</code></pre>`;
-    },
-  },
-});
+const renderer = new (Marked as any).Renderer();
+renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
+  const highlighted = lang && hljs.getLanguage(lang)
+    ? hljs.highlight(text, { language: lang, ignoreIllegals: true }).value
+    : hljs.highlightAuto(text).value;
+  return `<pre><code class="hljs">${highlighted}</code></pre>`;
+};
+
+const marked = new Marked({ renderer });
 
 function mdKey(blockIdx: number): string {
   return activeItemId === 'diff' ? `md::${blockIdx}` : `doc:${activeItemId}:${blockIdx}`;

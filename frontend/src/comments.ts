@@ -1,6 +1,6 @@
 import {
-  comments, files, activeFileIdx, claudeComments,
-  sessionItems, activeItemId, mdMeta,
+  comments, files, activeFileIdx,
+  sessionItems,
   lineIdToKey,
 } from './state';
 import { escapeHtml } from './utils';

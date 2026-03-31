@@ -1,13 +1,13 @@
 import {
   files, activeFileIdx, comments, claudeComments,
-  getLineId, lineIdToKey, resetLineIds,
-  setFiles, setActiveFileIdx,
-  type DiffFile, type DiffLine,
+  getLineId,
+  setActiveFileIdx,
+  type DiffFile,
 } from './state';
 import { fetchContext, fetchFile } from './api';
 import { escapeHtml, detectLang, highlightLine, showToast } from './utils';
 import { toggleComment, editComment } from './comments';
-import { renderFileList } from './ui';
+// renderFileList imported lazily to avoid circular dependency
 
 export function parseDiff(raw: string): DiffFile[] {
   const result: DiffFile[] = [];
