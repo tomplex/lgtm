@@ -1,0 +1,21 @@
+[project]
+name = "lgtm"
+version = "0.1.0"
+description = "Web-based review UI for collaborating with Claude Code on code changes and documents"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sse-starlette",
+]
+
+[project.scripts]
+lgtm = "server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+artifacts = ["frontend/dist/**"]
