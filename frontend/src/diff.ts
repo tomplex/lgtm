@@ -154,9 +154,12 @@ export function renderDiff(fileIdx: number): void {
       </tr>`;
     }
 
-    // Claude's comments on this line
-    const lineNum = line.newLine ?? line.oldLine;
-    const claudeForLine = claudeComments.filter(c => c.file === file.path && c.line === lineNum);
+    // Claude's comments on this line — match by side (default: new file)
+    const claudeForLine = claudeComments.filter(c => {
+      if (c.file !== file.path) return false;
+      const side = c.side || 'new';
+      return side === 'new' ? c.line === line.newLine : c.line === line.oldLine;
+    });
     for (const cc of claudeForLine) {
       const ccIdx = claudeComments.indexOf(cc);
       html += `<tr class="claude-comment-row">
@@ -207,6 +210,69 @@ export function renderDiff(fileIdx: number): void {
     if (next && next.classList.contains('diff-hunk')) next.remove();
     expandContext(row.dataset.file!, parseInt(row.dataset.line!), 'down', row, count);
   });
+
+  // Render orphaned Claude comments — comments targeting lines not visible in the diff.
+  // These get inserted after the nearest preceding visible line, with an explicit line label.
+  const fileComments = claudeComments.filter(c => c.file === file.path && c.line != null);
+  const visibleNewLines = new Set(file.lines.map(l => l.newLine).filter((n): n is number => n != null));
+  const visibleOldLines = new Set(file.lines.map(l => l.oldLine).filter((n): n is number => n != null));
+  const orphaned = fileComments.filter(cc => {
+    const side = cc.side || 'new';
+    return side === 'new' ? !visibleNewLines.has(cc.line!) : !visibleOldLines.has(cc.line!);
+  });
+  // Sort orphaned comments by target line so they appear in order
+  orphaned.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
+  for (const cc of orphaned) {
+    const ccIdx = claudeComments.indexOf(cc);
+    const side = cc.side || 'new';
+    const targetLine = cc.line!;
+
+    // Find the last diff line whose line number is <= targetLine on the correct side
+    let anchorLineIdx = -1;
+    for (let i = file.lines.length - 1; i >= 0; i--) {
+      const num = side === 'new' ? file.lines[i].newLine : file.lines[i].oldLine;
+      if (num != null && num <= targetLine) { anchorLineIdx = i; break; }
+    }
+
+    const tr = document.createElement('tr');
+    tr.className = 'claude-comment-row';
+    tr.innerHTML = `
+      <td colspan="3">
+        <div class="comment-box" style="max-width:calc(100vw - 360px)">
+          <div class="claude-comment">
+            <span class="claude-label">Claude &middot; line ${targetLine}${side === 'old' ? ' (old)' : ''}</span>
+            <span class="claude-dismiss" data-dismiss-claude="${ccIdx}" title="Dismiss">&times;</span>
+            ${escapeHtml(cc.comment)}
+          </div>
+        </div>
+      </td>
+    `;
+
+    const table = container.querySelector('.diff-table');
+    if (!table) continue;
+
+    if (anchorLineIdx >= 0) {
+      const anchorKey = `${file.path}::${anchorLineIdx}`;
+      const anchorId = getLineId(anchorKey);
+      let anchor = document.getElementById('line-' + anchorId);
+      if (anchor) {
+        // Skip past any existing comment rows
+        while (anchor!.nextElementSibling?.classList.contains('comment-row') ||
+               anchor!.nextElementSibling?.classList.contains('claude-comment-row')) {
+          anchor = anchor!.nextElementSibling as HTMLElement;
+        }
+        anchor.after(tr);
+        continue;
+      }
+    }
+    // No preceding line — insert before the first content row (after the file header)
+    const firstRow = table.querySelector('tr');
+    if (firstRow) {
+      firstRow.before(tr);
+    } else {
+      table.appendChild(tr);
+    }
+  }
 
   // Handle hash-based navigation
   const hash = window.location.hash;
@@ -310,6 +376,15 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
       if (l.type === 'add' && l.newLine) addLines.add(l.newLine);
     });
 
+    // Index Claude comments by new-file line number for this file
+    const commentsByLine: Record<number, typeof claudeComments> = {};
+    for (const cc of claudeComments) {
+      if (cc.file === file.path && cc.line != null && (cc.side || 'new') === 'new') {
+        if (!commentsByLine[cc.line]) commentsByLine[cc.line] = [];
+        commentsByLine[cc.line].push(cc);
+      }
+    }
+
     let html = `<div class="diff-file-header">${escapeHtml(file.path)} <a style="float:right;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer" data-action="back-to-diff" data-file-idx="${fileIdx}">Back to diff</a></div>`;
     html += `<table class="diff-table">`;
     for (const l of lines) {
@@ -320,9 +395,28 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
         <td class="line-num">${l.num}</td>
         <td class="line-content"><span class="diff-prefix"> </span>${codeHtml}</td>
       </tr>`;
+
+      // Claude comments on this line
+      for (const cc of commentsByLine[l.num] || []) {
+        const ccIdx = claudeComments.indexOf(cc);
+        html += `<tr class="claude-comment-row">
+          <td colspan="3">
+            <div class="comment-box" style="max-width:calc(100vw - 360px)">
+              <div class="claude-comment">
+                <span class="claude-label">Claude</span>
+                <span class="claude-dismiss" data-dismiss-claude="${ccIdx}" title="Dismiss">&times;</span>
+                ${escapeHtml(cc.comment)}
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      }
     }
     html += `</table>`;
     container.innerHTML = html;
+
+    // Event delegation for dismiss buttons
+    container.addEventListener('click', handleDiffContainerClick);
 
     // Back-to-diff click handler
     container.querySelector('[data-action="back-to-diff"]')?.addEventListener('click', () => renderDiff(fileIdx));

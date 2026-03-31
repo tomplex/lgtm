@@ -22,6 +22,7 @@ export interface SessionItem {
 export interface ClaudeComment {
   file?: string;
   line?: number;
+  side?: 'new' | 'old';
   block?: number;
   comment: string;
   _item: string;

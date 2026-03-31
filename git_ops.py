@@ -23,19 +23,26 @@ def detect_base_branch(repo_path):
 
 
 def get_branch_diff(repo_path, base_branch):
+    merge_base = git_run(repo_path, 'merge-base', base_branch, 'HEAD')
+    if not merge_base:
+        return ''
+    # Committed files on the branch
     files_output = git_run(
         repo_path,
         'log', '--first-parent', '--no-merges',
         '--diff-filter=ACDMR', '--name-only', '--format=',
         f'{base_branch}..HEAD'
     )
-    if not files_output.strip():
-        return ''
-    branch_files = sorted(set(f for f in files_output.split('\n') if f.strip()))
+    branch_files = set(f for f in files_output.split('\n') if f.strip())
+    # Uncommitted files (staged + unstaged)
+    uncommitted = git_run(repo_path, 'diff', '--name-only', 'HEAD')
+    staged = git_run(repo_path, 'diff', '--name-only', '--cached')
+    for output in (uncommitted, staged):
+        branch_files.update(f for f in output.split('\n') if f.strip())
     if not branch_files:
         return ''
-    merge_base = git_run(repo_path, 'merge-base', base_branch, 'HEAD')
-    return git_run(repo_path, 'diff', merge_base, 'HEAD', '--', *branch_files)
+    # Diff merge-base against working tree (includes uncommitted changes)
+    return git_run(repo_path, 'diff', merge_base, '--', *sorted(branch_files))
 
 
 def get_selected_commits_diff(repo_path, shas):
