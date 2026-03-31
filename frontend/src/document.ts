@@ -6,15 +6,18 @@ import {
 } from './state';
 import { escapeHtml } from './utils';
 
-const renderer = new (Marked as any).Renderer();
-renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
-  const highlighted = lang && hljs.getLanguage(lang)
-    ? hljs.highlight(text, { language: lang, ignoreIllegals: true }).value
-    : hljs.highlightAuto(text).value;
-  return `<pre><code class="hljs">${highlighted}</code></pre>`;
-};
-
-const marked = new Marked({ renderer });
+const marked = new Marked({
+  renderer: {
+    // marked v12 passes { text, lang } at runtime but types expect positional args
+    code(this: unknown, ...args: unknown[]) {
+      const token = (typeof args[0] === 'object' ? args[0] : { text: args[0], lang: args[1] }) as { text: string; lang?: string };
+      const highlighted = token.lang && hljs.getLanguage(token.lang)
+        ? hljs.highlight(token.text, { language: token.lang, ignoreIllegals: true }).value
+        : hljs.highlightAuto(token.text).value;
+      return `<pre><code class="hljs">${highlighted}</code></pre>`;
+    },
+  },
+});
 
 function mdKey(blockIdx: number): string {
   return activeItemId === 'diff' ? `md::${blockIdx}` : `doc:${activeItemId}:${blockIdx}`;

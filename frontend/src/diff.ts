@@ -7,7 +7,6 @@ import {
 import { fetchContext, fetchFile } from './api';
 import { escapeHtml, detectLang, highlightLine, showToast } from './utils';
 import { toggleComment, editComment } from './comments';
-// renderFileList imported lazily to avoid circular dependency
 
 export function parseDiff(raw: string): DiffFile[] {
   const result: DiffFile[] = [];
