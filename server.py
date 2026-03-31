@@ -222,8 +222,14 @@ class ReviewHandler(http.server.BaseHTTPRequestHandler):
 
         if path == '/comments':
             item_id = qs.get('item', [''])[0]
+            index = qs.get('index', [''])[0]
             with s.claude_comments_lock:
-                if item_id:
+                if item_id and index:
+                    idx = int(index)
+                    items = s.claude_comments.get(item_id, [])
+                    if 0 <= idx < len(items):
+                        items.pop(idx)
+                elif item_id:
                     s.claude_comments.pop(item_id, None)
                 else:
                     s.claude_comments.clear()

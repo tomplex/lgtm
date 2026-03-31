@@ -25,6 +25,7 @@ export interface ClaudeComment {
   block?: number;
   comment: string;
   _item: string;
+  _serverIndex: number;
 }
 
 export interface RepoMeta {

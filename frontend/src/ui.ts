@@ -149,7 +149,7 @@ export async function switchToItem(itemId: string): Promise<void> {
     document.querySelector('.keyboard-hint')!.innerHTML = 'Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment';
 
     setRepoMeta(data.meta || {});
-    setClaudeComments((data.claudeComments || []).map(c => ({ ...c, _item: 'diff' })));
+    setClaudeComments((data.claudeComments || []).map((c, i) => ({ ...c, _item: 'diff', _serverIndex: i })));
     setAppMode('diff');
 
     if (data.description) {
@@ -186,7 +186,7 @@ export async function switchToItem(itemId: string): Promise<void> {
     document.getElementById('description-banner')!.style.display = 'none';
     document.querySelector('.keyboard-hint')!.innerHTML = 'Click any block to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Esc</kbd> cancel';
 
-    setClaudeComments((data.claudeComments || []).map(c => ({ ...c, _item: activeItemId })));
+    setClaudeComments((data.claudeComments || []).map((c, i) => ({ ...c, _item: activeItemId, _serverIndex: i })));
     setAppMode('file');
     renderMarkdown(data);
   }

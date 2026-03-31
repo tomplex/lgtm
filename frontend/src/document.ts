@@ -5,6 +5,7 @@ import {
   mdMeta, setMdMeta, setClaudeComments, type MdMeta,
 } from './state';
 import { escapeHtml } from './utils';
+import { deleteClaudeComment } from './api';
 
 const marked = new Marked({
   renderer: {
@@ -92,8 +93,12 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = parseInt(el.dataset.dismissClaudeMd!);
-      setClaudeComments(claudeComments.filter((_, i) => i !== idx));
-      renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
+      const cc = claudeComments[idx];
+      if (cc) {
+        deleteClaudeComment(cc._item, cc._serverIndex);
+        setClaudeComments(claudeComments.filter((_, i) => i !== idx));
+        renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
+      }
     });
   });
 

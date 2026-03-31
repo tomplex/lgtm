@@ -4,7 +4,7 @@ import {
   setActiveFileIdx, setWholeFileView, setClaudeComments,
   type DiffFile,
 } from './state';
-import { fetchContext, fetchFile } from './api';
+import { fetchContext, fetchFile, deleteClaudeComment } from './api';
 import { escapeHtml, detectLang, highlightLine, showToast } from './utils';
 import { toggleComment, editComment } from './comments';
 
@@ -220,8 +220,12 @@ function handleDiffContainerClick(e: Event): void {
   const dismissEl = target.closest<HTMLElement>('[data-dismiss-claude]');
   if (dismissEl) {
     const idx = parseInt(dismissEl.dataset.dismissClaude!);
-    setClaudeComments(claudeComments.filter((_, i) => i !== idx));
-    renderDiff(activeFileIdx);
+    const cc = claudeComments[idx];
+    if (cc) {
+      deleteClaudeComment(cc._item, cc._serverIndex);
+      setClaudeComments(claudeComments.filter((_, i) => i !== idx));
+      renderDiff(activeFileIdx);
+    }
     return;
   }
 

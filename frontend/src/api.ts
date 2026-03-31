@@ -69,7 +69,11 @@ export async function submitReview(comments: string, raw: Record<string, string>
   return resp.json();
 }
 
-export async function deleteClaudeComments(itemId?: string): Promise<void> {
+export async function deleteClaudeComment(itemId: string, index: number): Promise<void> {
+  await fetch(`/comments?item=${encodeURIComponent(itemId)}&index=${index}`, { method: 'DELETE' });
+}
+
+export async function deleteAllClaudeComments(itemId?: string): Promise<void> {
   const url = itemId ? `/comments?item=${encodeURIComponent(itemId)}` : '/comments';
   await fetch(url, { method: 'DELETE' });
 }
