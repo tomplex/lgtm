@@ -295,7 +295,7 @@
 
   /* Comment rows */
   tr.comment-row td {
-    padding: 8px 12px 8px 60px;
+    padding: 4px 12px 4px 60px;
     background: var(--comment-bg);
     border-left: 3px solid var(--comment-border);
     white-space: normal;
@@ -305,18 +305,18 @@
   .comment-box {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     max-width: calc(100vw - 360px);
   }
 
   .comment-box textarea {
     width: 100%;
-    min-height: 60px;
-    padding: 8px 12px;
+    min-height: 50px;
+    padding: 6px 10px;
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 4px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
     font-size: 13px;
     resize: vertical;
@@ -348,27 +348,39 @@
   .comment-actions .cancel-btn:hover { background: var(--hover); }
 
   .saved-comment {
-    padding: 8px 12px;
+    padding: 6px 10px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 4px;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 1.4;
     white-space: pre-wrap;
     cursor: pointer;
     position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
   }
   .saved-comment:hover { border-color: var(--accent); }
-  .saved-comment .edit-hint {
-    position: absolute;
-    top: 4px;
-    right: 8px;
-    font-size: 10px;
+  .saved-comment .comment-text { flex: 1; }
+  .saved-comment .inline-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .saved-comment .inline-actions a {
+    font-size: 11px;
     color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: 3px;
     opacity: 0;
     transition: opacity 0.15s;
   }
-  .saved-comment:hover .edit-hint { opacity: 1; }
+  .saved-comment:hover .inline-actions a { opacity: 1; }
+  .saved-comment .inline-actions a:hover { background: var(--hover); color: var(--accent); }
+  .saved-comment .inline-actions a.del-action:hover { color: var(--del-text); background: var(--del-line-bg); }
 
   .empty-state {
     display: flex;
@@ -574,14 +586,21 @@
 
   /* --- Claude comments --- */
   .claude-comment {
-    padding: 8px 12px;
+    padding: 6px 10px;
     background: #1a1528;
     border: 1px solid #6e40c9;
-    border-radius: 6px;
+    border-radius: 4px;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 1.4;
     white-space: pre-wrap;
-    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .claude-comment .claude-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
   }
   .claude-comment .claude-label {
     font-size: 10px;
@@ -589,29 +608,88 @@
     color: #a371f7;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 4px;
-    display: block;
+    flex-shrink: 0;
   }
-  .claude-comment .claude-dismiss {
-    position: absolute;
-    top: 6px;
-    right: 8px;
-    font-size: 14px;
-    color: #a371f7;
+  .claude-comment .claude-text {
+    flex: 1;
+    white-space: pre-wrap;
+  }
+  .claude-comment .inline-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .claude-comment .inline-actions a {
+    font-size: 11px;
+    color: var(--text-muted);
     cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.15s;
-    line-height: 1;
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: 3px;
   }
-  .claude-comment:hover .claude-dismiss { opacity: 0.6; }
-  .claude-comment .claude-dismiss:hover { opacity: 1; }
+  .claude-comment .inline-actions a:hover {
+    background: var(--hover);
+    color: #a371f7;
+  }
   tr.claude-comment-row td {
-    padding: 8px 12px 8px 60px;
+    padding: 4px 12px 4px 60px;
     background: #1a1528;
     border-left: 3px solid #6e40c9;
     white-space: normal;
     max-width: 0;
   }
+
+  /* Resolved state */
+  .claude-comment.resolved {
+    opacity: 0.5;
+    border-style: dashed;
+  }
+  .claude-comment .resolve-badge {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--add-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  /* Reply nested inside Claude comment */
+  .claude-reply {
+    padding: 6px 8px;
+    background: var(--bg);
+    border-radius: 3px;
+    border-left: 2px solid var(--accent);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .claude-reply:hover { border-color: var(--accent); }
+  .claude-reply .reply-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  .claude-reply .reply-text {
+    flex: 1;
+    white-space: pre-wrap;
+  }
+  .claude-reply .inline-actions a {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .claude-reply:hover .inline-actions a { opacity: 1; }
+  .claude-reply .inline-actions a:hover { background: var(--hover); color: var(--accent); }
+  .claude-reply .inline-actions a.del-action:hover { color: var(--del-text); background: var(--del-line-bg); }
 
   /* --- Reviewed file marker --- */
   .file-item.reviewed { opacity: 0.45; }
