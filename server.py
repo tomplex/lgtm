@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import asyncio
 import http.server
 import json
 import queue
@@ -34,42 +35,125 @@ def slugify(title):
 
 
 class Session:
-    def __init__(self, repo_path, base_branch, description='', output_path=''):
+    def __init__(self, repo_path: str, base_branch: str, description: str = '', output_path: str = ''):
         self.repo_path = repo_path
         self.base_branch = base_branch
         self.description = description
         self.output_path = output_path
-        self.round = 0
-        self.round_lock = threading.Lock()
-        self.items = [{
+        self._round = 0
+        self._items: list[dict] = [{
             'id': 'diff',
             'type': 'diff',
             'title': 'Code Changes',
         }]
-        self.items_lock = threading.Lock()
-        self.claude_comments = {}
-        self.claude_comments_lock = threading.Lock()
-        self._sse_clients: list[queue.Queue] = []
-        self._sse_lock = threading.Lock()
+        self._claude_comments: dict[str, list[dict]] = {}
+        self._sse_clients: list[asyncio.Queue] = []
 
-    def add_sse_client(self) -> queue.Queue:
-        q: queue.Queue = queue.Queue()
-        with self._sse_lock:
-            self._sse_clients.append(q)
+    # --- Queries ---
+
+    @property
+    def items(self) -> list[dict]:
+        return self._items
+
+    def get_item_data(self, item_id: str, commits: str | None = None) -> dict:
+        claude_comments = self._claude_comments.get(item_id, [])
+
+        if item_id == 'diff':
+            if commits:
+                shas = [s.strip() for s in commits.split(',') if s.strip()]
+                diff = get_selected_commits_diff(self.repo_path, shas)
+            else:
+                diff = get_branch_diff(self.repo_path, self.base_branch)
+            return {
+                'mode': 'diff',
+                'diff': diff,
+                'description': self.description,
+                'meta': get_repo_meta(self.repo_path, self.base_branch),
+                'claudeComments': claude_comments,
+            }
+
+        item = next((i for i in self._items if i['id'] == item_id), None)
+        if not item:
+            return {'mode': 'error', 'error': f'Item not found: {item_id}'}
+
+        p = Path(item['path'])
+        content = p.read_text() if p.exists() else ''
+        is_markdown = p.name.endswith(('.md', '.mdx', '.markdown'))
+
+        return {
+            'mode': 'file',
+            'content': content,
+            'filename': p.name,
+            'filepath': str(p),
+            'markdown': is_markdown,
+            'title': item.get('title', p.name),
+            'claudeComments': claude_comments,
+        }
+
+    # --- Mutations ---
+
+    def add_item(self, item_id: str, title: str, filepath: str) -> dict:
+        existing = next((i for i in self._items if i['id'] == item_id), None)
+        if existing:
+            existing['path'] = os.path.abspath(filepath)
+            existing['title'] = title
+        else:
+            self._items.append({
+                'id': item_id,
+                'type': 'document',
+                'title': title,
+                'path': os.path.abspath(filepath),
+            })
+        return {'ok': True, 'id': item_id, 'items': self._items}
+
+    def add_comments(self, item_id: str, comments: list[dict]) -> int:
+        if item_id not in self._claude_comments:
+            self._claude_comments[item_id] = []
+        self._claude_comments[item_id].extend(comments)
+        return len(self._claude_comments[item_id])
+
+    def delete_comment(self, item_id: str, index: int) -> None:
+        items = self._claude_comments.get(item_id, [])
+        if 0 <= index < len(items):
+            items.pop(index)
+
+    def clear_comments(self, item_id: str | None = None) -> None:
+        if item_id:
+            self._claude_comments.pop(item_id, None)
+        else:
+            self._claude_comments.clear()
+
+    def submit_review(self, comments_text: str) -> int:
+        self._round += 1
+        current_round = self._round
+
+        with open(self.output_path, 'a') as f:
+            f.write(f"\n---\n# Review Round {current_round}\n\n")
+            f.write(comments_text)
+            f.write('\n')
+
+        signal_path = self.output_path + '.signal'
+        with open(signal_path, 'w') as f:
+            f.write(str(current_round))
+
+        return current_round
+
+    # --- SSE ---
+
+    def subscribe(self) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue()
+        self._sse_clients.append(q)
         return q
 
-    def remove_sse_client(self, q: queue.Queue) -> None:
-        with self._sse_lock:
-            self._sse_clients = [c for c in self._sse_clients if c is not q]
+    def unsubscribe(self, q: asyncio.Queue) -> None:
+        self._sse_clients = [c for c in self._sse_clients if c is not q]
 
     def broadcast(self, event: str, data: dict) -> None:
-        msg = json.dumps(data)
-        with self._sse_lock:
-            for q in self._sse_clients:
-                try:
-                    q.put_nowait(f"event: {event}\ndata: {msg}\n\n")
-                except queue.Full:
-                    pass
+        for q in self._sse_clients:
+            try:
+                q.put_nowait({'event': event, 'data': json.dumps(data)})
+            except asyncio.QueueFull:
+                pass
 
 
 class ReviewHandler(http.server.BaseHTTPRequestHandler):
