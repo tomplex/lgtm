@@ -214,6 +214,24 @@ class ReviewHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        qs = parse_qs(parsed.query)
+        s = self.session
+
+        if path == '/comments':
+            item_id = qs.get('item', [''])[0]
+            with s.claude_comments_lock:
+                if item_id:
+                    s.claude_comments.pop(item_id, None)
+                else:
+                    s.claude_comments.clear()
+            self._respond_json({'ok': True})
+        else:
+            self.send_response(404)
+            self.end_headers()
+
     def _read_body(self):
         length = int(self.headers.get('Content-Length', 0))
         return json.loads(self.rfile.read(length)) if length else {}

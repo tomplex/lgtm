@@ -2,7 +2,7 @@ import { Marked } from 'marked';
 import hljs from 'highlight.js';
 import {
   comments, claudeComments, activeItemId,
-  mdMeta, setMdMeta, type MdMeta,
+  mdMeta, setMdMeta, setClaudeComments, type MdMeta,
 } from './state';
 import { escapeHtml } from './utils';
 
@@ -49,10 +49,12 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
     const claudeForBlock = claudeComments.filter(c => c.block === blockIdx);
     let claudeHtml = '';
     for (const cc of claudeForBlock) {
+      const ccIdx = claudeComments.indexOf(cc);
       claudeHtml += `<div class="md-comment" style="margin:4px 0">
         <div class="comment-box" style="max-width:100%">
           <div class="claude-comment">
             <span class="claude-label">Claude</span>
+            <span class="claude-dismiss" data-dismiss-claude-md="${ccIdx}" title="Dismiss">&times;</span>
             ${escapeHtml(cc.comment)}
           </div>
         </div>
@@ -84,6 +86,14 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       editMdComment(parseInt(el.dataset.editMdComment!));
+    });
+  });
+  container.querySelectorAll<HTMLElement>('[data-dismiss-claude-md]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(el.dataset.dismissClaudeMd!);
+      setClaudeComments(claudeComments.filter((_, i) => i !== idx));
+      renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
     });
   });
 

@@ -68,3 +68,8 @@ export async function submitReview(comments: string, raw: Record<string, string>
   });
   return resp.json();
 }
+
+export async function deleteClaudeComments(itemId?: string): Promise<void> {
+  const url = itemId ? `/comments?item=${encodeURIComponent(itemId)}` : '/comments';
+  await fetch(url, { method: 'DELETE' });
+}

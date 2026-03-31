@@ -1,7 +1,7 @@
 import {
   files, activeFileIdx, comments, claudeComments,
   getLineId,
-  setActiveFileIdx, setWholeFileView,
+  setActiveFileIdx, setWholeFileView, setClaudeComments,
   type DiffFile,
 } from './state';
 import { fetchContext, fetchFile } from './api';
@@ -158,11 +158,13 @@ export function renderDiff(fileIdx: number): void {
     const lineNum = line.newLine ?? line.oldLine;
     const claudeForLine = claudeComments.filter(c => c.file === file.path && c.line === lineNum);
     for (const cc of claudeForLine) {
+      const ccIdx = claudeComments.indexOf(cc);
       html += `<tr class="claude-comment-row">
         <td colspan="3">
           <div class="comment-box" style="max-width:calc(100vw - 360px)">
             <div class="claude-comment">
               <span class="claude-label">Claude</span>
+              <span class="claude-dismiss" data-dismiss-claude="${ccIdx}" title="Dismiss">&times;</span>
               ${escapeHtml(cc.comment)}
             </div>
           </div>
@@ -213,6 +215,15 @@ export function renderDiff(fileIdx: number): void {
 
 function handleDiffContainerClick(e: Event): void {
   const target = e.target as HTMLElement;
+
+  // Dismiss Claude comment
+  const dismissEl = target.closest<HTMLElement>('[data-dismiss-claude]');
+  if (dismissEl) {
+    const idx = parseInt(dismissEl.dataset.dismissClaude!);
+    setClaudeComments(claudeComments.filter((_, i) => i !== idx));
+    renderDiff(activeFileIdx);
+    return;
+  }
 
   // Line number click -> toggle comment
   const lineNumEl = target.closest<HTMLElement>('.line-num[data-line-id]');

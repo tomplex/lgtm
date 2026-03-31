@@ -592,6 +592,19 @@
     margin-bottom: 4px;
     display: block;
   }
+  .claude-comment .claude-dismiss {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 14px;
+    color: #a371f7;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    line-height: 1;
+  }
+  .claude-comment:hover .claude-dismiss { opacity: 0.6; }
+  .claude-comment .claude-dismiss:hover { opacity: 1; }
   tr.claude-comment-row td {
     padding: 8px 12px 8px 60px;
     background: #1a1528;
