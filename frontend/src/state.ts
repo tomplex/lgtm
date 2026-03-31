@@ -65,6 +65,7 @@ export let activeItemId = 'diff';
 export let allCommits: Commit[] = [];
 export const selectedShas = new Set<string>();
 export const reviewedFiles = new Set<string>();
+export const resolvedComments = new Set<string>();
 export let wholeFileView = false;
 
 // Line ID tracking
