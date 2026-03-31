@@ -1,7 +1,7 @@
 import {
   files, activeFileIdx, comments, claudeComments,
   getLineId,
-  setActiveFileIdx,
+  setActiveFileIdx, setWholeFileView,
   type DiffFile,
 } from './state';
 import { fetchContext, fetchFile } from './api';
@@ -318,6 +318,7 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
 
 export function selectFile(idx: number): void {
   setActiveFileIdx(idx);
+  setWholeFileView(false);
   document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
   document.querySelector(`.file-item[data-idx="${idx}"]`)?.classList.add('active');
   if (files[idx]) window.location.hash = 'file=' + encodeURIComponent(files[idx].path);

@@ -63,6 +63,7 @@ export let activeItemId = 'diff';
 export let allCommits: Commit[] = [];
 export const selectedShas = new Set<string>();
 export const reviewedFiles = new Set<string>();
+export let wholeFileView = false;
 
 // Line ID tracking
 let lineIdCounter = 0;
@@ -95,3 +96,4 @@ export function setClaudeComments(c: ClaudeComment[]) { claudeComments = c; }
 export function setSessionItems(items: SessionItem[]) { sessionItems = items; }
 export function setActiveItemId(id: string) { activeItemId = id; }
 export function setAllCommits(c: Commit[]) { allCommits = c; }
+export function setWholeFileView(v: boolean) { wholeFileView = v; }

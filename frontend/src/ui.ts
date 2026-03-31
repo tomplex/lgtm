@@ -1,13 +1,14 @@
 import {
   files, activeFileIdx, comments, claudeComments, reviewedFiles,
   sessionItems, activeItemId, repoMeta, allCommits, selectedShas, appMode,
+  wholeFileView, setWholeFileView,
   setFiles, setActiveFileIdx, setRepoMeta, setClaudeComments,
   setSessionItems, setActiveItemId, setAllCommits, setAppMode,
   resetLineIds,
 } from './state';
 import { fetchItems, fetchItemData, fetchCommits, submitReview as apiSubmitReview } from './api';
 import { escapeHtml, showToast } from './utils';
-import { parseDiff, renderDiff, selectFile } from './diff';
+import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
 import { renderMarkdown, renderMarkdownComments } from './document';
 import { jumpToComment, formatAllComments } from './comments';
 
@@ -69,11 +70,35 @@ function toggleReviewed(path: string, e?: Event): void {
   renderFileList();
 }
 
+function matchesGlob(path: string, pattern: string): boolean {
+  // Convert simple glob to regex: * matches anything except /
+  const regex = new RegExp(
+    '^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*') + '$'
+  );
+  // Match against full path or just the basename
+  const basename = path.split('/').pop() || path;
+  return regex.test(path) || regex.test(basename);
+}
+
 export function filterFiles(query: string): void {
-  const q = query.toLowerCase();
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    document.querySelectorAll<HTMLElement>('.file-item').forEach(el => el.classList.remove('hidden'));
+    return;
+  }
+
+  const terms = q.split(/\s+/);
   document.querySelectorAll<HTMLElement>('.file-item').forEach(el => {
-    const path = el.querySelector('.filename')!.textContent!.toLowerCase();
-    el.classList.toggle('hidden', q !== '' && !path.includes(q));
+    const path = el.querySelector('.filename')!.textContent!.trim().toLowerCase();
+    const visible = terms.every(term => {
+      if (term.startsWith('!')) {
+        const neg = term.slice(1);
+        if (!neg) return true;
+        return neg.includes('*') ? !matchesGlob(path, neg) : !path.includes(neg);
+      }
+      return term.includes('*') ? matchesGlob(path, term) : path.includes(term);
+    });
+    el.classList.toggle('hidden', !visible);
   });
 }
 
@@ -121,7 +146,7 @@ export async function switchToItem(itemId: string): Promise<void> {
   if (data.mode === 'diff') {
     document.querySelector<HTMLElement>('.sidebar')!.style.display = '';
     document.getElementById('resize-handle')!.style.display = '';
-    document.querySelector('.keyboard-hint')!.innerHTML = 'Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment';
+    document.querySelector('.keyboard-hint')!.innerHTML = 'Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment';
 
     setRepoMeta(data.meta || {});
     setClaudeComments((data.claudeComments || []).map(c => ({ ...c, _item: 'diff' })));
@@ -312,6 +337,16 @@ export function setupKeyboardShortcuts(): void {
       if (allCommits.length > 0) toggleCommitPanel();
     } else if (e.key === 'e' && !e.metaKey && !e.ctrlKey) {
       if (files[activeFileIdx]) toggleReviewed(files[activeFileIdx].path);
+    } else if (e.key === 'w' && !e.metaKey && !e.ctrlKey) {
+      if (appMode === 'diff' && files[activeFileIdx]) {
+        if (wholeFileView) {
+          setWholeFileView(false);
+          renderDiff(activeFileIdx);
+        } else {
+          setWholeFileView(true);
+          showWholeFile(activeFileIdx);
+        }
+      }
     } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
       jumpToComment('next');
     } else if (e.key === 'p' && !e.metaKey && !e.ctrlKey) {
