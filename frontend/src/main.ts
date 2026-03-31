@@ -4,6 +4,8 @@ import './style.css';
 import { fetchItemData } from './api';
 import { applyHash } from './diff';
 import { escapeHtml } from './utils';
+import { activeItemId } from './state';
+import { showToast } from './utils';
 import {
   loadItems, switchToItem, refreshDiff, handleSubmitReview,
   toggleCommitPanel, setupKeyboardShortcuts, setupResizableSidebar, setupFileSearch,
@@ -40,6 +42,23 @@ window.addEventListener('hashchange', () => applyHash(window.location.hash));
 setupKeyboardShortcuts();
 setupResizableSidebar();
 setupFileSearch();
+
+// SSE — auto-reload on server events
+function connectSSE(): void {
+  const es = new EventSource('/events');
+  es.addEventListener('comments_changed', () => {
+    switchToItem(activeItemId);
+    showToast('New comments from Claude', 2000);
+  });
+  es.addEventListener('items_changed', () => {
+    loadItems().then(() => showToast('Review items updated', 2000));
+  });
+  es.onerror = () => {
+    es.close();
+    setTimeout(connectSSE, 5000);
+  };
+}
+connectSSE();
 
 // Go
 init();

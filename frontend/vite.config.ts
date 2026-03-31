@@ -24,6 +24,9 @@ export default defineConfig({
       '/comments': {
         target: `http://127.0.0.1:${process.env.REVIEW_PORT || 9870}`,
       },
+      '/events': {
+        target: `http://127.0.0.1:${process.env.REVIEW_PORT || 9870}`,
+      },
     },
   },
 });

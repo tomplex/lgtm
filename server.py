@@ -13,6 +13,7 @@ Usage:
 import argparse
 import http.server
 import json
+import queue
 import mimetypes
 import os
 import threading
@@ -48,6 +49,27 @@ class Session:
         self.items_lock = threading.Lock()
         self.claude_comments = {}
         self.claude_comments_lock = threading.Lock()
+        self._sse_clients: list[queue.Queue] = []
+        self._sse_lock = threading.Lock()
+
+    def add_sse_client(self) -> queue.Queue:
+        q: queue.Queue = queue.Queue()
+        with self._sse_lock:
+            self._sse_clients.append(q)
+        return q
+
+    def remove_sse_client(self, q: queue.Queue) -> None:
+        with self._sse_lock:
+            self._sse_clients = [c for c in self._sse_clients if c is not q]
+
+    def broadcast(self, event: str, data: dict) -> None:
+        msg = json.dumps(data)
+        with self._sse_lock:
+            for q in self._sse_clients:
+                try:
+                    q.put_nowait(f"event: {event}\ndata: {msg}\n\n")
+                except queue.Full:
+                    pass
 
 
 class ReviewHandler(http.server.BaseHTTPRequestHandler):
@@ -92,8 +114,34 @@ class ReviewHandler(http.server.BaseHTTPRequestHandler):
                 'commits': get_branch_commits(s.repo_path, s.base_branch)
             })
 
+        if path == '/events':
+            return self._serve_sse()
+
         # Try serving static files from dist/
         return self._serve_static(path)
+
+    def _serve_sse(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.end_headers()
+
+        q = self.session.add_sse_client()
+        try:
+            while True:
+                try:
+                    msg = q.get(timeout=30)
+                    self.wfile.write(msg.encode())
+                    self.wfile.flush()
+                except queue.Empty:
+                    # Send keepalive
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            self.session.remove_sse_client(q)
 
     def _serve_index(self):
         index = DIST_DIR / 'index.html'
@@ -182,6 +230,7 @@ class ReviewHandler(http.server.BaseHTTPRequestHandler):
 
             self._respond_json({'ok': True, 'id': item_id, 'items': s.items})
             print(f"ITEM_ADDED={item_id}", flush=True)
+            s.broadcast('items_changed', {'id': item_id})
 
         elif path == '/comments':
             item_id = data.get('item', 'diff')
@@ -192,6 +241,7 @@ class ReviewHandler(http.server.BaseHTTPRequestHandler):
                 s.claude_comments[item_id].extend(new_comments)
             self._respond_json({'ok': True, 'count': len(s.claude_comments.get(item_id, []))})
             print(f"CLAUDE_COMMENTS_ADDED={len(new_comments)} item={item_id}", flush=True)
+            s.broadcast('comments_changed', {'item': item_id, 'count': len(new_comments)})
 
         elif path == '/submit':
             with s.round_lock:
