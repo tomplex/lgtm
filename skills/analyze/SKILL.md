@@ -5,7 +5,7 @@ description: >
   phase, summary, and category, then produces an overview, review strategy, and
   thematic groupings. Use when the user asks to analyze a branch for review, or
   when code is mostly done and a review session is active.
-allowed-tools: "mcp__plugin_lgtm_lgtm__set_analysis,mcp__plugin_lgtm_lgtm__start,Agent,Bash(git:*)"
+allowed-tools: "mcp__lgtm__set_analysis,mcp__lgtm__start,Agent,Bash(git:*)"
 ---
 
 # Analyze Skill

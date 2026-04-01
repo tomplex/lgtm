@@ -4,7 +4,7 @@ description: >
   Use when the user asks to register a project for review, start a code review,
   open LGTM, analyze changes, or mentions LGTM. Also use when you want to offer
   the user a review of completed work.
-allowed-tools: "mcp__plugin_lgtm_lgtm__start,mcp__plugin_lgtm_lgtm__add_document,mcp__plugin_lgtm_lgtm__comment,mcp__plugin_lgtm_lgtm__read_feedback,mcp__plugin_lgtm_lgtm__stop,Skill(lgtm:analyze)"
+allowed-tools: "mcp__lgtm__start,mcp__lgtm__add_document,mcp__lgtm__comment,mcp__lgtm__read_feedback,mcp__lgtm__stop,Skill(lgtm:analyze)"
 ---
 
 # LGTM
