@@ -97,11 +97,20 @@ export function renderFileList(): void {
     el.appendChild(div);
   });
 
-  document.getElementById('stats')!.innerHTML = `
-    ${files.length} file${files.length !== 1 ? 's' : ''} &middot;
-    <span class="add">+${totalAdd}</span> <span class="del">-${totalDel}</span>
-    ${Object.keys(comments).length > 0 ? ` &middot; ${Object.keys(comments).length} comment${Object.keys(comments).length !== 1 ? 's' : ''}` : ''}
-  `;
+  const reviewedCount = displayFiles.filter(f => reviewedFiles.has(f.path)).length;
+  const remainingLines = displayFiles.filter(f => !reviewedFiles.has(f.path)).reduce((sum, f) => sum + f.additions, 0);
+  const commentCount = Object.keys(comments).filter(k => !k.startsWith('claude:')).length;
+
+  let statsHtml = `${files.length} file${files.length !== 1 ? 's' : ''} &middot; <span class="add">+${totalAdd}</span> <span class="del">-${totalDel}</span>`;
+  if (reviewedCount === files.length && files.length > 0) {
+    statsHtml += ` &middot; All files reviewed`;
+  } else if (remainingLines > 0) {
+    statsHtml += ` &middot; ${remainingLines} line${remainingLines !== 1 ? 's' : ''} to review`;
+  }
+  if (commentCount > 0) {
+    statsHtml += ` &middot; ${commentCount} comment${commentCount !== 1 ? 's' : ''}`;
+  }
+  document.getElementById('stats')!.innerHTML = statsHtml;
 
   const q = (document.getElementById('file-search') as HTMLInputElement).value;
   if (q) filterFiles(q);

@@ -532,8 +532,8 @@ kbd {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 20px;
-  font-size: 13px;
+  padding: 10px 20px;
+  font-size: 14px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.1s;
@@ -575,20 +575,22 @@ kbd {
 
 .commit-actions {
   display: flex;
-  gap: 12px;
-  padding: 6px 20px;
+  gap: 16px;
+  padding: 8px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-tertiary);
-  font-size: 12px;
+  font-size: 13px;
   flex-shrink: 0;
 }
 .commit-actions a {
   color: var(--accent);
   cursor: pointer;
   text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 .commit-actions a:hover {
-  text-decoration: underline;
+  background: var(--hover);
 }
 
 /* --- Tab bar --- */
@@ -604,8 +606,8 @@ kbd {
 }
 
 .tab-item {
-  padding: 8px 16px;
-  font-size: 13px;
+  padding: 10px 20px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;

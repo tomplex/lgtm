@@ -429,6 +429,17 @@ function handleDiffContainerClick(e: Event): void {
     return;
   }
 
+  // Line content click -> toggle comment (larger click target)
+  const lineContentEl = target.closest<HTMLElement>('.line-content');
+  if (lineContentEl) {
+    const row = lineContentEl.closest<HTMLElement>('tr[id^="line-"]');
+    if (row) {
+      const lineId = row.id.replace('line-', '');
+      toggleComment(lineId);
+      return;
+    }
+  }
+
   // Saved comment click -> edit
   const editEl = target.closest<HTMLElement>('[data-edit-comment]');
   if (editEl) {

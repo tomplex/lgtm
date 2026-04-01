@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Code Review</title>
-  <script type="module" crossorigin src="/assets/index-BP5WQp9m.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CSkEEDkI.css">
+  <script type="module" crossorigin src="/assets/index-DTGZPTjJ.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Ck20BR8a.css">
 </head>
 <body>
 <header>
@@ -23,10 +23,24 @@
 <div class="meta-bar" id="meta-bar" style="display:none"></div>
 <div class="commit-panel" id="commit-panel"></div>
 <div class="description-banner" id="description-banner" style="display:none"></div>
+<div class="overview-banner" id="overview-banner" style="display:none">
+  <div class="overview-content">
+    <div class="overview-text" id="overview-text"></div>
+    <div class="overview-strategy" id="overview-strategy"></div>
+  </div>
+  <button class="overview-toggle" id="overview-toggle" title="Toggle overview">&#9650;</button>
+</div>
 <div class="main">
   <div class="sidebar">
-    <div class="sidebar-search">
-      <input type="text" id="file-search" placeholder="Filter files... (f)" autocomplete="off">
+    <div class="sidebar-controls">
+      <div class="view-toggle" id="view-toggle" style="display:none">
+        <button class="view-btn active" data-view="flat">Flat</button>
+        <button class="view-btn" data-view="grouped">Grouped</button>
+        <button class="view-btn" data-view="phased">Phased</button>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="file-search" placeholder="Filter files... (f)" autocomplete="off">
+      </div>
     </div>
     <div class="file-list" id="file-list"></div>
   </div>
