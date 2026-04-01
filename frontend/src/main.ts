@@ -1,10 +1,10 @@
 import 'highlight.js/styles/github-dark.css';
 import './style.css';
 
-import { fetchItemData } from './api';
+import { fetchItemData, fetchAnalysis } from './api';
 import { applyHash } from './diff';
 import { escapeHtml } from './utils';
-import { activeItemId } from './state';
+import { activeItemId, setAnalysis } from './state';
 import { showToast } from './utils';
 import { loadState } from './persistence';
 import {
@@ -16,12 +16,16 @@ import {
   setupKeyboardShortcuts,
   setupResizableSidebar,
   setupFileSearch,
+  setupViewToggle,
 } from './ui';
 
 async function init(): Promise<void> {
   loadState();
   try {
     await loadItems();
+
+    const analysisData = await fetchAnalysis();
+    if (analysisData) setAnalysis(analysisData);
 
     // Set page title from first load
     const data = await fetchItemData('diff');
@@ -51,6 +55,7 @@ window.addEventListener('hashchange', () => applyHash(window.location.hash));
 setupKeyboardShortcuts();
 setupResizableSidebar();
 setupFileSearch();
+setupViewToggle();
 
 // SSE — auto-reload on server events
 function connectSSE(): void {
