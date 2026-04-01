@@ -29,10 +29,13 @@ async function init(): Promise<void> {
 
     // Set page title from first load
     const data = await fetchItemData('diff');
-    if (data.mode === 'diff') {
-      const branch = data.meta?.branch || 'Review';
-      document.title = `Review: ${branch}`;
-      document.querySelector('h1')!.textContent = `Review: ${branch}`;
+    if (data.mode === 'diff' && data.meta) {
+      const repo = data.meta.repoName || 'Review';
+      const branch = data.meta.branch || '';
+      const base = data.meta.baseBranch || 'main';
+      document.title = `${repo} — ${branch}`;
+      const h1 = document.querySelector('h1')!;
+      h1.innerHTML = `<strong>${escapeHtml(repo)}</strong> <span class="header-branch">${escapeHtml(branch)} → ${escapeHtml(base)}</span>`;
     }
 
     // Load the default item (diff)

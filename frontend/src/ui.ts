@@ -115,6 +115,8 @@ function setupFileView(data: { content: string; claudeComments?: any[]; [key: st
   document.getElementById('resize-handle')!.style.display = 'none';
   document.getElementById('meta-bar')!.style.display = 'none';
   document.getElementById('description-banner')!.style.display = 'none';
+  document.getElementById('overview-banner')!.style.display = 'none';
+  document.getElementById('commit-panel')!.style.display = 'none';
   document.querySelector('.keyboard-hint')!.innerHTML =
     'Click any block to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Esc</kbd> cancel';
 
@@ -183,6 +185,7 @@ export async function handleSubmitReview(): Promise<void> {
     showToast(`Review round ${result.round} submitted!`, 3000);
     for (const key of Object.keys(comments)) delete comments[key];
     clearPersistedState();
+    document.getElementById('description-banner')!.style.display = 'none';
     if (appMode === 'file') {
       renderMarkdownComments();
     } else {
@@ -199,15 +202,23 @@ export async function handleSubmitReview(): Promise<void> {
 
 // --- Keyboard shortcuts ---
 
+function getAdjacentFileIdx(direction: 'next' | 'prev'): number | null {
+  const items = Array.from(document.querySelectorAll<HTMLElement>('.file-item:not(.hidden)'));
+  const currentPos = items.findIndex(el => parseInt(el.dataset.idx!) === activeFileIdx);
+  const targetPos = direction === 'next' ? currentPos + 1 : currentPos - 1;
+  if (targetPos < 0 || targetPos >= items.length) return null;
+  return parseInt(items[targetPos].dataset.idx!);
+}
+
 export function setupKeyboardShortcuts(): void {
   document.addEventListener('keydown', (e) => {
     if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
     if (e.key === 'j' || e.key === 'ArrowDown') {
-      const next = activeFileIdx + 1;
-      if (next < files.length) selectFile(next);
+      const nextIdx = getAdjacentFileIdx('next');
+      if (nextIdx !== null) selectFile(nextIdx);
     } else if (e.key === 'k' || e.key === 'ArrowUp') {
-      const prev = activeFileIdx - 1;
-      if (prev >= 0) selectFile(prev);
+      const prevIdx = getAdjacentFileIdx('prev');
+      if (prevIdx !== null) selectFile(prevIdx);
     } else if (e.key === 'r' && !e.metaKey && !e.ctrlKey) {
       refreshDiff();
     } else if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {

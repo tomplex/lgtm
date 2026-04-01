@@ -53,6 +53,13 @@ header h1 {
   white-space: nowrap;
 }
 
+.header-branch {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-left: 6px;
+}
+
 header .stats {
   font-size: 13px;
   color: var(--text-muted);
