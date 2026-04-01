@@ -5,7 +5,7 @@ description: >
   phase, summary, and category, then produces an overview, review strategy, and
   thematic groupings. Use when the user asks to analyze a branch for review, or
   when code is mostly done and a review session is active.
-allowed-tools: "mcp__lgtm__review_set_analysis_from_files,mcp__lgtm__review_status,Agent,Bash(git:*)"
+allowed-tools: "mcp__lgtm__set_analysis,mcp__lgtm__status,Agent,Bash(git:*)"
 ---
 
 # Analyze Skill
@@ -16,7 +16,7 @@ parses and submits the analysis.
 
 ## Prerequisites
 
-An LGTM review session must be active for the repo. Check with `review_status`
+An LGTM review session must be active for the repo. Check with `status`
 if unsure. If no session exists, tell the user to start one first (or start one
 yourself with the review skill).
 
@@ -57,7 +57,7 @@ The agent reads the file analysis, then writes a markdown file with overview, st
 
 ### Step 3: Submit
 
-Call `review_set_analysis_from_files` with:
+Call `set_analysis` with:
 - `repoPath`: the repo path
 - `fileAnalysisPath`: `/tmp/lgtm-analysis-files.md`
 - `synthesisPath`: `/tmp/lgtm-analysis-synthesis.md`

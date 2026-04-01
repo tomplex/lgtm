@@ -12,7 +12,7 @@ type McpTextResult = { content: [{ type: 'text'; text: string }] };
 function requireProject(manager: SessionManager, repoPath: string): { found: ReturnType<SessionManager['findByRepoPath']> & object } | { error: McpTextResult } {
   const found = manager.findByRepoPath(repoPath);
   if (!found) {
-    return { error: { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] } };
+    return { error: { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call start first.' }) }] } };
   }
   return { found };
 }
@@ -24,7 +24,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   });
 
   server.tool(
-    'review_start',
+    'start',
     'Register a project for code review and get the browser URL',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
@@ -40,7 +40,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
-    'review_add_document',
+    'add_document',
     'Add a document tab to a review session',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
@@ -60,7 +60,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
-    'review_comment',
+    'comment',
     'Add Claude comments to a review item (diff or document)',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
@@ -84,7 +84,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
-    'review_status',
+    'status',
     'List all registered review projects and their feedback status',
     {},
     async () => {
@@ -109,7 +109,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
-    'review_read_feedback',
+    'read_feedback',
     'Read the submitted review feedback for a project',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
@@ -129,7 +129,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
-    'review_stop',
+    'stop',
     'Deregister a project and stop its review session',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
@@ -144,37 +144,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
-    'review_set_analysis',
-    'Set analysis data for a project (file priorities, review strategy, groupings)',
-    {
-      repoPath: z.string().describe('Absolute path to the git repository'),
-      analysis: z.object({
-        overview: z.string().describe('Brief overview of the changes'),
-        reviewStrategy: z.string().describe('Suggested review approach'),
-        files: z.record(z.string(), z.object({
-          priority: z.enum(['critical', 'important', 'normal', 'low']),
-          phase: z.enum(['review', 'skim', 'rubber-stamp']),
-          summary: z.string(),
-          category: z.string(),
-        })).describe('Per-file analysis keyed by file path'),
-        groups: z.array(z.object({
-          name: z.string(),
-          description: z.string().optional(),
-          files: z.array(z.string()),
-        })).describe('Logical file groupings'),
-      }).describe('The analysis data'),
-    },
-    async ({ repoPath, analysis }) => {
-      const lookup = requireProject(manager, repoPath);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
-      found.session.setAnalysis(analysis);
-      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }] };
-    },
-  );
-
-  server.tool(
-    'review_set_analysis_from_files',
+    'set_analysis',
     'Parse file-analysis and synthesis markdown files into structured analysis data and set on the session',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
