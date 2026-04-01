@@ -1,0 +1,26 @@
+{
+  "name": "lgtm",
+  "version": "0.1.0",
+  "description": "Web-based review UI for collaborating with Claude Code",
+  "type": "module",
+  "scripts": {
+    "build:server": "tsc -p server/tsconfig.json",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "npm run build:server && npm run build:frontend",
+    "dev": "tsx server/server.ts",
+    "start": "node dist/server/server.js"
+  },
+  "bin": {
+    "lgtm": "dist/server/server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
