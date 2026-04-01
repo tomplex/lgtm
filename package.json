@@ -7,7 +7,7 @@
     "build:server": "tsc -p server/tsconfig.json",
     "build:frontend": "cd frontend && npm run build",
     "build": "npm run build:server && npm run build:frontend",
-    "dev": "tsx --watch --ignore .git server/server.ts",
+    "dev": "tsx watch --exclude .git server/server.ts",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:all": "concurrently -n server,frontend -c blue,green \"npm run dev -- --repo . --port 9900\" \"cd frontend && REVIEW_PORT=9900 npm run dev\"",
     "start": "node dist/server/server.js",
