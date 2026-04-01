@@ -1,5 +1,5 @@
 ---
-name: file-analyzer
+name: file-classifier
 description: Analyze a code diff and classify every file by priority, phase, summary, and category. Use when generating LGTM analysis for a review session.
 model: sonnet
 allowed-tools: "Bash(git:*),Read,Write"

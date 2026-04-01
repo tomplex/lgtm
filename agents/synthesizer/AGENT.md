@@ -1,6 +1,6 @@
 ---
-name: synthesis
-description: Synthesize per-file analysis into an overview, review strategy, and thematic file groupings. Use after file-analyzer has produced per-file classifications.
+name: synthesizer
+description: Synthesize per-file analysis into an overview, review strategy, and thematic file groupings. Use after file-classifier has produced per-file classifications.
 model: sonnet
 allowed-tools: "Read,Write"
 ---
