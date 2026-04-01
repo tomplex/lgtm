@@ -12,7 +12,7 @@ import {
 } from './state';
 import { fetchContext, fetchFile } from './api';
 import { renderClaudeCommentHtml, handleClaudeCommentAction } from './claude-comments';
-import { escapeHtml, detectLang, highlightLine, showToast } from './utils';
+import { escapeHtml, detectLang, highlightLine, showToast, renderMd } from './utils';
 import { toggleComment, editComment } from './comments';
 import { renderFileList } from './ui';
 
@@ -197,7 +197,7 @@ function renderDiffLineHtml(
       <td colspan="3">
         <div class="comment-box">
           <div class="saved-comment" data-edit-comment="${lineId}">
-            <span class="comment-text">${escapeHtml(comments[lineKey])}</span>
+            <span class="comment-text">${renderMd(comments[lineKey])}</span>
             <span class="inline-actions">
               <a>edit</a>
               <a class="del-action" data-delete-comment="${lineId}">delete</a>

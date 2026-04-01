@@ -1,4 +1,26 @@
 import hljs from 'highlight.js';
+import { Marked } from 'marked';
+
+const marked = new Marked({
+  renderer: {
+    code(this: unknown, ...args: unknown[]) {
+      const token = (typeof args[0] === 'object' ? args[0] : { text: args[0], lang: args[1] }) as {
+        text: string;
+        lang?: string;
+      };
+      const highlighted =
+        token.lang && hljs.getLanguage(token.lang)
+          ? hljs.highlight(token.text, { language: token.lang, ignoreIllegals: true }).value
+          : hljs.highlightAuto(token.text).value;
+      return `<pre><code class="hljs">${highlighted}</code></pre>`;
+    },
+  },
+});
+
+/** Render a markdown string to HTML. Used for comment text. */
+export function renderMd(text: string): string {
+  return marked.parse(text) as string;
+}
 
 const EXT_TO_LANG: Record<string, string> = {
   js: 'javascript',

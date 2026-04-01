@@ -422,7 +422,6 @@ tr.comment-row td {
   border-radius: 4px;
   font-size: 13px;
   line-height: 1.4;
-  white-space: pre-wrap;
   cursor: pointer;
   position: relative;
   display: flex;
@@ -460,6 +459,59 @@ tr.comment-row td {
 .saved-comment .inline-actions a.del-action:hover {
   color: var(--del-text);
   background: var(--del-line-bg);
+}
+
+/* Markdown inside comments */
+.comment-text p,
+.claude-text p,
+.reply-text p {
+  margin: 0;
+}
+.comment-text p + p,
+.claude-text p + p,
+.reply-text p + p {
+  margin-top: 6px;
+}
+.comment-text code,
+.claude-text code,
+.reply-text code {
+  background: var(--bg-tertiary);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.comment-text pre,
+.claude-text pre,
+.reply-text pre {
+  margin: 6px 0;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.comment-text pre code,
+.claude-text pre code,
+.reply-text pre code {
+  background: none;
+  padding: 0;
+}
+.comment-text ul,
+.comment-text ol,
+.claude-text ul,
+.claude-text ol,
+.reply-text ul,
+.reply-text ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+.comment-text blockquote,
+.claude-text blockquote,
+.reply-text blockquote {
+  margin: 4px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  color: var(--text-muted);
 }
 
 .empty-state {
@@ -696,7 +748,6 @@ kbd {
 }
 .claude-comment .claude-text {
   flex: 1;
-  white-space: pre-wrap;
 }
 .claude-comment .inline-actions {
   display: flex;
@@ -761,7 +812,6 @@ tr.claude-comment-row td {
 }
 .claude-reply .reply-text {
   flex: 1;
-  white-space: pre-wrap;
 }
 .claude-reply .inline-actions a {
   font-size: 11px;

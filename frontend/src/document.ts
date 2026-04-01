@@ -1,5 +1,3 @@
-import { Marked } from 'marked';
-import hljs from 'highlight.js';
 import {
   comments,
   claudeComments,
@@ -8,26 +6,9 @@ import {
   setMdMeta,
   type MdMeta,
 } from './state';
-import { escapeHtml } from './utils';
+import { escapeHtml, renderMd } from './utils';
 import { saveState } from './persistence';
 import { renderClaudeCommentHtml, handleClaudeCommentAction } from './claude-comments';
-
-const marked = new Marked({
-  renderer: {
-    // marked v12 passes { text, lang } at runtime but types expect positional args
-    code(this: unknown, ...args: unknown[]) {
-      const token = (typeof args[0] === 'object' ? args[0] : { text: args[0], lang: args[1] }) as {
-        text: string;
-        lang?: string;
-      };
-      const highlighted =
-        token.lang && hljs.getLanguage(token.lang)
-          ? hljs.highlight(token.text, { language: token.lang, ignoreIllegals: true }).value
-          : hljs.highlightAuto(token.text).value;
-      return `<pre><code class="hljs">${highlighted}</code></pre>`;
-    },
-  },
-});
 
 function mdKey(blockIdx: number): string {
   return activeItemId === 'diff' ? `md::${blockIdx}` : `doc:${activeItemId}:${blockIdx}`;
@@ -46,7 +27,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   setMdMeta(data);
   const container = document.getElementById('diff-container')!;
 
-  const rawHtml = marked.parse(data.content) as string;
+  const rawHtml = renderMd(data.content);
   const temp = document.createElement('div');
   temp.innerHTML = rawHtml;
 
@@ -74,7 +55,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
       html += `<div class="md-comment" id="${mdCommentId(blockIdx)}">
         <div class="comment-box">
           <div class="saved-comment" data-edit-md-comment="${blockIdx}">
-            <span class="comment-text">${escapeHtml(comments[key])}</span>
+            <span class="comment-text">${renderMd(comments[key])}</span>
             <span class="inline-actions">
               <a>edit</a>
               <a class="del-action" data-delete-md-comment="${blockIdx}">delete</a>
@@ -141,7 +122,7 @@ export function renderMarkdownComments(): void {
       div.innerHTML = `
         <div class="comment-box">
           <div class="saved-comment" data-edit-md-comment="${idx}">
-            <span class="comment-text">${escapeHtml(comments[key])}</span>
+            <span class="comment-text">${renderMd(comments[key])}</span>
             <span class="inline-actions">
               <a>edit</a>
               <a class="del-action" data-delete-md-comment="${idx}">delete</a>

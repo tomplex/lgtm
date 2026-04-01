@@ -1,5 +1,5 @@
 import { comments, claudeComments, resolvedComments, setClaudeComments } from './state';
-import { escapeHtml } from './utils';
+import { escapeHtml, renderMd } from './utils';
 import { deleteClaudeComment } from './api';
 import { saveState } from './persistence';
 
@@ -15,7 +15,7 @@ export function renderClaudeCommentHtml(
 
   let inner = `<div class="claude-header">
       <span class="claude-label">Claude</span>
-      <span class="claude-text">${escapeHtml(cc.comment)}</span>`;
+      <span class="claude-text">${renderMd(cc.comment)}</span>`;
 
   if (isResolved) {
     inner += `<span class="resolve-badge">Resolved</span>
@@ -32,7 +32,7 @@ export function renderClaudeCommentHtml(
   if (replyText) {
     inner += `<div class="claude-reply" data-edit-reply="${ccIdx}">
       <span class="reply-label">You</span>
-      <span class="reply-text">${escapeHtml(replyText)}</span>
+      <span class="reply-text">${renderMd(replyText)}</span>
       <span class="inline-actions">
         <a>edit</a>
         <a class="del-action" data-delete-reply="${ccIdx}">delete</a>
