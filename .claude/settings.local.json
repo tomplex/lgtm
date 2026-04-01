@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const {version} = require\\(''marked/package.json''\\); console.log\\(version\\)\")",
+      "Bash(lsof -ti:9847)",
+      "Bash(lsof -ti:9848)",
+      "Bash(xargs kill:*)",
+      "Bash(uv run:*)",
+      "Bash(uv sync:*)",
+      "Bash(kill:*)",
+      "mcp__private-journal__process_thoughts",
+      "Bash(uv tool:*)",
+      "Bash(uv pip:*)",
+      "Bash(npx eslint:*)",
+      "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/scripts/start-server.sh --project-dir /Users/tom/dev/claude-review)",
+      "Bash(bash /Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh --project-dir /Users/tom/dev/claude-review)",
+      "Bash(ty check:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npx vitest:*)",
+      "Bash(bash /Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/stop-server.sh /Users/tom/dev/claude-review/.superpowers/brainstorm/76731-1775003284)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(/Users/tom/dev/claude-review/.venv/bin/pytest tests/test_session.py -v -k \"analysis\" 2>&1)",
+      "Bash(/Users/tom/dev/claude-review/.venv/bin/pytest tests/ -v 2>&1)",
+      "Bash(ps:*)",
+      "Bash(npx tsx:*)",
+      "Bash(node -e \"console.log\\(typeof import.meta\\)\")",
+      "Bash(node -e \"const e = require\\(''./node_modules/express/package.json''\\); console.log\\(e.version\\)\")",
+      "WebFetch(domain:ts.sdk.modelcontextprotocol.io)",
+      "Bash(/tmp/lgtm-analysis-synthesis.md:*)",
+      "Skill(lgtm:analyze)",
+      "Skill(lgtm:lgtm)",
+      "mcp__lgtm__start",
+      "mcp__lgtm__comment",
+      "mcp__lgtm__add_document",
+      "mcp__lgtm__read_feedback",
+      "mcp__lgtm__set_analysis",
+      "mcp__lgtm__stop",
+      "Bash(chmod:*)",
+      "Bash(node:*)"
+    ]
+  }
+}
