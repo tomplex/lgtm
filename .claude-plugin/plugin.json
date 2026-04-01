@@ -1,7 +1,7 @@
 {
   "name": "lgtm",
   "description": "Web-based code review UI with AI-powered analysis for collaborative code review sessions",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": { "name": "Tom" },
   "keywords": ["review", "diff", "mcp", "analysis"]
 }
