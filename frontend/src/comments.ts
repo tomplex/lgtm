@@ -172,9 +172,9 @@ function formatClaudeInteractions(): string {
 
   for (const cc of claudeComments) {
     if (cc.file == null || cc._item !== 'diff') continue;
-    const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-    const reply = comments[ccKey];
-    const resolved = resolvedComments.has(ccKey);
+    const key = `claude:${cc.id}`;
+    const reply = comments[key];
+    const resolved = resolvedComments.has(key);
 
     if (!reply && !resolved) continue;
 
@@ -212,9 +212,9 @@ function formatDocClaudeInteractions(): string {
     const interactions: { block: number; comment: string; reply?: string; resolved: boolean }[] = [];
 
     for (const cc of itemComments) {
-      const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-      const reply = comments[ccKey];
-      const resolved = resolvedComments.has(ccKey);
+      const key = `claude:${cc.id}`;
+      const reply = comments[key];
+      const resolved = resolvedComments.has(key);
       if (!reply && !resolved) continue;
       interactions.push({ block: cc.block ?? 0, comment: cc.comment, reply, resolved });
     }

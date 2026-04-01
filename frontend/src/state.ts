@@ -20,13 +20,13 @@ export interface SessionItem {
 }
 
 export interface ClaudeComment {
+  id: string;
   file?: string;
   line?: number;
   side?: 'new' | 'old';
   block?: number;
   comment: string;
   _item: string;
-  _serverIndex: number;
 }
 
 export interface RepoMeta {
@@ -79,7 +79,7 @@ export let files: DiffFile[] = [];
 // Key format conventions for the comments record:
 //   "filepath::lineIdx"          — diff line comment (user note on a specific line)
 //   "doc:itemId:blockIdx"        — document block comment
-//   "claude:itemId:serverIndex"  — Claude reply text for a review comment
+//   "claude:commentId"           — Claude reply text for a review comment
 //   "md::blockIdx"               — markdown block comment
 export const comments: Record<string, string> = {};
 export let activeFileIdx = 0;

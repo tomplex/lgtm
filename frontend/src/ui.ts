@@ -206,7 +206,7 @@ function setupDiffView(data: { diff: string; description: string; meta: any; cla
     'Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment';
 
   setRepoMeta(data.meta || {});
-  setClaudeComments((data.claudeComments || []).map((c, i) => ({ ...c, _item: 'diff', _serverIndex: i })));
+  setClaudeComments((data.claudeComments || []).map(c => ({ ...c, _item: 'diff' })));
   setAppMode('diff');
 
   if (data.description) {
@@ -236,7 +236,7 @@ function setupFileView(data: { content: string; claudeComments?: any[]; [key: st
   document.querySelector('.keyboard-hint')!.innerHTML =
     'Click any block to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Esc</kbd> cancel';
 
-  setClaudeComments((data.claudeComments || []).map((c, i) => ({ ...c, _item: activeItemId, _serverIndex: i })));
+  setClaudeComments((data.claudeComments || []).map(c => ({ ...c, _item: activeItemId })));
   setAppMode('file');
   renderMarkdown(data);
 }

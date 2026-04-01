@@ -271,9 +271,9 @@ export function createApp(manager: SessionManager): express.Express {
   projectRouter.delete('/comments', (req, res) => {
     const session = res.locals.session;
     const itemId = req.query.item as string | undefined;
-    const index = req.query.index as string | undefined;
-    if (itemId && index) {
-      session.deleteComment(itemId, parseInt(index));
+    const commentId = req.query.id as string | undefined;
+    if (itemId && commentId) {
+      session.deleteComment(itemId, commentId);
     } else if (itemId) {
       session.clearComments(itemId);
     } else {

@@ -3,39 +3,48 @@ import { escapeHtml, renderMd } from './utils';
 import { deleteClaudeComment } from './api';
 import { saveState } from './persistence';
 
+// --- Helpers ---
+
+function ccKey(cc: { id: string }): string {
+  return `claude:${cc.id}`;
+}
+
+function findById(id: string) {
+  return claudeComments.find(c => c.id === id);
+}
+
 // --- Rendering ---
 
 export function renderClaudeCommentHtml(
-  cc: { comment: string; _item: string; _serverIndex: number },
-  ccIdx: number,
+  cc: { id: string; comment: string; _item: string },
 ): string {
-  const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-  const isResolved = resolvedComments.has(ccKey);
-  const replyText = comments[ccKey];
+  const key = ccKey(cc);
+  const isResolved = resolvedComments.has(key);
+  const replyText = comments[key];
 
   let inner = `<div class="claude-header">
       <span class="claude-label">Claude</span>`;
 
   if (isResolved) {
     inner += `<span class="resolve-badge">Resolved</span>
-      <span class="inline-actions"><a data-unresolve-claude="${ccIdx}">unresolve</a></span>`;
+      <span class="inline-actions"><a data-unresolve-claude="${cc.id}">unresolve</a></span>`;
   } else {
     inner += `<span class="inline-actions">
-        <a data-reply-claude="${ccIdx}">reply</a>
-        <a data-resolve-claude="${ccIdx}">resolve</a>
-        <a data-dismiss-claude="${ccIdx}">dismiss</a>
+        <a data-reply-claude="${cc.id}">reply</a>
+        <a data-resolve-claude="${cc.id}">resolve</a>
+        <a data-dismiss-claude="${cc.id}">dismiss</a>
       </span>`;
   }
   inner += `</div>`;
   inner += `<div class="claude-text">${renderMd(cc.comment)}</div>`;
 
   if (replyText) {
-    inner += `<div class="claude-reply" data-edit-reply="${ccIdx}">
+    inner += `<div class="claude-reply" data-edit-reply="${cc.id}">
       <div class="claude-reply-header">
         <span class="reply-label">You</span>
         <span class="inline-actions">
           <a>edit</a>
-          <a class="del-action" data-delete-reply="${ccIdx}">delete</a>
+          <a class="del-action" data-delete-reply="${cc.id}">delete</a>
         </span>
       </div>
       <div class="reply-text">${renderMd(replyText)}</div>
@@ -51,11 +60,10 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
   // Dismiss
   const dismissEl = target.closest<HTMLElement>('[data-dismiss-claude]');
   if (dismissEl) {
-    const idx = parseInt(dismissEl.dataset.dismissClaude!);
-    const cc = claudeComments[idx];
+    const cc = findById(dismissEl.dataset.dismissClaude!);
     if (cc) {
-      deleteClaudeComment(cc._item, cc._serverIndex);
-      setClaudeComments(claudeComments.filter((_, i) => i !== idx));
+      deleteClaudeComment(cc._item, cc.id);
+      setClaudeComments(claudeComments.filter(c => c.id !== cc.id));
       rerender();
     }
     return true;
@@ -64,10 +72,9 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
   // Resolve
   const resolveEl = target.closest<HTMLElement>('[data-resolve-claude]');
   if (resolveEl) {
-    const idx = parseInt(resolveEl.dataset.resolveClaude!);
-    const cc = claudeComments[idx];
+    const cc = findById(resolveEl.dataset.resolveClaude!);
     if (cc) {
-      resolvedComments.add(`claude:${cc._item}:${cc._serverIndex}`);
+      resolvedComments.add(ccKey(cc));
       saveState();
       rerender();
     }
@@ -77,10 +84,9 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
   // Unresolve
   const unresolveEl = target.closest<HTMLElement>('[data-unresolve-claude]');
   if (unresolveEl) {
-    const idx = parseInt(unresolveEl.dataset.unresolveClaude!);
-    const cc = claudeComments[idx];
+    const cc = findById(unresolveEl.dataset.unresolveClaude!);
     if (cc) {
-      resolvedComments.delete(`claude:${cc._item}:${cc._serverIndex}`);
+      resolvedComments.delete(ccKey(cc));
       saveState();
       rerender();
     }
@@ -90,28 +96,25 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
   // Reply
   const replyEl = target.closest<HTMLElement>('[data-reply-claude]');
   if (replyEl) {
-    const idx = parseInt(replyEl.dataset.replyClaude!);
-    const cc = claudeComments[idx];
-    if (cc) openReplyTextarea(idx, cc, rerender);
+    const cc = findById(replyEl.dataset.replyClaude!);
+    if (cc) openReplyTextarea(cc, rerender);
     return true;
   }
 
   // Edit reply
   const editReplyEl = target.closest<HTMLElement>('[data-edit-reply]');
   if (editReplyEl) {
-    const idx = parseInt(editReplyEl.dataset.editReply!);
-    const cc = claudeComments[idx];
-    if (cc) openReplyTextarea(idx, cc, rerender);
+    const cc = findById(editReplyEl.dataset.editReply!);
+    if (cc) openReplyTextarea(cc, rerender);
     return true;
   }
 
   // Delete reply
   const deleteReplyEl = target.closest<HTMLElement>('[data-delete-reply]');
   if (deleteReplyEl) {
-    const idx = parseInt(deleteReplyEl.dataset.deleteReply!);
-    const cc = claudeComments[idx];
+    const cc = findById(deleteReplyEl.dataset.deleteReply!);
     if (cc) {
-      delete comments[`claude:${cc._item}:${cc._serverIndex}`];
+      delete comments[ccKey(cc)];
       saveState();
       rerender();
     }
@@ -124,15 +127,14 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
 // --- Reply textarea ---
 
 function openReplyTextarea(
-  ccIdx: number,
-  cc: { _item: string; _serverIndex: number },
+  cc: { id: string; _item: string },
   rerender: () => void,
 ): void {
-  const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-  const existing = comments[ccKey] || '';
+  const key = ccKey(cc);
+  const existing = comments[key] || '';
 
   const commentEl = document
-    .querySelector(`[data-reply-claude="${ccIdx}"], [data-edit-reply="${ccIdx}"]`)
+    .querySelector(`[data-reply-claude="${cc.id}"], [data-edit-reply="${cc.id}"]`)
     ?.closest('.claude-comment');
   if (!commentEl) return;
 
@@ -158,8 +160,8 @@ function openReplyTextarea(
 
   const save = () => {
     const trimmed = textarea.value.trim();
-    if (trimmed) comments[ccKey] = trimmed;
-    else delete comments[ccKey];
+    if (trimmed) comments[key] = trimmed;
+    else delete comments[key];
     saveState();
     rerender();
   };

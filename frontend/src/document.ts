@@ -41,10 +41,9 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
     const claudeForBlock = claudeComments.filter((c) => c.block === blockIdx);
     let claudeHtml = '';
     for (const cc of claudeForBlock) {
-      const ccIdx = claudeComments.indexOf(cc);
       claudeHtml += `<div class="md-comment" style="margin:4px 0">
         <div class="comment-box" style="max-width:100%">
-          ${renderClaudeCommentHtml(cc, ccIdx)}
+          ${renderClaudeCommentHtml(cc)}
         </div>
       </div>`;
     }

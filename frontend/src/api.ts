@@ -122,8 +122,8 @@ export async function submitReview(
   return checkedJson<{ ok: boolean; round: number }>(resp);
 }
 
-export async function deleteClaudeComment(itemId: string, index: number): Promise<void> {
-  const resp = await fetch(`${baseUrl()}/comments?item=${encodeURIComponent(itemId)}&index=${index}`, { method: 'DELETE' });
+export async function deleteClaudeComment(itemId: string, commentId: string): Promise<void> {
+  const resp = await fetch(`${baseUrl()}/comments?item=${encodeURIComponent(itemId)}&id=${encodeURIComponent(commentId)}`, { method: 'DELETE' });
   await checkedJson<{ ok: boolean }>(resp);
 }
 

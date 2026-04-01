@@ -181,11 +181,10 @@ function renderDiffLineHtml(
     return side === 'new' ? c.line === line.newLine : c.line === line.oldLine;
   });
   for (const cc of claudeForLine) {
-    const ccIdx = claudeComments.indexOf(cc);
     html += `<tr class="claude-comment-row">
       <td colspan="3">
         <div class="comment-box" style="max-width:calc(100vw - 360px)">
-          ${renderClaudeCommentHtml(cc, ccIdx)}
+          ${renderClaudeCommentHtml(cc)}
         </div>
       </td>
     </tr>`;
@@ -222,7 +221,6 @@ function insertOrphanedComments(file: DiffFile, container: HTMLElement): void {
 
   orphaned.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
   for (const cc of orphaned) {
-    const ccIdx = claudeComments.indexOf(cc);
     const side = cc.side || 'new';
     const targetLine = cc.line!;
 
@@ -241,7 +239,7 @@ function insertOrphanedComments(file: DiffFile, container: HTMLElement): void {
     tr.innerHTML = `
       <td colspan="3">
         <div class="comment-box" style="max-width:calc(100vw - 360px)">
-          ${renderClaudeCommentHtml(ccWithLabel, ccIdx)}
+          ${renderClaudeCommentHtml(ccWithLabel)}
         </div>
       </td>
     `;
@@ -473,11 +471,10 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
 
       // Claude comments on this line
       for (const cc of commentsByLine[l.num] || []) {
-        const ccIdx = claudeComments.indexOf(cc);
         html += `<tr class="claude-comment-row">
           <td colspan="3">
             <div class="comment-box" style="max-width:calc(100vw - 360px)">
-              ${renderClaudeCommentHtml(cc, ccIdx)}
+              ${renderClaudeCommentHtml(cc)}
             </div>
           </td>
         </tr>`;

@@ -16,6 +16,7 @@ interface SessionItem {
 }
 
 interface ClaudeComment {
+  id: string;
   file?: string;
   line?: number;
   side?: 'new' | 'old';
@@ -188,19 +189,22 @@ export class Session {
     return true;
   }
 
-  addComments(itemId: string, comments: ClaudeComment[]): number {
+  addComments(itemId: string, comments: Omit<ClaudeComment, 'id'>[]): number {
     if (!this._claudeComments[itemId]) {
       this._claudeComments[itemId] = [];
     }
-    this._claudeComments[itemId].push(...comments);
+    for (const c of comments) {
+      this._claudeComments[itemId].push({ ...c, id: crypto.randomUUID() });
+    }
     this.persist();
     return this._claudeComments[itemId].length;
   }
 
-  deleteComment(itemId: string, index: number): void {
+  deleteComment(itemId: string, commentId: string): void {
     const items = this._claudeComments[itemId];
-    if (items && index >= 0 && index < items.length) {
-      items.splice(index, 1);
+    if (items) {
+      const idx = items.findIndex(c => c.id === commentId);
+      if (idx !== -1) items.splice(idx, 1);
     }
     this.persist();
   }

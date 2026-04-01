@@ -15,7 +15,7 @@
 - [x] Markdown rendering in comments (both user and Claude)
 - [ ] Line range commenting (select multiple lines, one comment)
 - [ ] Whole-file comments (not tied to a specific line)
-- [ ] Multi-round reply/resolve stability — reply keys use `claude:<item>:<serverIndex>` which shifts when Claude adds new comments between rounds. Needs stable IDs (UUID per comment, server-side).
+- [x] Multi-round reply/resolve stability — reply keys use `claude:<item>:<serverIndex>` which shifts when Claude adds new comments between rounds. Needs stable IDs (UUID per comment, server-side).
 
 ## Diff & commits
 - [x] Auto-reload diff when git state changes (SSE push or polling)

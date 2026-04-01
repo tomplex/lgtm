@@ -9,7 +9,7 @@ export interface ProjectBlob {
   baseBranch: string;
   description: string;
   items: { id: string; type: 'diff' | 'document'; title: string; path?: string }[];
-  claudeComments: Record<string, { file?: string; line?: number; side?: string; block?: number; comment: string }[]>;
+  claudeComments: Record<string, { id: string; file?: string; line?: number; side?: string; block?: number; comment: string }[]>;
   analysis: Record<string, unknown> | null;
   round: number;
   userComments: Record<string, string>;
