@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type express from 'express';
 import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
+import { parseFileAnalysis, parseSynthesis } from './parse-analysis.js';
 
 type McpTextResult = { content: [{ type: 'text'; text: string }] };
 
@@ -169,6 +170,48 @@ function createMcpServer(manager: SessionManager): McpServer {
       const { found } = lookup;
       found.session.setAnalysis(analysis);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }] };
+    },
+  );
+
+  server.tool(
+    'review_set_analysis_from_files',
+    'Parse file-analysis and synthesis markdown files into structured analysis data and set on the session',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+      fileAnalysisPath: z.string().describe('Absolute path to the file-analyzer markdown output'),
+      synthesisPath: z.string().describe('Absolute path to the synthesis agent markdown output'),
+    },
+    async ({ repoPath, fileAnalysisPath, synthesisPath }) => {
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
+
+      try {
+        const files = parseFileAnalysis(readFileSync(fileAnalysisPath, 'utf-8'));
+        const synthesis = parseSynthesis(readFileSync(synthesisPath, 'utf-8'));
+
+        const analysis = {
+          overview: synthesis.overview,
+          reviewStrategy: synthesis.reviewStrategy,
+          files,
+          groups: synthesis.groups,
+        };
+
+        found.session.setAnalysis(analysis);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: true,
+            fileCount: Object.keys(files).length,
+            groupCount: synthesis.groups.length,
+          }) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            error: err instanceof Error ? err.message : String(err),
+          }) }],
+        };
+      }
     },
   );
 
