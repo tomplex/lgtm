@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import type express from 'express';
 import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
@@ -80,31 +80,6 @@ function createMcpServer(manager: SessionManager): McpServer {
       const count = found.session.addComments(itemId, comments);
       found.session.broadcast('comments_changed', { item: itemId, count: comments.length });
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, count }) }] };
-    },
-  );
-
-  server.tool(
-    'status',
-    'List active review sessions and whether the user has submitted feedback. Use this to check if a session exists before calling other tools, or to poll for new feedback.',
-    {},
-    async () => {
-      const projects = manager.list().map(p => {
-        const session = manager.get(p.slug)!;
-        let hasFeedback = false;
-        let feedbackRounds = 0;
-        try {
-          const content = readFileSync(session.outputPath, 'utf-8');
-          hasFeedback = content.trim().length > 0;
-          const signalPath = session.outputPath + '.signal';
-          if (existsSync(signalPath)) {
-            feedbackRounds = parseInt(readFileSync(signalPath, 'utf-8').trim()) || 0;
-          }
-        } catch {
-          // file doesn't exist yet
-        }
-        return { ...p, hasFeedback, feedbackRounds };
-      });
-      return { content: [{ type: 'text' as const, text: JSON.stringify({ projects }) }] };
     },
   );
 

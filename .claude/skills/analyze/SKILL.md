@@ -5,7 +5,7 @@ description: >
   phase, summary, and category, then produces an overview, review strategy, and
   thematic groupings. Use when the user asks to analyze a branch for review, or
   when code is mostly done and a review session is active.
-allowed-tools: "mcp__lgtm__set_analysis,mcp__lgtm__status,Agent,Bash(git:*)"
+allowed-tools: "mcp__lgtm__set_analysis,mcp__lgtm__start,Agent,Bash(git:*)"
 ---
 
 # Analyze Skill
@@ -16,9 +16,9 @@ parses and submits the analysis.
 
 ## Prerequisites
 
-An LGTM review session must be active for the repo. Check with `status`
-if unsure. If no session exists, tell the user to start one first (or start one
-yourself with the review skill).
+An LGTM review session must be active for the repo. If no session exists,
+start one with `start` (calling it again for an existing session is safe —
+it returns the existing URL).
 
 ## Pipeline
 
