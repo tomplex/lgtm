@@ -29,7 +29,7 @@ import type { SidebarView } from './state';
 import { fetchItems, fetchItemData, fetchCommits, submitReview as apiSubmitReview } from './api';
 import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
-import { sortFilesByPriority, groupFiles } from './analysis';
+import { sortFilesByPriority, groupFiles, phaseFiles } from './analysis';
 import { renderMarkdown, renderMarkdownComments } from './document';
 import { jumpToComment, formatAllComments } from './comments';
 import { saveState, clearPersistedState } from './persistence';
@@ -182,7 +182,67 @@ function renderGroupedFileList(): void {
     el.appendChild(fileContainer);
   }
 }
-function renderPhasedFileList(): void { /* Task 8 */ }
+const PHASE_CONFIG = {
+  review: { label: 'Review carefully', color: '#f85149', icon: '⬤' },
+  skim: { label: 'Skim', color: '#d29922', icon: '◐' },
+  'rubber-stamp': { label: 'Rubber stamp', color: '#8b949e', icon: '○' },
+} as const;
+
+function renderPhasedFileList(): void {
+  const el = document.getElementById('file-list')!;
+  el.innerHTML = '';
+
+  if (!analysis) return;
+  const phases = phaseFiles(files, analysis);
+
+  for (const phase of ['review', 'skim', 'rubber-stamp'] as const) {
+    const phaseFiles_ = phases[phase];
+    if (phaseFiles_.length === 0) continue;
+
+    const config = PHASE_CONFIG[phase];
+    const reviewedCount = phaseFiles_.filter(f => reviewedFiles.has(f.path)).length;
+    const pct = Math.round((reviewedCount / phaseFiles_.length) * 100);
+
+    const header = document.createElement('div');
+    header.className = 'phase-header';
+    header.innerHTML = `
+      <div class="phase-header-top">
+        <span class="phase-label" style="color: ${config.color}">${config.icon} ${config.label}</span>
+        <span class="phase-progress-text">${reviewedCount} / ${phaseFiles_.length} reviewed</span>
+      </div>
+      <div class="phase-progress-bar">
+        <div class="phase-progress-fill" style="width: ${pct}%; background: ${config.color}"></div>
+      </div>
+    `;
+    el.appendChild(header);
+
+    for (const file of phaseFiles_) {
+      const idx = files.indexOf(file);
+      const div = document.createElement('div');
+      const isReviewed = reviewedFiles.has(file.path);
+      div.className = 'file-item phased' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '');
+      div.dataset.idx = String(idx);
+
+      const base = file.path.split('/').pop() || file.path;
+      const commentCount = Object.keys(comments).filter(k => k.startsWith(file.path + '::')).length;
+      const claudeCount = claudeComments.filter(c => c.file === file.path).length;
+
+      div.innerHTML = `
+        <span class="review-check" title="Mark as reviewed (e)">${isReviewed ? '&#10003;' : '&#9675;'}</span>
+        <span class="filename"><span class="base">${escapeHtml(base)}</span></span>
+        ${claudeCount > 0 ? `<span class="badge claude-badge" title="Claude comments">${claudeCount}</span>` : ''}
+        ${commentCount > 0 ? `<span class="badge comments-badge" title="Your comments">${commentCount}</span>` : ''}
+        <span class="file-stats">
+          <span class="add">+${file.additions}</span>
+          <span class="del">-${file.deletions}</span>
+        </span>
+      `;
+      div.querySelector('.review-check')!.addEventListener('click', (ev) => { ev.stopPropagation(); toggleReviewed(file.path); });
+      div.onclick = () => selectFile(idx);
+      el.appendChild(div);
+    }
+  }
+}
 
 export function renderViewToggle(): void {
   const toggle = document.getElementById('view-toggle')!;

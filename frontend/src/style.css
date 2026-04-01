@@ -1127,3 +1127,37 @@ tr.expand-row:hover td {
 }
 .group-stats .add { color: var(--add-text); }
 .group-stats .del { color: var(--del-text); }
+
+/* --- Phase headers --- */
+.phase-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.phase-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.phase-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.phase-progress-text {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.phase-progress-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.phase-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
