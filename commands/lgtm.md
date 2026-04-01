@@ -1,3 +1,4 @@
+---
 name: lgtm
 description: Register the current project with LGTM for code review
 arguments:

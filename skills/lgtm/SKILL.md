@@ -1,3 +1,4 @@
+---
 name: lgtm
 description: >
   Use when the user asks to register a project for review, start a code review,
