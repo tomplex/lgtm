@@ -29,7 +29,7 @@ import type { SidebarView } from './state';
 import { fetchItems, fetchItemData, fetchCommits, submitReview as apiSubmitReview } from './api';
 import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
-import { sortFilesByPriority } from './analysis';
+import { sortFilesByPriority, groupFiles } from './analysis';
 import { renderMarkdown, renderMarkdownComments } from './document';
 import { jumpToComment, formatAllComments } from './comments';
 import { saveState, clearPersistedState } from './persistence';
@@ -107,7 +107,81 @@ export function renderFileList(): void {
   if (q) filterFiles(q);
 }
 
-function renderGroupedFileList(): void { /* Task 7 */ }
+function renderGroupedFileList(): void {
+  const el = document.getElementById('file-list')!;
+  el.innerHTML = '';
+
+  if (!analysis) return;
+  const groups = groupFiles(files, analysis);
+
+  for (const group of groups) {
+    const hasHighPriority = group.files.some(f => {
+      const p = analysis!.files[f.path]?.priority;
+      return p === 'critical' || p === 'important';
+    });
+
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.dataset.expanded = String(hasHighPriority);
+
+    const totalAdd = group.files.reduce((s, f) => s + f.additions, 0);
+    const totalDel = group.files.reduce((s, f) => s + f.deletions, 0);
+
+    header.innerHTML = `
+      <div class="group-header-left">
+        <span class="group-chevron">${hasHighPriority ? '▾' : '▸'}</span>
+        <span class="group-name">${escapeHtml(group.name)}</span>
+        <span class="group-count">${group.files.length} file${group.files.length !== 1 ? 's' : ''}</span>
+        ${group.description ? `<span class="group-desc">${escapeHtml(group.description)}</span>` : ''}
+      </div>
+      <div class="group-stats">
+        <span class="add">+${totalAdd}</span>
+        <span class="del">-${totalDel}</span>
+      </div>
+    `;
+
+    const fileContainer = document.createElement('div');
+    fileContainer.className = 'group-files';
+    fileContainer.style.display = hasHighPriority ? '' : 'none';
+
+    for (const file of group.files) {
+      const idx = files.indexOf(file);
+      const div = document.createElement('div');
+      const isReviewed = reviewedFiles.has(file.path);
+      const priority = analysis!.files[file.path]?.priority;
+      div.className = 'file-item grouped' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '') + (priority ? ` priority-${priority}` : '');
+      div.dataset.idx = String(idx);
+
+      const base = file.path.split('/').pop() || file.path;
+      const commentCount = Object.keys(comments).filter(k => k.startsWith(file.path + '::')).length;
+      const claudeCount = claudeComments.filter(c => c.file === file.path).length;
+
+      div.innerHTML = `
+        <span class="review-check" title="Mark as reviewed (e)">${isReviewed ? '&#10003;' : '&#9675;'}</span>
+        <span class="filename"><span class="base">${escapeHtml(base)}</span></span>
+        ${claudeCount > 0 ? `<span class="badge claude-badge" title="Claude comments">${claudeCount}</span>` : ''}
+        ${commentCount > 0 ? `<span class="badge comments-badge" title="Your comments">${commentCount}</span>` : ''}
+        <span class="file-stats">
+          <span class="add">+${file.additions}</span>
+          <span class="del">-${file.deletions}</span>
+        </span>
+      `;
+      div.querySelector('.review-check')!.addEventListener('click', (ev) => { ev.stopPropagation(); toggleReviewed(file.path); });
+      div.onclick = () => selectFile(idx);
+      fileContainer.appendChild(div);
+    }
+
+    header.addEventListener('click', () => {
+      const expanded = header.dataset.expanded === 'true';
+      header.dataset.expanded = String(!expanded);
+      header.querySelector('.group-chevron')!.textContent = expanded ? '▸' : '▾';
+      fileContainer.style.display = expanded ? 'none' : '';
+    });
+
+    el.appendChild(header);
+    el.appendChild(fileContainer);
+  }
+}
 function renderPhasedFileList(): void { /* Task 8 */ }
 
 export function renderViewToggle(): void {

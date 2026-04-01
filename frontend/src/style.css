@@ -1078,3 +1078,52 @@ tr.expand-row:hover td {
   color: var(--text-muted);
   margin-top: 2px;
 }
+
+/* --- Group headers --- */
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.group-header:hover { background: var(--hover); }
+.group-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.group-chevron {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 10px;
+}
+.group-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.group-count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.group-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-stats {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.group-stats .add { color: var(--add-text); }
+.group-stats .del { color: var(--del-text); }
