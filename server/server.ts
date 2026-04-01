@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import open from 'open';
 import { createApp } from './app.js';
@@ -41,7 +42,11 @@ function main(): void {
       });
       console.log(`PROJECT_REGISTERED=${result.slug}`);
       console.log(`REVIEW_URL=${result.url}`);
-      open(result.url);
+      const lockFile = `/tmp/lgtm-opened-${port}`;
+      if (!existsSync(lockFile)) {
+        writeFileSync(lockFile, String(process.pid));
+        open(result.url);
+      }
     }
   });
 }
