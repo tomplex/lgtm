@@ -73,7 +73,7 @@ let lineIdCounter = 0;
 const lineKeyToId: Record<string, string> = {};
 
 export function getLineId(lineKey: string): string {
-  if (!lineKeyToId[lineKey]) lineKeyToId[lineKey] = 'lc-' + (lineIdCounter++);
+  if (!lineKeyToId[lineKey]) lineKeyToId[lineKey] = 'lc-' + lineIdCounter++;
   return lineKeyToId[lineKey];
 }
 
@@ -90,13 +90,33 @@ export function resetLineIds(): void {
 }
 
 // Setters for reassignable state (since `export let` can't be reassigned from outside)
-export function setFiles(f: DiffFile[]) { files = f; }
-export function setActiveFileIdx(i: number) { activeFileIdx = i; }
-export function setAppMode(m: 'diff' | 'file') { appMode = m; }
-export function setMdMeta(m: MdMeta) { mdMeta = m; }
-export function setRepoMeta(m: RepoMeta) { repoMeta = m; }
-export function setClaudeComments(c: ClaudeComment[]) { claudeComments = c; }
-export function setSessionItems(items: SessionItem[]) { sessionItems = items; }
-export function setActiveItemId(id: string) { activeItemId = id; }
-export function setAllCommits(c: Commit[]) { allCommits = c; }
-export function setWholeFileView(v: boolean) { wholeFileView = v; }
+export function setFiles(f: DiffFile[]) {
+  files = f;
+}
+export function setActiveFileIdx(i: number) {
+  activeFileIdx = i;
+}
+export function setAppMode(m: 'diff' | 'file') {
+  appMode = m;
+}
+export function setMdMeta(m: MdMeta) {
+  mdMeta = m;
+}
+export function setRepoMeta(m: RepoMeta) {
+  repoMeta = m;
+}
+export function setClaudeComments(c: ClaudeComment[]) {
+  claudeComments = c;
+}
+export function setSessionItems(items: SessionItem[]) {
+  sessionItems = items;
+}
+export function setActiveItemId(id: string) {
+  activeItemId = id;
+}
+export function setAllCommits(c: Commit[]) {
+  allCommits = c;
+}
+export function setWholeFileView(v: boolean) {
+  wholeFileView = v;
+}

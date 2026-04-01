@@ -1,9 +1,25 @@
 import {
-  files, activeFileIdx, comments, claudeComments, reviewedFiles,
-  sessionItems, activeItemId, repoMeta, allCommits, selectedShas, appMode,
-  wholeFileView, setWholeFileView,
-  setFiles, setActiveFileIdx, setRepoMeta, setClaudeComments,
-  setSessionItems, setActiveItemId, setAllCommits, setAppMode,
+  files,
+  activeFileIdx,
+  comments,
+  claudeComments,
+  reviewedFiles,
+  sessionItems,
+  activeItemId,
+  repoMeta,
+  allCommits,
+  selectedShas,
+  appMode,
+  wholeFileView,
+  setWholeFileView,
+  setFiles,
+  setActiveFileIdx,
+  setRepoMeta,
+  setClaudeComments,
+  setSessionItems,
+  setActiveItemId,
+  setAllCommits,
+  setAppMode,
   resetLineIds,
 } from './state';
 import { fetchItems, fetchItemData, fetchCommits, submitReview as apiSubmitReview } from './api';
@@ -19,7 +35,8 @@ export function renderFileList(): void {
   saveState();
   const el = document.getElementById('file-list')!;
   el.innerHTML = '';
-  let totalAdd = 0, totalDel = 0;
+  let totalAdd = 0,
+    totalDel = 0;
 
   files.forEach((file, idx) => {
     totalAdd += file.additions;
@@ -30,8 +47,8 @@ export function renderFileList(): void {
     div.className = 'file-item' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '');
     div.dataset.idx = String(idx);
 
-    const commentCount = Object.keys(comments).filter(k => k.startsWith(file.path + '::')).length;
-    const claudeCount = claudeComments.filter(c => c.file === file.path).length;
+    const commentCount = Object.keys(comments).filter((k) => k.startsWith(file.path + '::')).length;
+    const claudeCount = claudeComments.filter((c) => c.file === file.path).length;
 
     const lastSlash = file.path.lastIndexOf('/');
     const dir = lastSlash >= 0 ? file.path.slice(0, lastSlash + 1) : '';
@@ -74,9 +91,7 @@ function toggleReviewed(path: string, e?: Event): void {
 
 function matchesGlob(path: string, pattern: string): boolean {
   // Convert simple glob to regex: * matches anything except /
-  const regex = new RegExp(
-    '^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*') + '$'
-  );
+  const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*') + '$');
   // Match against full path or just the basename
   const basename = path.split('/').pop() || path;
   return regex.test(path) || regex.test(basename);
@@ -85,14 +100,14 @@ function matchesGlob(path: string, pattern: string): boolean {
 export function filterFiles(query: string): void {
   const q = query.trim().toLowerCase();
   if (!q) {
-    document.querySelectorAll<HTMLElement>('.file-item').forEach(el => el.classList.remove('hidden'));
+    document.querySelectorAll<HTMLElement>('.file-item').forEach((el) => el.classList.remove('hidden'));
     return;
   }
 
   const terms = q.split(/\s+/);
-  document.querySelectorAll<HTMLElement>('.file-item').forEach(el => {
+  document.querySelectorAll<HTMLElement>('.file-item').forEach((el) => {
     const path = el.querySelector('.filename')!.textContent!.trim().toLowerCase();
-    const visible = terms.every(term => {
+    const visible = terms.every((term) => {
       if (term.startsWith('!')) {
         const neg = term.slice(1);
         if (!neg) return true;
@@ -115,10 +130,11 @@ export function renderTabs(): void {
     tab.dataset.id = item.id;
 
     let badges = '';
-    const effUserCount = item.id === 'diff'
-      ? Object.keys(comments).filter(k => !k.startsWith('doc:')).length
-      : Object.keys(comments).filter(k => k.startsWith(`doc:${item.id}:`)).length;
-    const claudeCount = claudeComments.filter(c => c._item === item.id).length;
+    const effUserCount =
+      item.id === 'diff'
+        ? Object.keys(comments).filter((k) => !k.startsWith('doc:')).length
+        : Object.keys(comments).filter((k) => k.startsWith(`doc:${item.id}:`)).length;
+    const claudeCount = claudeComments.filter((c) => c._item === item.id).length;
 
     if (claudeCount > 0) badges += `<span class="tab-badge claude">${claudeCount}</span>`;
     if (effUserCount > 0) badges += `<span class="tab-badge user">${effUserCount}</span>`;
@@ -136,7 +152,9 @@ export async function loadItems(): Promise<void> {
     const items = await fetchItems();
     setSessionItems(items);
     renderTabs();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function switchToItem(itemId: string): Promise<void> {
@@ -148,7 +166,8 @@ export async function switchToItem(itemId: string): Promise<void> {
   if (data.mode === 'diff') {
     document.querySelector<HTMLElement>('.sidebar')!.style.display = '';
     document.getElementById('resize-handle')!.style.display = '';
-    document.querySelector('.keyboard-hint')!.innerHTML = 'Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment';
+    document.querySelector('.keyboard-hint')!.innerHTML =
+      'Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment';
 
     setRepoMeta(data.meta || {});
     setClaudeComments((data.claudeComments || []).map((c, i) => ({ ...c, _item: 'diff', _serverIndex: i })));
@@ -180,13 +199,13 @@ export async function switchToItem(itemId: string): Promise<void> {
     if (files.length > 0) selectFile(0);
     else document.getElementById('diff-container')!.innerHTML = '<div class="empty-state">No changes to review</div>';
     loadCommits();
-
   } else if (data.mode === 'file') {
     document.querySelector<HTMLElement>('.sidebar')!.style.display = 'none';
     document.getElementById('resize-handle')!.style.display = 'none';
     document.getElementById('meta-bar')!.style.display = 'none';
     document.getElementById('description-banner')!.style.display = 'none';
-    document.querySelector('.keyboard-hint')!.innerHTML = 'Click any block to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Esc</kbd> cancel';
+    document.querySelector('.keyboard-hint')!.innerHTML =
+      'Click any block to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Esc</kbd> cancel';
 
     setClaudeComments((data.claudeComments || []).map((c, i) => ({ ...c, _item: activeItemId, _serverIndex: i })));
     setAppMode('file');
@@ -203,10 +222,12 @@ export async function loadCommits(): Promise<void> {
     if (commits.length === 0) return;
 
     document.getElementById('commit-toggle-wrap')!.style.display = '';
-    commits.forEach(c => selectedShas.add(c.sha));
+    commits.forEach((c) => selectedShas.add(c.sha));
     updateCommitToggle();
     renderCommitPanel();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function updateCommitToggle(): void {
@@ -241,7 +262,7 @@ function renderCommitPanel(): void {
   panel.innerHTML = html;
 
   // Event listeners
-  panel.querySelectorAll<HTMLInputElement>('input[data-sha]').forEach(el => {
+  panel.querySelectorAll<HTMLInputElement>('input[data-sha]').forEach((el) => {
     el.addEventListener('change', () => {
       if (el.checked) selectedShas.add(el.dataset.sha!);
       else selectedShas.delete(el.dataset.sha!);
@@ -249,7 +270,7 @@ function renderCommitPanel(): void {
     });
   });
   panel.querySelector('[data-action="select-all-commits"]')!.addEventListener('click', () => {
-    allCommits.forEach(c => selectedShas.add(c.sha));
+    allCommits.forEach((c) => selectedShas.add(c.sha));
     renderCommitPanel();
     updateCommitToggle();
   });
@@ -264,9 +285,8 @@ function renderCommitPanel(): void {
 async function applyCommitSelection(): Promise<void> {
   document.getElementById('commit-panel')!.classList.remove('open');
 
-  const commits = selectedShas.size > 0 && selectedShas.size < allCommits.length
-    ? Array.from(selectedShas).join(',')
-    : undefined;
+  const commits =
+    selectedShas.size > 0 && selectedShas.size < allCommits.length ? Array.from(selectedShas).join(',') : undefined;
 
   try {
     const data = await fetchItemData('diff', commits);
@@ -276,7 +296,9 @@ async function applyCommitSelection(): Promise<void> {
     if (activeFileIdx >= files.length) setActiveFileIdx(0);
     renderFileList();
     if (files.length > 0) renderDiff(activeFileIdx);
-    else document.getElementById('diff-container')!.innerHTML = '<div class="empty-state">No changes for selected commits</div>';
+    else
+      document.getElementById('diff-container')!.innerHTML =
+        '<div class="empty-state">No changes for selected commits</div>';
     showToast(`Showing ${selectedShas.size} commit${selectedShas.size !== 1 ? 's' : ''}`);
   } catch (e: any) {
     showToast('Failed to apply: ' + e.message);

@@ -1,8 +1,14 @@
 import { Marked } from 'marked';
 import hljs from 'highlight.js';
 import {
-  comments, claudeComments, activeItemId, resolvedComments,
-  mdMeta, setMdMeta, setClaudeComments, type MdMeta,
+  comments,
+  claudeComments,
+  activeItemId,
+  resolvedComments,
+  mdMeta,
+  setMdMeta,
+  setClaudeComments,
+  type MdMeta,
 } from './state';
 import { escapeHtml } from './utils';
 import { deleteClaudeComment } from './api';
@@ -12,10 +18,14 @@ const marked = new Marked({
   renderer: {
     // marked v12 passes { text, lang } at runtime but types expect positional args
     code(this: unknown, ...args: unknown[]) {
-      const token = (typeof args[0] === 'object' ? args[0] : { text: args[0], lang: args[1] }) as { text: string; lang?: string };
-      const highlighted = token.lang && hljs.getLanguage(token.lang)
-        ? hljs.highlight(token.text, { language: token.lang, ignoreIllegals: true }).value
-        : hljs.highlightAuto(token.text).value;
+      const token = (typeof args[0] === 'object' ? args[0] : { text: args[0], lang: args[1] }) as {
+        text: string;
+        lang?: string;
+      };
+      const highlighted =
+        token.lang && hljs.getLanguage(token.lang)
+          ? hljs.highlight(token.text, { language: token.lang, ignoreIllegals: true }).value
+          : hljs.highlightAuto(token.text).value;
       return `<pre><code class="hljs">${highlighted}</code></pre>`;
     },
   },
@@ -83,7 +93,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
     const hasComment = !!comments[key];
 
     // Claude comments on this block
-    const claudeForBlock = claudeComments.filter(c => c.block === blockIdx);
+    const claudeForBlock = claudeComments.filter((c) => c.block === blockIdx);
     let claudeHtml = '';
     for (const cc of claudeForBlock) {
       const ccIdx = claudeComments.indexOf(cc);
@@ -115,16 +125,16 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   container.innerHTML = `<div class="md-content">${html}</div>`;
 
   // Attach click handlers
-  container.querySelectorAll<HTMLElement>('.md-block').forEach(el => {
+  container.querySelectorAll<HTMLElement>('.md-block').forEach((el) => {
     el.addEventListener('click', () => toggleMdComment(parseInt(el.dataset.block!)));
   });
-  container.querySelectorAll<HTMLElement>('[data-edit-md-comment]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-edit-md-comment]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       editMdComment(parseInt(el.dataset.editMdComment!));
     });
   });
-  container.querySelectorAll<HTMLElement>('[data-dismiss-claude-md]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-dismiss-claude-md]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = parseInt(el.dataset.dismissClaudeMd!);
@@ -138,7 +148,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   });
 
   // Resolve Claude comment
-  container.querySelectorAll<HTMLElement>('[data-resolve-claude-md]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-resolve-claude-md]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = parseInt(el.dataset.resolveClaudeMd!);
@@ -151,7 +161,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   });
 
   // Unresolve Claude comment
-  container.querySelectorAll<HTMLElement>('[data-unresolve-claude-md]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-unresolve-claude-md]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = parseInt(el.dataset.unresolveClaudeMd!);
@@ -164,7 +174,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   });
 
   // Reply to Claude comment
-  container.querySelectorAll<HTMLElement>('[data-reply-claude-md]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-reply-claude-md]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = parseInt(el.dataset.replyClaudeMd!);
@@ -174,7 +184,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   });
 
   // Edit reply
-  container.querySelectorAll<HTMLElement>('[data-edit-reply-md]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-edit-reply-md]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = parseInt(el.dataset.editReplyMd!);
@@ -184,7 +194,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   });
 
   // Delete reply
-  container.querySelectorAll<HTMLElement>('[data-delete-reply-md]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-delete-reply-md]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = parseInt(el.dataset.deleteReplyMd!);
@@ -197,7 +207,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   });
 
   // Delete user comment via inline action
-  container.querySelectorAll<HTMLElement>('[data-delete-md-comment]').forEach(el => {
+  container.querySelectorAll<HTMLElement>('[data-delete-md-comment]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const blockIdx = parseInt(el.dataset.deleteMdComment!);
@@ -212,7 +222,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
 
 export function renderMarkdownComments(): void {
   saveState();
-  document.querySelectorAll<HTMLElement>('.md-block').forEach(el => {
+  document.querySelectorAll<HTMLElement>('.md-block').forEach((el) => {
     const idx = parseInt(el.dataset.block!);
     const key = mdKey(idx);
     el.classList.toggle('has-comment', !!comments[key]);
@@ -246,16 +256,21 @@ export function renderMarkdownComments(): void {
 export function updateMdStats(): void {
   const count = Object.keys(comments).length;
   document.getElementById('stats')!.innerHTML =
-    `${mdMeta.filename || 'Document'}` +
-    (count > 0 ? ` &middot; ${count} comment${count !== 1 ? 's' : ''}` : '');
+    `${mdMeta.filename || 'Document'}` + (count > 0 ? ` &middot; ${count} comment${count !== 1 ? 's' : ''}` : '');
 }
 
 export function toggleMdComment(blockIdx: number): void {
   const key = mdKey(blockIdx);
-  if (comments[key]) { editMdComment(blockIdx); return; }
+  if (comments[key]) {
+    editMdComment(blockIdx);
+    return;
+  }
 
   const existing = document.getElementById(mdCommentId(blockIdx));
-  if (existing) { existing.querySelector('textarea')?.focus(); return; }
+  if (existing) {
+    existing.querySelector('textarea')?.focus();
+    return;
+  }
 
   const block = document.getElementById(mdBlockId(blockIdx));
   if (!block) return;
@@ -276,12 +291,23 @@ export function toggleMdComment(blockIdx: number): void {
   const textarea = div.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Escape') { div.remove(); e.preventDefault(); }
-    else if (e.key === 'Enter' && e.metaKey) { saveMdComment(blockIdx); e.preventDefault(); }
+    if (e.key === 'Escape') {
+      div.remove();
+      e.preventDefault();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      saveMdComment(blockIdx);
+      e.preventDefault();
+    }
   });
   textarea.addEventListener('click', (e) => e.stopPropagation());
-  div.querySelector('[data-action="cancel"]')!.addEventListener('click', (e) => { e.stopPropagation(); div.remove(); });
-  div.querySelector('[data-action="save"]')!.addEventListener('click', (e) => { e.stopPropagation(); saveMdComment(blockIdx); });
+  div.querySelector('[data-action="cancel"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    div.remove();
+  });
+  div.querySelector('[data-action="save"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveMdComment(blockIdx);
+  });
 
   block.after(div);
   textarea.focus();
@@ -306,13 +332,28 @@ export function editMdComment(blockIdx: number): void {
   const textarea = div.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Escape') { renderMarkdownComments(); e.preventDefault(); }
-    else if (e.key === 'Enter' && e.metaKey) { saveMdComment(blockIdx); e.preventDefault(); }
+    if (e.key === 'Escape') {
+      renderMarkdownComments();
+      e.preventDefault();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      saveMdComment(blockIdx);
+      e.preventDefault();
+    }
   });
   textarea.addEventListener('click', (e) => e.stopPropagation());
-  div.querySelector('[data-action="cancel-edit"]')!.addEventListener('click', (e) => { e.stopPropagation(); renderMarkdownComments(); });
-  div.querySelector('[data-action="delete"]')!.addEventListener('click', (e) => { e.stopPropagation(); delete comments[key]; renderMarkdownComments(); });
-  div.querySelector('[data-action="save"]')!.addEventListener('click', (e) => { e.stopPropagation(); saveMdComment(blockIdx); });
+  div.querySelector('[data-action="cancel-edit"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    renderMarkdownComments();
+  });
+  div.querySelector('[data-action="delete"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    delete comments[key];
+    renderMarkdownComments();
+  });
+  div.querySelector('[data-action="save"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveMdComment(blockIdx);
+  });
 
   textarea.focus();
   textarea.setSelectionRange(textarea.value.length, textarea.value.length);
@@ -332,7 +373,8 @@ function openMdReplyTextarea(ccIdx: number, cc: { _item: string; _serverIndex: n
   const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
   const existing = comments[ccKey] || '';
 
-  const commentEl = document.querySelector(`[data-reply-claude-md="${ccIdx}"], [data-edit-reply-md="${ccIdx}"]`)
+  const commentEl = document
+    .querySelector(`[data-reply-claude-md="${ccIdx}"], [data-edit-reply-md="${ccIdx}"]`)
     ?.closest('.claude-comment');
   if (!commentEl) return;
 
@@ -358,11 +400,22 @@ function openMdReplyTextarea(ccIdx: number, cc: { _item: string; _serverIndex: n
 
   textarea.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Escape') { wrap.remove(); e.preventDefault(); }
-    else if (e.key === 'Enter' && e.metaKey) { saveMdReply(ccKey, textarea.value); e.preventDefault(); }
+    if (e.key === 'Escape') {
+      wrap.remove();
+      e.preventDefault();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      saveMdReply(ccKey, textarea.value);
+      e.preventDefault();
+    }
   });
-  wrap.querySelector('[data-action="cancel-reply"]')!.addEventListener('click', (e) => { e.stopPropagation(); wrap.remove(); });
-  wrap.querySelector('[data-action="save-reply"]')!.addEventListener('click', (e) => { e.stopPropagation(); saveMdReply(ccKey, textarea.value); });
+  wrap.querySelector('[data-action="cancel-reply"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wrap.remove();
+  });
+  wrap.querySelector('[data-action="save-reply"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveMdReply(ccKey, textarea.value);
+  });
 }
 
 function saveMdReply(ccKey: string, text: string): void {

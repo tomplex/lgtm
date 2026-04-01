@@ -1,8 +1,4 @@
-import {
-  comments, files, activeFileIdx, claudeComments, resolvedComments,
-  sessionItems,
-  lineIdToKey,
-} from './state';
+import { comments, files, activeFileIdx, claudeComments, resolvedComments, sessionItems, lineIdToKey } from './state';
 import { escapeHtml } from './utils';
 import { renderDiff } from './diff';
 import { renderFileList } from './ui';
@@ -11,9 +7,15 @@ import { saveState } from './persistence';
 export function toggleComment(lineId: string): void {
   const lineKey = lineIdToKey(lineId);
   if (!lineKey) return;
-  if (comments[lineKey]) { editComment(lineId); return; }
+  if (comments[lineKey]) {
+    editComment(lineId);
+    return;
+  }
   const existing = document.getElementById('cr-' + lineId);
-  if (existing) { existing.querySelector('textarea')?.focus(); return; }
+  if (existing) {
+    existing.querySelector('textarea')?.focus();
+    return;
+  }
 
   const lineRow = document.getElementById('line-' + lineId);
   if (!lineRow) return;
@@ -35,8 +37,13 @@ export function toggleComment(lineId: string): void {
 
   const textarea = commentRow.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { cancelComment(lineId); e.preventDefault(); }
-    else if (e.key === 'Enter' && e.metaKey) { saveComment(lineId); e.preventDefault(); }
+    if (e.key === 'Escape') {
+      cancelComment(lineId);
+      e.preventDefault();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      saveComment(lineId);
+      e.preventDefault();
+    }
   });
   commentRow.querySelector('[data-action="cancel"]')!.addEventListener('click', () => cancelComment(lineId));
   commentRow.querySelector('[data-action="save"]')!.addEventListener('click', () => saveComment(lineId));
@@ -66,8 +73,13 @@ export function editComment(lineId: string): void {
 
   const textarea = td.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { renderDiff(activeFileIdx); e.preventDefault(); }
-    else if (e.key === 'Enter' && e.metaKey) { saveComment(lineId); e.preventDefault(); }
+    if (e.key === 'Escape') {
+      renderDiff(activeFileIdx);
+      e.preventDefault();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      saveComment(lineId);
+      e.preventDefault();
+    }
   });
   td.querySelector('[data-action="cancel-edit"]')!.addEventListener('click', () => renderDiff(activeFileIdx));
   td.querySelector('[data-action="delete"]')!.addEventListener('click', () => deleteComment(lineId));
@@ -83,7 +95,10 @@ function saveComment(lineId: string): void {
   const lineKey = lineIdToKey(lineId);
   if (!lineKey) return;
   const text = row.querySelector('textarea')?.value?.trim();
-  if (!text) { deleteComment(lineId); return; }
+  if (!text) {
+    deleteComment(lineId);
+    return;
+  }
   comments[lineKey] = text;
   saveState();
   renderDiff(activeFileIdx);
@@ -111,18 +126,19 @@ export function jumpToComment(direction: 'next' | 'prev'): void {
   const containerRect = container.getBoundingClientRect();
 
   if (direction === 'next') {
-    const next = rows.find(r => r.getBoundingClientRect().top > containerRect.top + 10);
+    const next = rows.find((r) => r.getBoundingClientRect().top > containerRect.top + 10);
     if (next) next.scrollIntoView({ block: 'center', behavior: 'smooth' });
     else rows[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
   } else {
-    const prev = rows.reverse().find(r => r.getBoundingClientRect().top < containerRect.top - 10);
+    const prev = rows.reverse().find((r) => r.getBoundingClientRect().top < containerRect.top - 10);
     if (prev) prev.scrollIntoView({ block: 'center', behavior: 'smooth' });
     else rows[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 }
 
 function formatDiffComments(): string {
-  const byFile: Record<string, { lineNum: number | string; lineType: string; lineContent: string; comment: string }[]> = {};
+  const byFile: Record<string, { lineNum: number | string; lineType: string; lineContent: string; comment: string }[]> =
+    {};
   for (const [key, text] of Object.entries(comments)) {
     if (key.startsWith('doc:') || key.startsWith('md::') || key.startsWith('claude:')) continue;
     const sepIdx = key.lastIndexOf('::');
@@ -130,7 +146,7 @@ function formatDiffComments(): string {
     const lineIdxStr = key.substring(sepIdx + 2);
     if (!byFile[filePath]) byFile[filePath] = [];
     const lineIdx = parseInt(lineIdxStr);
-    const file = files.find(f => f.path === filePath);
+    const file = files.find((f) => f.path === filePath);
     const line = file?.lines[lineIdx];
     byFile[filePath].push({
       lineNum: line?.newLine ?? line?.oldLine ?? '?',
@@ -192,7 +208,7 @@ function formatDocClaudeInteractions(): string {
   let output = '';
   for (const item of sessionItems) {
     if (item.id === 'diff') continue;
-    const itemComments = claudeComments.filter(cc => cc._item === item.id);
+    const itemComments = claudeComments.filter((cc) => cc._item === item.id);
     const interactions: { block: number; comment: string; reply?: string; resolved: boolean }[] = [];
 
     for (const cc of itemComments) {

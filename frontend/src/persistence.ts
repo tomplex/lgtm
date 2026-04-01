@@ -21,7 +21,9 @@ export function saveState(): void {
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch { /* storage full or unavailable */ }
+    } catch {
+      /* storage full or unavailable */
+    }
   }, 100);
 }
 
@@ -48,7 +50,9 @@ export function loadState(): void {
         resolvedComments.add(key);
       }
     }
-  } catch { /* corrupt or unavailable */ }
+  } catch {
+    /* corrupt or unavailable */
+  }
 }
 
 export function clearPersistedState(): void {

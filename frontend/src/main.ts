@@ -8,8 +8,14 @@ import { activeItemId } from './state';
 import { showToast } from './utils';
 import { loadState } from './persistence';
 import {
-  loadItems, switchToItem, refreshDiff, handleSubmitReview,
-  toggleCommitPanel, setupKeyboardShortcuts, setupResizableSidebar, setupFileSearch,
+  loadItems,
+  switchToItem,
+  refreshDiff,
+  handleSubmitReview,
+  toggleCommitPanel,
+  setupKeyboardShortcuts,
+  setupResizableSidebar,
+  setupFileSearch,
 } from './ui';
 
 async function init(): Promise<void> {
@@ -28,7 +34,8 @@ async function init(): Promise<void> {
     // Load the default item (diff)
     await switchToItem('diff');
   } catch (e: any) {
-    document.getElementById('diff-container')!.innerHTML = `<div class="empty-state">Error: ${escapeHtml(e.message)}</div>`;
+    document.getElementById('diff-container')!.innerHTML =
+      `<div class="empty-state">Error: ${escapeHtml(e.message)}</div>`;
   }
 }
 

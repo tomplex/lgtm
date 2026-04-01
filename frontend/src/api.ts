@@ -45,10 +45,13 @@ export async function fetchCommits(): Promise<Commit[]> {
 }
 
 export async function fetchContext(
-  filepath: string, line: number, count: number, direction: string
+  filepath: string,
+  line: number,
+  count: number,
+  direction: string,
 ): Promise<{ num: number; content: string }[]> {
   const resp = await fetch(
-    `/context?file=${encodeURIComponent(filepath)}&line=${line}&count=${count}&direction=${direction}`
+    `/context?file=${encodeURIComponent(filepath)}&line=${line}&count=${count}&direction=${direction}`,
   );
   const data = await resp.json();
   return data.lines || [];
@@ -60,7 +63,10 @@ export async function fetchFile(filepath: string): Promise<{ num: number; conten
   return data.lines || [];
 }
 
-export async function submitReview(comments: string, raw: Record<string, string>): Promise<{ ok: boolean; round: number }> {
+export async function submitReview(
+  comments: string,
+  raw: Record<string, string>,
+): Promise<{ ok: boolean; round: number }> {
   const resp = await fetch('/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

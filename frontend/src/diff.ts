@@ -1,7 +1,14 @@
 import {
-  files, activeFileIdx, comments, claudeComments, resolvedComments,
-  getLineId, lineIdToKey,
-  setActiveFileIdx, setWholeFileView, setClaudeComments,
+  files,
+  activeFileIdx,
+  comments,
+  claudeComments,
+  resolvedComments,
+  getLineId,
+  lineIdToKey,
+  setActiveFileIdx,
+  setWholeFileView,
+  setClaudeComments,
   type DiffFile,
 } from './state';
 import { fetchContext, fetchFile, deleteClaudeComment } from './api';
@@ -13,7 +20,8 @@ export function parseDiff(raw: string): DiffFile[] {
   const result: DiffFile[] = [];
   const lines = raw.split('\n');
   let current: DiffFile | null = null;
-  let oldLine = 0, newLine = 0;
+  let oldLine = 0,
+    newLine = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -25,7 +33,10 @@ export function parseDiff(raw: string): DiffFile[] {
     }
     if (!current) continue;
     if (line.startsWith('--- a/') || line.startsWith('--- /dev/null')) continue;
-    if (line.startsWith('+++ b/')) { current.path = line.slice(6); continue; }
+    if (line.startsWith('+++ b/')) {
+      current.path = line.slice(6);
+      continue;
+    }
     if (line.startsWith('+++ /dev/null')) {
       if (i > 0 && lines[i - 1].startsWith('--- a/')) current.path = lines[i - 1].slice(6) + ' (deleted)';
       continue;
@@ -51,27 +62,30 @@ export function parseDiff(raw: string): DiffFile[] {
       current.lines.push({ type: 'context', content: line.slice(1) || '', oldLine: oldLine++, newLine: newLine++ });
     }
   }
-  return result.filter(f => f.path);
+  return result.filter((f) => f.path);
 }
 
 function computeWordDiff(oldStr: string, newStr: string) {
   const oldWords = oldStr.match(/\S+|\s+/g) || [];
   const newWords = newStr.match(/\S+|\s+/g) || [];
 
-  const m = oldWords.length, n = newWords.length;
+  const m = oldWords.length,
+    n = newWords.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   for (let i = 1; i <= m; i++)
     for (let j = 1; j <= n; j++)
       dp[i][j] = oldWords[i - 1] === newWords[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
 
-  let i = m, j = n;
+  let i = m,
+    j = n;
   const oldParts: { text: string; changed: boolean }[] = [];
   const newParts: { text: string; changed: boolean }[] = [];
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && oldWords[i - 1] === newWords[j - 1]) {
       oldParts.unshift({ text: oldWords[i - 1], changed: false });
       newParts.unshift({ text: newWords[j - 1], changed: false });
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
       newParts.unshift({ text: newWords[j - 1], changed: true });
       j--;
@@ -84,7 +98,9 @@ function computeWordDiff(oldStr: string, newStr: string) {
 }
 
 function renderWordDiff(parts: { text: string; changed: boolean }[], cls: string): string {
-  return parts.map(p => p.changed ? `<span class="${cls}">${escapeHtml(p.text)}</span>` : escapeHtml(p.text)).join('');
+  return parts
+    .map((p) => (p.changed ? `<span class="${cls}">${escapeHtml(p.text)}</span>` : escapeHtml(p.text)))
+    .join('');
 }
 
 function renderClaudeCommentHtml(cc: { comment: string; _item: string; _serverIndex: number }, ccIdx: number): string {
@@ -151,7 +167,10 @@ export function renderDiff(fileIdx: number): void {
 
       let prevNewLine = 0;
       for (let pi = lineIdx - 1; pi >= 0; pi--) {
-        if (file.lines[pi].newLine != null) { prevNewLine = file.lines[pi].newLine!; break; }
+        if (file.lines[pi].newLine != null) {
+          prevNewLine = file.lines[pi].newLine!;
+          break;
+        }
       }
       const gap = hunkNewStart - prevNewLine - 1;
       const isSmallGap = prevNewLine > 0 && gap > 0 && gap <= 8;
@@ -191,7 +210,7 @@ export function renderDiff(fileIdx: number): void {
     }
 
     // Claude's comments on this line — match by side (default: new file)
-    const claudeForLine = claudeComments.filter(c => {
+    const claudeForLine = claudeComments.filter((c) => {
       if (c.file !== file.path) return false;
       const side = c.side || 'new';
       return side === 'new' ? c.line === line.newLine : c.line === line.oldLine;
@@ -239,7 +258,7 @@ export function renderDiff(fileIdx: number): void {
   container.addEventListener('click', handleDiffContainerClick);
 
   // Auto-expand small gaps
-  container.querySelectorAll<HTMLElement>('tr[data-auto-expand]').forEach(row => {
+  container.querySelectorAll<HTMLElement>('tr[data-auto-expand]').forEach((row) => {
     const count = parseInt(row.dataset.count!) || 8;
     const next = row.nextElementSibling;
     if (next && next.classList.contains('diff-hunk')) next.remove();
@@ -248,10 +267,10 @@ export function renderDiff(fileIdx: number): void {
 
   // Render orphaned Claude comments — comments targeting lines not visible in the diff.
   // These get inserted after the nearest preceding visible line, with an explicit line label.
-  const fileComments = claudeComments.filter(c => c.file === file.path && c.line != null);
-  const visibleNewLines = new Set(file.lines.map(l => l.newLine).filter((n): n is number => n != null));
-  const visibleOldLines = new Set(file.lines.map(l => l.oldLine).filter((n): n is number => n != null));
-  const orphaned = fileComments.filter(cc => {
+  const fileComments = claudeComments.filter((c) => c.file === file.path && c.line != null);
+  const visibleNewLines = new Set(file.lines.map((l) => l.newLine).filter((n): n is number => n != null));
+  const visibleOldLines = new Set(file.lines.map((l) => l.oldLine).filter((n): n is number => n != null));
+  const orphaned = fileComments.filter((cc) => {
     const side = cc.side || 'new';
     return side === 'new' ? !visibleNewLines.has(cc.line!) : !visibleOldLines.has(cc.line!);
   });
@@ -266,7 +285,10 @@ export function renderDiff(fileIdx: number): void {
     let anchorLineIdx = -1;
     for (let i = file.lines.length - 1; i >= 0; i--) {
       const num = side === 'new' ? file.lines[i].newLine : file.lines[i].oldLine;
-      if (num != null && num <= targetLine) { anchorLineIdx = i; break; }
+      if (num != null && num <= targetLine) {
+        anchorLineIdx = i;
+        break;
+      }
     }
 
     const ccWithLabel = { ...cc, comment: `[line ${targetLine}${side === 'old' ? ' (old)' : ''}] ${cc.comment}` };
@@ -289,8 +311,10 @@ export function renderDiff(fileIdx: number): void {
       let anchor = document.getElementById('line-' + anchorId);
       if (anchor) {
         // Skip past any existing comment rows
-        while (anchor!.nextElementSibling?.classList.contains('comment-row') ||
-               anchor!.nextElementSibling?.classList.contains('claude-comment-row')) {
+        while (
+          anchor!.nextElementSibling?.classList.contains('comment-row') ||
+          anchor!.nextElementSibling?.classList.contains('claude-comment-row')
+        ) {
           anchor = anchor!.nextElementSibling as HTMLElement;
         }
         anchor.after(tr);
@@ -433,7 +457,8 @@ function openReplyTextarea(ccIdx: number, cc: { _item: string; _serverIndex: num
   const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
   const existing = comments[ccKey] || '';
 
-  const commentEl = document.querySelector(`[data-reply-claude="${ccIdx}"], [data-edit-reply="${ccIdx}"]`)
+  const commentEl = document
+    .querySelector(`[data-reply-claude="${ccIdx}"], [data-edit-reply="${ccIdx}"]`)
     ?.closest('.claude-comment');
   if (!commentEl) return;
 
@@ -458,15 +483,28 @@ function openReplyTextarea(ccIdx: number, cc: { _item: string; _serverIndex: num
   textarea.setSelectionRange(textarea.value.length, textarea.value.length);
 
   textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { wrap.remove(); e.preventDefault(); e.stopPropagation(); }
-    else if (e.key === 'Enter' && e.metaKey) { saveReply(ccKey, textarea.value, wrap); e.preventDefault(); e.stopPropagation(); }
+    if (e.key === 'Escape') {
+      wrap.remove();
+      e.preventDefault();
+      e.stopPropagation();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      saveReply(ccKey, textarea.value);
+      e.preventDefault();
+      e.stopPropagation();
+    }
   });
   textarea.addEventListener('click', (e) => e.stopPropagation());
-  wrap.querySelector('[data-action="cancel-reply"]')!.addEventListener('click', (e) => { e.stopPropagation(); wrap.remove(); });
-  wrap.querySelector('[data-action="save-reply"]')!.addEventListener('click', (e) => { e.stopPropagation(); saveReply(ccKey, textarea.value, wrap); });
+  wrap.querySelector('[data-action="cancel-reply"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wrap.remove();
+  });
+  wrap.querySelector('[data-action="save-reply"]')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveReply(ccKey, textarea.value);
+  });
 }
 
-function saveReply(ccKey: string, text: string, _wrap: Element): void {
+function saveReply(ccKey: string, text: string): void {
   const trimmed = text.trim();
   if (trimmed) {
     comments[ccKey] = trimmed;
@@ -477,7 +515,13 @@ function saveReply(ccKey: string, text: string, _wrap: Element): void {
   renderFileList();
 }
 
-export async function expandContext(filepath: string, lineNum: number, direction: string, rowEl: Element, count = 20): Promise<void> {
+export async function expandContext(
+  filepath: string,
+  lineNum: number,
+  direction: string,
+  rowEl: Element,
+  count = 20,
+): Promise<void> {
   try {
     const lines = await fetchContext(filepath, lineNum, count, direction);
     if (lines.length === 0) {
@@ -487,7 +531,9 @@ export async function expandContext(filepath: string, lineNum: number, direction
     const lang = detectLang(filepath);
     let html = '';
     for (const l of lines) {
-      const highlighted = lang ? `<code>${highlightLine(l.content, lang)}</code>` : `<span class="diff-text">${escapeHtml(l.content)}</span>`;
+      const highlighted = lang
+        ? `<code>${highlightLine(l.content, lang)}</code>`
+        : `<span class="diff-text">${escapeHtml(l.content)}</span>`;
       html += `<tr class="diff-context">
         <td class="line-num">${l.num}</td>
         <td class="line-num">${l.num}</td>
@@ -501,10 +547,15 @@ export async function expandContext(filepath: string, lineNum: number, direction
       for (const row of rows) rowEl.before(row);
     } else {
       let after = rowEl;
-      for (const row of rows) { after.after(row); after = row; }
+      for (const row of rows) {
+        after.after(row);
+        after = row;
+      }
     }
     rowEl.remove();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function showWholeFile(fileIdx: number): Promise<void> {
@@ -518,7 +569,7 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
     const container = document.getElementById('diff-container')!;
 
     const addLines = new Set<number>();
-    file.lines.forEach(l => {
+    file.lines.forEach((l) => {
       if (l.type === 'add' && l.newLine) addLines.add(l.newLine);
     });
 
@@ -535,7 +586,9 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
     html += `<table class="diff-table">`;
     for (const l of lines) {
       const cls = addLines.has(l.num) ? 'diff-add' : '';
-      const codeHtml = lang ? `<code>${highlightLine(l.content, lang)}</code>` : `<span class="diff-text">${escapeHtml(l.content)}</span>`;
+      const codeHtml = lang
+        ? `<code>${highlightLine(l.content, lang)}</code>`
+        : `<span class="diff-text">${escapeHtml(l.content)}</span>`;
       html += `<tr class="${cls}">
         <td class="line-num">${l.num}</td>
         <td class="line-num">${l.num}</td>
@@ -570,7 +623,7 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
 export function selectFile(idx: number): void {
   setActiveFileIdx(idx);
   setWholeFileView(false);
-  document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.file-item').forEach((el) => el.classList.remove('active'));
   document.querySelector(`.file-item[data-idx="${idx}"]`)?.classList.add('active');
   if (files[idx]) window.location.hash = 'file=' + encodeURIComponent(files[idx].path);
   renderDiff(idx);
@@ -580,6 +633,6 @@ export function applyHash(hash: string): void {
   const match = hash.match(/#file=(.+)/);
   if (!match) return;
   const path = decodeURIComponent(match[1]);
-  const idx = files.findIndex(f => f.path === path);
+  const idx = files.findIndex((f) => f.path === path);
   if (idx >= 0 && idx !== activeFileIdx) selectFile(idx);
 }

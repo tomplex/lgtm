@@ -15,6 +15,8 @@ import asyncio
 import json
 import os
 import webbrowser
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
@@ -23,27 +25,34 @@ from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
 from git_ops import (
-    detect_base_branch, get_branch_diff, get_selected_commits_diff,
-    get_branch_commits, get_repo_meta, get_file_lines, git_run,
+    detect_base_branch,
+    get_branch_commits,
+    get_branch_diff,
+    get_file_lines,
+    get_repo_meta,
+    get_selected_commits_diff,
+    git_run,
 )
 
 
-def slugify(title):
+def slugify(title: str) -> str:
     return title.lower().replace(' ', '-').replace('/', '-')[:40]
 
 
 class Session:
-    def __init__(self, repo_path: str, base_branch: str, description: str = '', output_path: str = ''):
+    def __init__(self, repo_path: str, base_branch: str, description: str = '', output_path: str = '') -> None:
         self.repo_path = repo_path
         self.base_branch = base_branch
         self.description = description
         self.output_path = output_path
         self._round = 0
-        self._items: list[dict] = [{
-            'id': 'diff',
-            'type': 'diff',
-            'title': 'Code Changes',
-        }]
+        self._items: list[dict] = [
+            {
+                'id': 'diff',
+                'type': 'diff',
+                'title': 'Code Changes',
+            }
+        ]
         self._claude_comments: dict[str, list[dict]] = {}
         self._sse_clients: list[asyncio.Queue] = []
 
@@ -96,12 +105,14 @@ class Session:
             existing['path'] = os.path.abspath(filepath)
             existing['title'] = title
         else:
-            self._items.append({
-                'id': item_id,
-                'type': 'document',
-                'title': title,
-                'path': os.path.abspath(filepath),
-            })
+            self._items.append(
+                {
+                    'id': item_id,
+                    'type': 'document',
+                    'title': title,
+                    'path': os.path.abspath(filepath),
+                }
+            )
         return {'ok': True, 'id': item_id, 'items': self._items}
 
     def add_comments(self, item_id: str, comments: list[dict]) -> int:
@@ -126,7 +137,7 @@ class Session:
         current_round = self._round
 
         with open(self.output_path, 'a') as f:
-            f.write(f"\n---\n# Review Round {current_round}\n\n")
+            f.write(f'\n---\n# Review Round {current_round}\n\n')
             f.write(comments_text)
             f.write('\n')
 
@@ -154,37 +165,41 @@ class Session:
                 pass
 
 
-app = FastAPI()
 session: Session  # set in main() before uvicorn.run
 _open_url: str = ''  # set in main(), opened on startup
 
 
-@app.on_event('startup')
-async def on_startup():
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     if _open_url:
         webbrowser.open(_open_url)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 # --- GET routes ---
 
+
 @app.get('/items')
-async def get_items():
+async def get_items() -> dict:
     return {'items': session.items}
 
 
 @app.get('/data')
-async def get_data(item: str = 'diff', commits: str | None = None):
+async def get_data(item: str = 'diff', commits: str | None = None) -> dict:
     return await asyncio.to_thread(session.get_item_data, item, commits)
 
 
 @app.get('/context')
-async def get_context(file: str = '', line: int = 0, count: int = 20, direction: str = 'down'):
+async def get_context(file: str = '', line: int = 0, count: int = 20, direction: str = 'down') -> dict:
     lines = await asyncio.to_thread(get_file_lines, session.repo_path, file, line, count, direction)
     return {'lines': lines}
 
 
 @app.get('/file')
-async def get_file(path: str = ''):
+async def get_file(path: str = '') -> dict:
     full_path = Path(session.repo_path) / path
     if not full_path.exists():
         return {'lines': []}
@@ -194,16 +209,16 @@ async def get_file(path: str = ''):
 
 
 @app.get('/commits')
-async def get_commits():
+async def get_commits() -> dict:
     commits = await asyncio.to_thread(get_branch_commits, session.repo_path, session.base_branch)
     return {'commits': commits}
 
 
 @app.get('/events')
-async def get_events():
+async def get_events() -> EventSourceResponse:
     q = session.subscribe()
 
-    async def event_generator():
+    async def event_generator():  # noqa: ANN202
         try:
             while True:
                 try:
@@ -221,40 +236,42 @@ async def get_events():
 
 # --- POST routes ---
 
+
 @app.post('/items')
-async def post_items(body: dict):
+async def post_items(body: dict) -> dict:
     filepath = body.get('path', '')
     title = body.get('title', '') or Path(filepath).stem
     item_id = body.get('id', '') or slugify(title)
 
     result = session.add_item(item_id, title, filepath)
-    print(f"ITEM_ADDED={item_id}", flush=True)
+    print(f'ITEM_ADDED={item_id}', flush=True)
     session.broadcast('items_changed', {'id': item_id})
     return result
 
 
 @app.post('/comments')
-async def post_comments(body: dict):
+async def post_comments(body: dict) -> dict:
     item_id = body.get('item', 'diff')
     new_comments = body.get('comments', [])
     count = session.add_comments(item_id, new_comments)
-    print(f"CLAUDE_COMMENTS_ADDED={len(new_comments)} item={item_id}", flush=True)
+    print(f'CLAUDE_COMMENTS_ADDED={len(new_comments)} item={item_id}', flush=True)
     session.broadcast('comments_changed', {'item': item_id, 'count': len(new_comments)})
     return {'ok': True, 'count': count}
 
 
 @app.post('/submit')
-async def post_submit(body: dict):
+async def post_submit(body: dict) -> dict:
     comments_text = body.get('comments', '')
     current_round = session.submit_review(comments_text)
-    print(f"REVIEW_ROUND={current_round}", flush=True)
+    print(f'REVIEW_ROUND={current_round}', flush=True)
     return {'ok': True, 'round': current_round}
 
 
 # --- DELETE routes ---
 
+
 @app.delete('/comments')
-async def delete_comments(item: str = '', index: str = ''):
+async def delete_comments(item: str = '', index: str = '') -> dict:
     if item and index:
         session.delete_comment(item, int(index))
     elif item:
@@ -276,7 +293,7 @@ def stable_port_for_path(path: str) -> int:
     return 9850 + (h % 100)
 
 
-def main():
+def main() -> None:
     global session, _open_url
 
     parser = argparse.ArgumentParser(description='Claude Code Review Server')
@@ -313,9 +330,9 @@ def main():
     )
 
     url = f'http://127.0.0.1:{port}'
-    print(f"REVIEW_URL={url}", flush=True)
-    print(f"REVIEW_OUTPUT={output_path}", flush=True)
-    print(f"REVIEW_PID={os.getpid()}", flush=True)
+    print(f'REVIEW_URL={url}', flush=True)
+    print(f'REVIEW_OUTPUT={output_path}', flush=True)
+    print(f'REVIEW_PID={os.getpid()}', flush=True)
 
     _open_url = url
     uvicorn.run(app, host='127.0.0.1', port=port, log_level='warning')
