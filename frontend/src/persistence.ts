@@ -1,41 +1,24 @@
 import { comments, reviewedFiles, resolvedComments, sidebarView } from './state';
 import type { SidebarView } from './state';
 import { setSidebarView } from './state';
+import {
+  fetchUserState,
+  putUserComment,
+  putUserReviewed,
+  putUserResolved,
+  putUserSidebarView,
+  clearUserState,
+} from './api';
 
-const STORAGE_KEY = 'lgtm-review-state';
+// Track keys to detect additions and deletions
+let lastCommentKeys = new Set<string>();
+let lastReviewedFiles = new Set<string>();
+let lastResolvedComments = new Set<string>();
+let lastSidebarView = '';
 
-interface PersistedState {
-  comments: Record<string, string>;
-  reviewedFiles: string[];
-  resolvedComments: string[];
-  sidebarView?: string;
-}
-
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
-
-export function saveState(): void {
-  // Debounce — coalesce rapid mutations into one write
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    const state: PersistedState = {
-      comments: { ...comments },
-      reviewedFiles: Array.from(reviewedFiles),
-      resolvedComments: Array.from(resolvedComments),
-      sidebarView,
-    };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* storage full or unavailable */
-    }
-  }, 100);
-}
-
-export function loadState(): void {
+export async function loadState(): Promise<void> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const state: PersistedState = JSON.parse(raw);
+    const state = await fetchUserState();
 
     if (state.comments) {
       for (const [key, value] of Object.entries(state.comments)) {
@@ -58,11 +41,59 @@ export function loadState(): void {
     if (state.sidebarView && ['flat', 'grouped', 'phased'].includes(state.sidebarView)) {
       setSidebarView(state.sidebarView as SidebarView);
     }
+
+    // Snapshot current state for diffing
+    lastCommentKeys = new Set(Object.keys(comments));
+    lastReviewedFiles = new Set(reviewedFiles);
+    lastResolvedComments = new Set(resolvedComments);
+    lastSidebarView = sidebarView;
   } catch {
-    /* corrupt or unavailable */
+    /* server unavailable — start fresh */
   }
 }
 
-export function clearPersistedState(): void {
-  localStorage.removeItem(STORAGE_KEY);
+export function saveState(): void {
+  // Send full current state to server. All endpoints are idempotent
+  // and the server is localhost, so redundant writes are cheap.
+
+  // Comments: sync all keys
+  const currentKeys = new Set(Object.keys(comments));
+  for (const key of currentKeys) {
+    putUserComment(key, comments[key]);
+  }
+  for (const key of lastCommentKeys) {
+    if (!currentKeys.has(key)) putUserComment(key, null);
+  }
+  lastCommentKeys = new Set(currentKeys);
+
+  // Reviewed files: toggle any that changed
+  for (const path of reviewedFiles) {
+    if (!lastReviewedFiles.has(path)) putUserReviewed(path);
+  }
+  for (const path of lastReviewedFiles) {
+    if (!reviewedFiles.has(path)) putUserReviewed(path);
+  }
+  lastReviewedFiles = new Set(reviewedFiles);
+
+  // Resolved comments: toggle any that changed
+  for (const key of resolvedComments) {
+    if (!lastResolvedComments.has(key)) putUserResolved(key);
+  }
+  for (const key of lastResolvedComments) {
+    if (!resolvedComments.has(key)) putUserResolved(key);
+  }
+  lastResolvedComments = new Set(resolvedComments);
+
+  // Sidebar view
+  if (sidebarView !== lastSidebarView) {
+    putUserSidebarView(sidebarView);
+    lastSidebarView = sidebarView;
+  }
+}
+
+export async function clearPersistedState(): Promise<void> {
+  lastCommentKeys = new Set();
+  lastReviewedFiles = new Set();
+  lastResolvedComments = new Set();
+  await clearUserState();
 }

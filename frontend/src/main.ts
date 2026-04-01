@@ -20,7 +20,13 @@ import {
 } from './ui';
 
 async function init(): Promise<void> {
-  loadState();
+  await loadState();
+  // One-time migration from localStorage
+  const legacyKey = 'lgtm-review-state';
+  const legacy = localStorage.getItem(legacyKey);
+  if (legacy) {
+    localStorage.removeItem(legacyKey);
+  }
   try {
     await loadItems();
 
