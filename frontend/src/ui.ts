@@ -12,6 +12,8 @@ import {
   appMode,
   wholeFileView,
   analysis,
+  sidebarView,
+  setSidebarView,
   setWholeFileView,
   setFiles,
   setActiveFileIdx,
@@ -23,9 +25,11 @@ import {
   setAppMode,
   resetLineIds,
 } from './state';
+import type { SidebarView } from './state';
 import { fetchItems, fetchItemData, fetchCommits, submitReview as apiSubmitReview } from './api';
 import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
+import { sortFilesByPriority } from './analysis';
 import { renderMarkdown, renderMarkdownComments } from './document';
 import { jumpToComment, formatAllComments } from './comments';
 import { saveState, clearPersistedState } from './persistence';
@@ -33,13 +37,27 @@ import { saveState, clearPersistedState } from './persistence';
 // --- File list sidebar ---
 
 export function renderFileList(): void {
+  if (analysis && sidebarView === 'grouped') {
+    renderGroupedFileList();
+    return;
+  }
+  if (analysis && sidebarView === 'phased') {
+    renderPhasedFileList();
+    return;
+  }
+
   saveState();
   const el = document.getElementById('file-list')!;
   el.innerHTML = '';
   let totalAdd = 0,
     totalDel = 0;
 
-  files.forEach((file, idx) => {
+  const displayFiles = analysis && sidebarView === 'flat'
+    ? sortFilesByPriority(files, analysis)
+    : files;
+
+  displayFiles.forEach((file) => {
+    const idx = files.indexOf(file);
     totalAdd += file.additions;
     totalDel += file.deletions;
 
@@ -48,18 +66,24 @@ export function renderFileList(): void {
     div.className = 'file-item' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '');
     div.dataset.idx = String(idx);
 
+    if (analysis?.files[file.path]) {
+      div.classList.add(`priority-${analysis.files[file.path].priority}`);
+    }
+
     const commentCount = Object.keys(comments).filter((k) => k.startsWith(file.path + '::')).length;
     const claudeCount = claudeComments.filter((c) => c.file === file.path).length;
 
     const lastSlash = file.path.lastIndexOf('/');
     const dir = lastSlash >= 0 ? file.path.slice(0, lastSlash + 1) : '';
     const base = lastSlash >= 0 ? file.path.slice(lastSlash + 1) : file.path;
+    const fileSummary = analysis?.files[file.path]?.summary;
 
     div.innerHTML = `
       <span class="review-check" title="Mark as reviewed (e)">${isReviewed ? '&#10003;' : '&#9675;'}</span>
       <span class="filename" title="${escapeHtml(file.path)}">
         ${dir ? `<span class="dir">${escapeHtml(dir)}</span>` : ''}
         <span class="base">${escapeHtml(base)}</span>
+        ${fileSummary ? `<span class="file-summary">${escapeHtml(fileSummary)}</span>` : ''}
       </span>
       ${claudeCount > 0 ? `<span class="badge claude-badge" title="Claude comments">${claudeCount}</span>` : ''}
       ${commentCount > 0 ? `<span class="badge comments-badge" title="Your comments">${commentCount}</span>` : ''}
@@ -81,6 +105,32 @@ export function renderFileList(): void {
 
   const q = (document.getElementById('file-search') as HTMLInputElement).value;
   if (q) filterFiles(q);
+}
+
+function renderGroupedFileList(): void { /* Task 7 */ }
+function renderPhasedFileList(): void { /* Task 8 */ }
+
+export function renderViewToggle(): void {
+  const toggle = document.getElementById('view-toggle')!;
+  if (!analysis) {
+    toggle.style.display = 'none';
+    return;
+  }
+  toggle.style.display = '';
+  toggle.querySelectorAll('.view-btn').forEach(btn => {
+    btn.classList.toggle('active', (btn as HTMLElement).dataset.view === sidebarView);
+  });
+}
+
+export function setupViewToggle(): void {
+  document.getElementById('view-toggle')!.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.view-btn') as HTMLElement;
+    if (!btn || btn.dataset.view === sidebarView) return;
+    setSidebarView(btn.dataset.view as SidebarView);
+    saveState();
+    renderViewToggle();
+    renderFileList();
+  });
 }
 
 function toggleReviewed(path: string, e?: Event): void {
@@ -199,6 +249,7 @@ export async function switchToItem(itemId: string): Promise<void> {
 
     setFiles(parseDiff(data.diff));
     renderFileList();
+    renderViewToggle();
     if (files.length > 0) selectFile(0);
     else document.getElementById('diff-container')!.innerHTML = '<div class="empty-state">No changes to review</div>';
     loadCommits();
