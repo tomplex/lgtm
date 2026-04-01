@@ -69,12 +69,23 @@ export interface Commit {
 }
 
 export function getBranchCommits(repoPath: string, baseBranch: string): Commit[] {
-  const output = gitRun(
+  let output = gitRun(
     repoPath,
     'log', '--first-parent', '--no-merges',
     '--format=%H|%s|%an|%ar',
     `${baseBranch}..HEAD`,
   );
+
+  // On main (or when range is empty), show recent commits
+  if (!output.trim()) {
+    output = gitRun(
+      repoPath,
+      'log', '--first-parent', '--no-merges',
+      '--format=%H|%s|%an|%ar',
+      '-20', 'HEAD',
+    );
+  }
+
   const commits: Commit[] = [];
   for (const line of output.split('\n')) {
     if (!line.includes('|')) continue;

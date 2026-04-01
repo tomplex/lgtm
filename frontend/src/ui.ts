@@ -445,7 +445,12 @@ export async function loadCommits(): Promise<void> {
     if (commits.length === 0) return;
 
     document.getElementById('commit-toggle-wrap')!.style.display = '';
-    commits.forEach((c) => selectedShas.add(c.sha));
+    // On the base branch, don't auto-select (user picks commits to review)
+    // On a feature branch, select all (shows full branch diff)
+    const onBaseBranch = repoMeta.branch === repoMeta.baseBranch;
+    if (!onBaseBranch) {
+      commits.forEach((c) => selectedShas.add(c.sha));
+    }
     updateCommitToggle();
     renderCommitPanel();
   } catch {
