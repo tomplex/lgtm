@@ -8,14 +8,16 @@ Make it easy for a human and Claude to have a structured review conversation. Cl
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/).
+Requires [Node.js](https://nodejs.org/) 20+.
 
 ```bash
-# from PyPI (once published)
-uvx lgtm --repo .
-
 # from a local clone
-uv run lgtm --repo .
+npm install
+npm run dev -- --repo .
+
+# or build and run
+npm run build
+npm start -- --repo .
 ```
 
 ## Usage
@@ -48,32 +50,34 @@ cat /tmp/claude-review/<branch-slug>.md
 
 ## Architecture
 
-Vite + vanilla TypeScript frontend, Python backend. No frameworks on either side - just typed modules and `http.server`.
+TypeScript server (Express) with a Vite + vanilla TypeScript frontend.
 
 ```
-pyproject.toml             -- package config, entry point
-server.py                  -- Python HTTP server, serves API + built frontend
-git_ops.py                 -- git operations (diff, commits, file context, branch detection)
+server/
+  server.ts              -- CLI entry point
+  app.ts                 -- Express app, routes, SSE
+  session.ts             -- Session class, data types
+  git-ops.ts             -- git operations (diff, commits, file context)
 frontend/
   src/
-    main.ts                -- entry point
-    api.ts                 -- HTTP client for server API
-    state.ts               -- shared application state
-    utils.ts               -- helpers (escaping, debounce, syntax detection)
-    diff.ts                -- diff parsing, rendering, context expansion
-    document.ts            -- markdown document view with block commenting
-    comments.ts            -- comment creation, display, navigation
-    ui.ts                  -- sidebar, tabs, header, keyboard shortcuts
-  index.html               -- shell HTML
-  style.css                -- all styles
-  vite.config.ts           -- Vite config with dev proxy to Python server
+    main.ts              -- entry point
+    api.ts               -- HTTP client for server API
+    state.ts             -- shared application state
+    utils.ts             -- helpers (escaping, debounce, syntax detection)
+    diff.ts              -- diff parsing, rendering, context expansion
+    document.ts          -- markdown document view with block commenting
+    comments.ts          -- comment creation, display, navigation
+    ui.ts                -- sidebar, tabs, header, keyboard shortcuts
+  index.html             -- shell HTML
+  style.css              -- all styles
+  vite.config.ts         -- Vite config with dev proxy to server
   package.json
-frontend/dist/             -- production build output (served by server.py)
+frontend/dist/           -- production build output (served by server)
 ```
 
-### Backend (`server.py` + `git_ops.py`)
+### Backend (`server/`)
 
-A `http.server`-based Python server that:
+An Express-based TypeScript server that:
 
 - Manages a **session** with multiple **review items** (always starts with "Code Changes" diff)
 - In production, serves the built frontend from `frontend/dist/`
@@ -81,7 +85,7 @@ A `http.server`-based Python server that:
 - Stores Claude's comments in memory, writes user feedback to disk
 - Auto-detects base branch (master/main), computes stable port from repo path hash
 
-Git operations (running git commands, parsing output) are in `git_ops.py`.
+Git operations (running git commands, parsing output) are in `server/git-ops.ts`.
 
 ### Frontend (`frontend/`)
 
