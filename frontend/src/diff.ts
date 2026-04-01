@@ -104,140 +104,114 @@ function renderWordDiff(parts: { text: string; changed: boolean }[], cls: string
 }
 
 
-export function renderDiff(fileIdx: number): void {
-  const file = files[fileIdx];
-  if (!file) return;
-  const container = document.getElementById('diff-container')!;
-  const lang = detectLang(file.path);
-
-  const fileAnalysis = analysis?.files[file.path];
-  const summaryHtml = fileAnalysis
-    ? `<div class="file-header-summary">${escapeHtml(fileAnalysis.summary)}</div>`
-    : '';
-  let html = `<div class="diff-file-header">${escapeHtml(file.path)} <a style="float:right;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none" data-action="show-whole-file" data-file-idx="${fileIdx}">Show whole file</a>${summaryHtml}</div>`;
-  html += `<table class="diff-table">`;
-
-  // Pre-compute word diffs for adjacent del/add pairs
+function precomputeWordDiffs(lines: DiffFile['lines']): Record<number, { text: string; changed: boolean }[]> {
   const wordDiffs: Record<number, { text: string; changed: boolean }[]> = {};
-  for (let i = 0; i < file.lines.length - 1; i++) {
-    if (file.lines[i].type === 'del' && file.lines[i + 1].type === 'add') {
-      const wd = computeWordDiff(file.lines[i].content, file.lines[i + 1].content);
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (lines[i].type === 'del' && lines[i + 1].type === 'add') {
+      const wd = computeWordDiff(lines[i].content, lines[i + 1].content);
       wordDiffs[i] = wd.oldParts;
       wordDiffs[i + 1] = wd.newParts;
     }
   }
+  return wordDiffs;
+}
 
-  file.lines.forEach((line, lineIdx) => {
-    const lineKey = `${file.path}::${lineIdx}`;
-    const lineId = getLineId(lineKey);
+function renderDiffLineHtml(
+  file: DiffFile,
+  line: DiffFile['lines'][number],
+  lineIdx: number,
+  lineId: string,
+  lang: string | null,
+  wordDiffs: Record<number, { text: string; changed: boolean }[]>,
+): string {
+  let html = '';
 
-    if (line.type === 'hunk') {
-      const hunkMatch = line.content.match(/@@ -(\d+)(?:,\d+)? \+(\d+)/);
-      const hunkNewStart = hunkMatch ? parseInt(hunkMatch[2]) : 0;
+  if (line.type === 'hunk') {
+    const hunkMatch = line.content.match(/@@ -(\d+)(?:,\d+)? \+(\d+)/);
+    const hunkNewStart = hunkMatch ? parseInt(hunkMatch[2]) : 0;
 
-      let prevNewLine = 0;
-      for (let pi = lineIdx - 1; pi >= 0; pi--) {
-        if (file.lines[pi].newLine != null) {
-          prevNewLine = file.lines[pi].newLine!;
-          break;
-        }
+    let prevNewLine = 0;
+    for (let pi = lineIdx - 1; pi >= 0; pi--) {
+      if (file.lines[pi].newLine != null) {
+        prevNewLine = file.lines[pi].newLine!;
+        break;
       }
-      const gap = hunkNewStart - prevNewLine - 1;
-      const isSmallGap = prevNewLine > 0 && gap > 0 && gap <= 8;
+    }
+    const gap = hunkNewStart - prevNewLine - 1;
+    const isSmallGap = prevNewLine > 0 && gap > 0 && gap <= 8;
 
-      if (isSmallGap) {
-        html += `<tr class="expand-row" data-auto-expand data-file="${escapeHtml(file.path)}" data-line="${prevNewLine}" data-count="${gap}">
-          <td colspan="3" style="color:var(--text-muted)">&#8943; ${gap} line${gap !== 1 ? 's' : ''} hidden</td>
-        </tr>`;
-      } else if (hunkNewStart > 1) {
-        html += `<tr class="expand-row" data-expand-up data-file="${escapeHtml(file.path)}" data-line="${hunkNewStart}">
-          <td colspan="3">&#8943; Show more context above</td>
-        </tr>`;
-      }
-      html += `<tr class="diff-hunk">
-        <td class="line-num"></td><td class="line-num"></td>
-        <td class="line-content">${escapeHtml(line.content)}</td>
+    if (isSmallGap) {
+      html += `<tr class="expand-row" data-auto-expand data-file="${escapeHtml(file.path)}" data-line="${prevNewLine}" data-count="${gap}">
+        <td colspan="3" style="color:var(--text-muted)">&#8943; ${gap} line${gap !== 1 ? 's' : ''} hidden</td>
       </tr>`;
+    } else if (hunkNewStart > 1) {
+      html += `<tr class="expand-row" data-expand-up data-file="${escapeHtml(file.path)}" data-line="${hunkNewStart}">
+        <td colspan="3">&#8943; Show more context above</td>
+      </tr>`;
+    }
+    html += `<tr class="diff-hunk">
+      <td class="line-num"></td><td class="line-num"></td>
+      <td class="line-content">${escapeHtml(line.content)}</td>
+    </tr>`;
+  } else {
+    const cls = line.type === 'add' ? 'diff-add' : line.type === 'del' ? 'diff-del' : 'diff-context';
+    const prefix = line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' ';
+
+    let codeHtml: string;
+    if (wordDiffs[lineIdx]) {
+      const wdCls = line.type === 'del' ? 'wdiff-del' : 'wdiff-add';
+      codeHtml = `<code>${renderWordDiff(wordDiffs[lineIdx], wdCls)}</code>`;
+    } else if (lang) {
+      codeHtml = `<code>${highlightLine(line.content, lang)}</code>`;
     } else {
-      const cls = line.type === 'add' ? 'diff-add' : line.type === 'del' ? 'diff-del' : 'diff-context';
-      const prefix = line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' ';
-
-      let codeHtml: string;
-      if (wordDiffs[lineIdx]) {
-        const wdCls = line.type === 'del' ? 'wdiff-del' : 'wdiff-add';
-        codeHtml = `<code>${renderWordDiff(wordDiffs[lineIdx], wdCls)}</code>`;
-      } else if (lang) {
-        codeHtml = `<code>${highlightLine(line.content, lang)}</code>`;
-      } else {
-        codeHtml = `<span class="diff-text">${escapeHtml(line.content)}</span>`;
-      }
-
-      html += `<tr class="${cls}" id="line-${lineId}">
-        <td class="line-num" data-line-id="${lineId}">${line.oldLine ?? ''}</td>
-        <td class="line-num" data-line-id="${lineId}">${line.newLine ?? ''}</td>
-        <td class="line-content"><span class="diff-prefix">${prefix}</span>${codeHtml}</td>
-      </tr>`;
+      codeHtml = `<span class="diff-text">${escapeHtml(line.content)}</span>`;
     }
 
-    // Claude's comments on this line — match by side (default: new file)
-    const claudeForLine = claudeComments.filter((c) => {
-      if (c.file !== file.path) return false;
-      const side = c.side || 'new';
-      return side === 'new' ? c.line === line.newLine : c.line === line.oldLine;
-    });
-    for (const cc of claudeForLine) {
-      const ccIdx = claudeComments.indexOf(cc);
-      html += `<tr class="claude-comment-row">
-        <td colspan="3">
-          <div class="comment-box" style="max-width:calc(100vw - 360px)">
-            ${renderClaudeCommentHtml(cc, ccIdx)}
-          </div>
-        </td>
-      </tr>`;
-    }
-
-    if (comments[lineKey]) {
-      html += `<tr class="comment-row" id="cr-${lineId}">
-        <td colspan="3">
-          <div class="comment-box">
-            <div class="saved-comment" data-edit-comment="${lineId}">
-              <span class="comment-text">${escapeHtml(comments[lineKey])}</span>
-              <span class="inline-actions">
-                <a>edit</a>
-                <a class="del-action" data-delete-comment="${lineId}">delete</a>
-              </span>
-            </div>
-          </div>
-        </td>
-      </tr>`;
-    }
-  });
-
-  // Expand context at end of file
-  const lastLine = file.lines[file.lines.length - 1];
-  if (lastLine && lastLine.newLine) {
-    html += `<tr class="expand-row" data-expand-down data-file="${escapeHtml(file.path)}" data-line="${lastLine.newLine}">
-      <td colspan="3">&#8943; Show more context below</td>
+    html += `<tr class="${cls}" id="line-${lineId}">
+      <td class="line-num" data-line-id="${lineId}">${line.oldLine ?? ''}</td>
+      <td class="line-num" data-line-id="${lineId}">${line.newLine ?? ''}</td>
+      <td class="line-content"><span class="diff-prefix">${prefix}</span>${codeHtml}</td>
     </tr>`;
   }
 
-  html += `</table>`;
-  container.innerHTML = html;
-
-  // Attach event listeners via delegation (remove first to avoid stacking on re-render)
-  container.removeEventListener('click', handleDiffContainerClick);
-  container.addEventListener('click', handleDiffContainerClick);
-
-  // Auto-expand small gaps
-  container.querySelectorAll<HTMLElement>('tr[data-auto-expand]').forEach((row) => {
-    const count = parseInt(row.dataset.count!) || 8;
-    const next = row.nextElementSibling;
-    if (next && next.classList.contains('diff-hunk')) next.remove();
-    expandContext(row.dataset.file!, parseInt(row.dataset.line!), 'down', row, count);
+  // Claude's comments on this line
+  const claudeForLine = claudeComments.filter((c) => {
+    if (c.file !== file.path) return false;
+    const side = c.side || 'new';
+    return side === 'new' ? c.line === line.newLine : c.line === line.oldLine;
   });
+  for (const cc of claudeForLine) {
+    const ccIdx = claudeComments.indexOf(cc);
+    html += `<tr class="claude-comment-row">
+      <td colspan="3">
+        <div class="comment-box" style="max-width:calc(100vw - 360px)">
+          ${renderClaudeCommentHtml(cc, ccIdx)}
+        </div>
+      </td>
+    </tr>`;
+  }
 
-  // Render orphaned Claude comments — comments targeting lines not visible in the diff.
-  // These get inserted after the nearest preceding visible line, with an explicit line label.
+  const lineKey = `${file.path}::${lineIdx}`;
+  if (comments[lineKey]) {
+    html += `<tr class="comment-row" id="cr-${lineId}">
+      <td colspan="3">
+        <div class="comment-box">
+          <div class="saved-comment" data-edit-comment="${lineId}">
+            <span class="comment-text">${escapeHtml(comments[lineKey])}</span>
+            <span class="inline-actions">
+              <a>edit</a>
+              <a class="del-action" data-delete-comment="${lineId}">delete</a>
+            </span>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }
+
+  return html;
+}
+
+function insertOrphanedComments(file: DiffFile, container: HTMLElement): void {
   const fileComments = claudeComments.filter((c) => c.file === file.path && c.line != null);
   const visibleNewLines = new Set(file.lines.map((l) => l.newLine).filter((n): n is number => n != null));
   const visibleOldLines = new Set(file.lines.map((l) => l.oldLine).filter((n): n is number => n != null));
@@ -245,14 +219,13 @@ export function renderDiff(fileIdx: number): void {
     const side = cc.side || 'new';
     return side === 'new' ? !visibleNewLines.has(cc.line!) : !visibleOldLines.has(cc.line!);
   });
-  // Sort orphaned comments by target line so they appear in order
+
   orphaned.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
   for (const cc of orphaned) {
     const ccIdx = claudeComments.indexOf(cc);
     const side = cc.side || 'new';
     const targetLine = cc.line!;
 
-    // Find the last diff line whose line number is <= targetLine on the correct side
     let anchorLineIdx = -1;
     for (let i = file.lines.length - 1; i >= 0; i--) {
       const num = side === 'new' ? file.lines[i].newLine : file.lines[i].oldLine;
@@ -281,7 +254,6 @@ export function renderDiff(fileIdx: number): void {
       const anchorId = getLineId(anchorKey);
       let anchor = document.getElementById('line-' + anchorId);
       if (anchor) {
-        // Skip past any existing comment rows
         while (
           anchor!.nextElementSibling?.classList.contains('comment-row') ||
           anchor!.nextElementSibling?.classList.contains('claude-comment-row')
@@ -292,7 +264,6 @@ export function renderDiff(fileIdx: number): void {
         continue;
       }
     }
-    // No preceding line — insert before the first content row (after the file header)
     const firstRow = table.querySelector('tr');
     if (firstRow) {
       firstRow.before(tr);
@@ -300,6 +271,54 @@ export function renderDiff(fileIdx: number): void {
       table.appendChild(tr);
     }
   }
+}
+
+export function renderDiff(fileIdx: number): void {
+  const file = files[fileIdx];
+  if (!file) return;
+  const container = document.getElementById('diff-container')!;
+  const lang = detectLang(file.path);
+
+  const fileAnalysis = analysis?.files[file.path];
+  const summaryHtml = fileAnalysis
+    ? `<div class="file-header-summary">${escapeHtml(fileAnalysis.summary)}</div>`
+    : '';
+  let html = `<div class="diff-file-header">${escapeHtml(file.path)} <a style="float:right;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none" data-action="show-whole-file" data-file-idx="${fileIdx}">Show whole file</a>${summaryHtml}</div>`;
+  html += `<table class="diff-table">`;
+
+  const wordDiffs = precomputeWordDiffs(file.lines);
+
+  file.lines.forEach((line, lineIdx) => {
+    const lineKey = `${file.path}::${lineIdx}`;
+    const lineId = getLineId(lineKey);
+    html += renderDiffLineHtml(file, line, lineIdx, lineId, lang, wordDiffs);
+  });
+
+  // Expand context at end of file
+  const lastLine = file.lines[file.lines.length - 1];
+  if (lastLine && lastLine.newLine) {
+    html += `<tr class="expand-row" data-expand-down data-file="${escapeHtml(file.path)}" data-line="${lastLine.newLine}">
+      <td colspan="3">&#8943; Show more context below</td>
+    </tr>`;
+  }
+
+  html += `</table>`;
+  container.innerHTML = html;
+
+  // Attach event listeners via delegation (remove first to avoid stacking on re-render)
+  container.removeEventListener('click', handleDiffContainerClick);
+  container.addEventListener('click', handleDiffContainerClick);
+
+  // Auto-expand small gaps
+  container.querySelectorAll<HTMLElement>('tr[data-auto-expand]').forEach((row) => {
+    const count = parseInt(row.dataset.count!) || 8;
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('diff-hunk')) next.remove();
+    expandContext(row.dataset.file!, parseInt(row.dataset.line!), 'down', row, count);
+  });
+
+  // Render orphaned Claude comments
+  insertOrphanedComments(file, container);
 
   // Handle hash-based navigation
   const hash = window.location.hash;
