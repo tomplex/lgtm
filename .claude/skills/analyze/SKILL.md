@@ -23,13 +23,18 @@ yourself with the review skill).
 
 ### Step 1: File analysis
 
-Spawn the `file-analyzer` agent. Pass the repo path so it can call `review_get_diff`.
+Spawn the `file-analyzer` agent. Pass the repo path and base branch so it can use git directly.
+
+To find the base branch, check `review_status` — the session's repo path tells you which repo,
+and you can get the base branch by running `git merge-base --fork-point main HEAD` or checking
+the branch the session was started against. If unclear, use `main` as the default.
 
 ```
 Prompt for the agent:
 
 Analyze the diff for the repository at <REPO_PATH>.
-Call review_get_diff with repoPath "<REPO_PATH>" to get the diff, then classify every file.
+The base branch is <BASE_BRANCH>.
+Use git commands to explore the diff and classify every file.
 ```
 
 The agent returns a JSON object keyed by file path with `priority`, `phase`, `summary`, and `category` per file.

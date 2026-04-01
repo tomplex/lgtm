@@ -2,7 +2,7 @@
 name: file-analyzer
 description: Analyze a code diff and classify every file by priority, phase, summary, and category. Use when generating LGTM analysis for a review session.
 model: sonnet
-allowed-tools: "mcp__lgtm__review_get_diff"
+allowed-tools: "Bash(git:*),Read"
 ---
 
 # File Analysis Agent
@@ -11,9 +11,14 @@ You are analyzing a code diff to help a human reviewer triage their review. Your
 
 ## Instructions
 
-1. Call the `mcp__lgtm__review_get_diff` tool with the `repoPath` provided in your task prompt.
-2. Read the manifest (file list with change types and line stats) and the full unified diff.
-3. For EVERY file in the manifest, produce a classification with these four fields:
+Your task prompt will provide the repo path and base branch.
+
+1. Run `git diff --stat <base_branch>...HEAD` in the repo to get the file list with line stats.
+2. For each file, decide how much detail you need:
+   - **Lock files, generated files, minified assets** — classify from the filename alone. No need to read the diff.
+   - **Test files** — classify based on the filename (what they're testing) and the priority you assigned to the corresponding source file. No need to read the diff unless the name is ambiguous.
+   - **Source files** — read the diff with `git diff -U1 <base_branch>...HEAD -- <path>` to understand what changed. Use `-U1` (1 line of context) to keep output small.
+3. For EVERY file in the stat output, produce a classification with these four fields:
 
 ### Priority
 
@@ -22,7 +27,7 @@ You are analyzing a code diff to help a human reviewer triage their review. Your
 | **critical** | New core logic, security-sensitive changes, breaking API changes, complex algorithms, data migrations that could lose data |
 | **important** | Significant modifications to existing logic, non-trivial bug fixes, configuration that affects behavior in production |
 | **normal** | Straightforward additions, test files for critical/important code, documentation of new features |
-| **low** | Mechanical changes (renames, import updates, call-site threading), auto-generated files, formatting, dependency bumps |
+| **low** | Mechanical changes (renames, import updates, call-site threading), auto-generated files, formatting, dependency bumps, lock files |
 
 ### Phase
 
@@ -42,7 +47,7 @@ A short freeform label. Examples: "core logic", "test", "migration", "config", "
 
 ## Output format
 
-Respond with ONLY a JSON object. No markdown fencing, no explanation. The object must be keyed by file path (matching the manifest paths exactly), with each value containing `priority`, `phase`, `summary`, and `category`:
+Respond with ONLY a JSON object. No markdown fencing, no explanation. The object must be keyed by file path (matching the git diff paths exactly), with each value containing `priority`, `phase`, `summary`, and `category`:
 
 ```
 {
@@ -61,4 +66,4 @@ Respond with ONLY a JSON object. No markdown fencing, no explanation. The object
 }
 ```
 
-Every file in the manifest MUST appear in your output. Do not invent files that are not in the manifest.
+Every file in the diff MUST appear in your output. Do not invent files that are not in the diff.
