@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 
-import { writeFileSync, mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import open from 'open';
-import { detectBaseBranch, gitRun } from './git-ops.js';
-import { Session } from './session.js';
 import { createApp } from './app.js';
+import { SessionManager } from './session-manager.js';
 
 function stablePortForPath(path: string): number {
   let h = 0;
@@ -30,38 +28,16 @@ function parseArgs(argv: string[]): Record<string, string> {
 function main(): void {
   const args = parseArgs(process.argv);
 
-  const repoPath = resolve(args.repo || process.cwd());
-  const baseBranch = args.base || detectBaseBranch(repoPath);
-  const port = args.port ? parseInt(args.port) : stablePortForPath(repoPath);
-  const description = args.description || '';
+  const port = args.port ? parseInt(args.port) : 9900;
 
-  const reviewDir = '/tmp/claude-review';
-  mkdirSync(reviewDir, { recursive: true });
+  mkdirSync('/tmp/claude-review', { recursive: true });
 
-  let outputPath: string;
-  if (args.output) {
-    outputPath = args.output;
-  } else {
-    const branch = gitRun(repoPath, 'rev-parse', '--abbrev-ref', 'HEAD');
-    const slug = branch ? branch.replace(/\//g, '-') : repoPath.split('/').pop()!;
-    outputPath = `${reviewDir}/${slug}.md`;
-  }
-
-  writeFileSync(outputPath, '');
-
-  const session = new Session({
-    repoPath,
-    baseBranch,
-    description,
-    outputPath,
-  });
-
-  const app = createApp(session);
+  const manager = new SessionManager(port);
+  const app = createApp(manager);
   const url = `http://127.0.0.1:${port}`;
 
   app.listen(port, '127.0.0.1', () => {
     console.log(`REVIEW_URL=${url}`);
-    console.log(`REVIEW_OUTPUT=${outputPath}`);
     console.log(`REVIEW_PID=${process.pid}`);
     open(url);
   });

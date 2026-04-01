@@ -1,28 +1,78 @@
-import express from 'express';
+import express, { type Request, type Response, type NextFunction, Router } from 'express';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getFileLines, getBranchCommits } from './git-ops.js';
 import { type Session, type SSEClient } from './session.js';
+import { type SessionManager } from './session-manager.js';
 
-export function createApp(session: Session): express.Express {
+declare global {
+  namespace Express {
+    interface Locals {
+      session: Session;
+    }
+  }
+}
+
+export function createApp(manager: SessionManager): express.Express {
   const app = express();
   app.use(express.json());
 
-  // --- GET routes ---
+  // --- Top-level project management routes ---
 
-  app.get('/items', (_req, res) => {
-    res.json({ items: session.items });
+  app.post('/projects', (req, res) => {
+    const { repoPath, description, baseBranch } = req.body;
+    if (!repoPath) {
+      res.status(400).json({ error: 'repoPath is required' });
+      return;
+    }
+    const result = manager.register(repoPath, { description, baseBranch });
+    console.log(`PROJECT_REGISTERED=${result.slug} path=${repoPath}`);
+    res.json({ ok: true, ...result });
   });
 
-  app.get('/data', (req, res) => {
+  app.get('/projects', (_req, res) => {
+    res.json({ projects: manager.list() });
+  });
+
+  app.delete('/projects/:slug', (req, res) => {
+    const removed = manager.deregister(req.params.slug);
+    if (!removed) {
+      res.status(404).json({ error: `Project not found: ${req.params.slug}` });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
+  // --- Project-scoped router ---
+
+  const projectRouter = Router({ mergeParams: true });
+
+  projectRouter.use((req: Request, res: Response, next: NextFunction) => {
+    const session = manager.get(req.params['slug'] as string);
+    if (!session) {
+      res.status(404).json({ error: `Project not found: ${req.params.slug}` });
+      return;
+    }
+    res.locals.session = session;
+    next();
+  });
+
+  // --- GET routes ---
+
+  projectRouter.get('/items', (_req, res) => {
+    res.json({ items: res.locals.session.items });
+  });
+
+  projectRouter.get('/data', (req, res) => {
     const itemId = (req.query.item as string) ?? 'diff';
     const commits = req.query.commits as string | undefined;
-    const data = session.getItemData(itemId, commits);
+    const data = res.locals.session.getItemData(itemId, commits);
     res.json(data);
   });
 
-  app.get('/context', (req, res) => {
+  projectRouter.get('/context', (req, res) => {
+    const session = res.locals.session;
     const file = (req.query.file as string) ?? '';
     const line = parseInt(req.query.line as string) || 0;
     const count = parseInt(req.query.count as string) || 20;
@@ -31,7 +81,8 @@ export function createApp(session: Session): express.Express {
     res.json({ lines });
   });
 
-  app.get('/file', (req, res) => {
+  projectRouter.get('/file', (req, res) => {
+    const session = res.locals.session;
     const filePath = (req.query.path as string) ?? '';
     const fullPath = join(session.repoPath, filePath);
     if (!existsSync(fullPath)) {
@@ -46,12 +97,14 @@ export function createApp(session: Session): express.Express {
     res.json({ lines });
   });
 
-  app.get('/commits', (_req, res) => {
+  projectRouter.get('/commits', (_req, res) => {
+    const session = res.locals.session;
     const commits = getBranchCommits(session.repoPath, session.baseBranch);
     res.json({ commits });
   });
 
-  app.get('/events', (req, res) => {
+  projectRouter.get('/events', (req, res) => {
+    const session = res.locals.session;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -75,13 +128,14 @@ export function createApp(session: Session): express.Express {
     });
   });
 
-  app.get('/analysis', (_req, res) => {
-    res.json({ analysis: session.analysis });
+  projectRouter.get('/analysis', (_req, res) => {
+    res.json({ analysis: res.locals.session.analysis });
   });
 
   // --- POST routes ---
 
-  app.post('/items', (req, res) => {
+  projectRouter.post('/items', (req, res) => {
+    const session = res.locals.session;
     const { path: filepath = '', title = '', id = '' } = req.body;
     const itemTitle = title || filepath.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Untitled';
     const itemId = id || slugify(itemTitle);
@@ -91,7 +145,8 @@ export function createApp(session: Session): express.Express {
     res.json(result);
   });
 
-  app.post('/comments', (req, res) => {
+  projectRouter.post('/comments', (req, res) => {
+    const session = res.locals.session;
     const itemId = req.body.item ?? 'diff';
     const newComments = req.body.comments ?? [];
     const count = session.addComments(itemId, newComments);
@@ -100,14 +155,16 @@ export function createApp(session: Session): express.Express {
     res.json({ ok: true, count });
   });
 
-  app.post('/submit', (req, res) => {
+  projectRouter.post('/submit', (req, res) => {
+    const session = res.locals.session;
     const commentsText = req.body.comments ?? '';
     const currentRound = session.submitReview(commentsText);
     console.log(`REVIEW_ROUND=${currentRound}`);
     res.json({ ok: true, round: currentRound });
   });
 
-  app.post('/analysis', (req, res) => {
+  projectRouter.post('/analysis', (req, res) => {
+    const session = res.locals.session;
     session.setAnalysis(req.body);
     console.log(`ANALYSIS_SET files=${Object.keys(req.body.files ?? {}).length}`);
     res.json({ ok: true });
@@ -115,7 +172,8 @@ export function createApp(session: Session): express.Express {
 
   // --- DELETE routes ---
 
-  app.delete('/comments', (req, res) => {
+  projectRouter.delete('/comments', (req, res) => {
+    const session = res.locals.session;
     const itemId = req.query.item as string | undefined;
     const index = req.query.index as string | undefined;
     if (itemId && index) {
@@ -128,12 +186,16 @@ export function createApp(session: Session): express.Express {
     res.json({ ok: true });
   });
 
-  // --- Static files (must be last) ---
+  // Mount project router
+  app.use('/project/:slug', projectRouter);
+
+  // --- Static files ---
 
   const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend', 'dist');
   if (existsSync(distDir)) {
     app.use(express.static(distDir));
-    app.get('/{*path}', (_req, res) => {
+    // SPA fallback for project URLs
+    app.get('/project/{*path}', (_req, res) => {
       res.sendFile(join(distDir, 'index.html'));
     });
   }
