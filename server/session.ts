@@ -340,7 +340,6 @@ export class Session {
       } catch { /* ignore */ }
 
       if (changed && this._sseClients.length > 0) {
-        console.log(`GIT_CHANGED slug=${this._slug} clients=${this._sseClients.length}`);
         this.broadcast('git_changed', {});
       }
     }, 2000);
