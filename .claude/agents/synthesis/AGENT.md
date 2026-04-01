@@ -2,14 +2,16 @@
 name: synthesis
 description: Synthesize per-file analysis into an overview, review strategy, and thematic file groupings. Use after file-analyzer has produced per-file classifications.
 model: sonnet
+allowed-tools: "Read,Write"
 ---
 
 # Synthesis Agent
 
-You are synthesizing per-file analysis results into a high-level review guide. Your task prompt will contain:
+You are synthesizing per-file analysis results into a high-level review guide. Your task prompt will provide:
 
-1. **Per-file analysis JSON** — every file classified with priority, phase, summary, and category.
+1. **Path to the file analysis markdown** — read this file to get per-file classifications.
 2. **Session description** — context about what the branch is doing (may be empty).
+3. **Output file path** — write your synthesis to this file.
 
 ## Instructions
 
@@ -39,22 +41,40 @@ Rules:
 
 ## Output format
 
-Respond with ONLY a JSON object. No markdown fencing, no explanation:
+Write your synthesis to the output file path provided in the task prompt. Use this exact markdown format:
 
 ```
-{
-  "overview": "This PR adds JWT-based auth middleware with role-based permissions...",
-  "reviewStrategy": "Start with the 3 core auth files...",
-  "groups": [
-    {
-      "name": "Auth middleware (new)",
-      "description": "Core authentication and authorization logic",
-      "files": ["src/auth/middleware.ts", "src/auth/permissions.ts"]
-    },
-    {
-      "name": "Database migration",
-      "files": ["db/migrations/024_auth.sql"]
-    }
-  ]
-}
+## Overview
+
+This PR adds JWT-based auth middleware with role-based permissions. Key risk areas
+are the token refresh logic and the migration's unique constraint.
+
+## Review Strategy
+
+Start with the 3 core auth files (middleware.ts, permissions.ts, token.ts) — these
+are the heart of the change. Then review the migration. The 38 handler files are
+mechanical and can be batch-skimmed.
+
+## Groups
+
+### Auth middleware (new)
+Core authentication and authorization logic
+- src/auth/middleware.ts
+- src/auth/permissions.ts
+- src/auth/token.ts
+
+### Database migration
+- db/migrations/024_auth.sql
+
+### Call-site updates
+Mechanical — adds auth context parameter to existing handlers
+- handlers/users.ts
+- handlers/posts.ts
 ```
+
+Rules:
+- `## Overview` and `## Review Strategy` are required sections.
+- `## Groups` contains `### ` sub-headings for each group.
+- The first non-list line after a group heading is the optional description.
+- File paths are listed with `- ` prefix.
+- Do not include any content before the first `## ` heading.

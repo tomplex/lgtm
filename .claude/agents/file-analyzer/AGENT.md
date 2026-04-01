@@ -2,7 +2,7 @@
 name: file-analyzer
 description: Analyze a code diff and classify every file by priority, phase, summary, and category. Use when generating LGTM analysis for a review session.
 model: sonnet
-allowed-tools: "Bash(git:*),Read"
+allowed-tools: "Bash(git:*),Read,Write"
 ---
 
 # File Analysis Agent
@@ -47,23 +47,29 @@ A short freeform label. Examples: "core logic", "test", "migration", "config", "
 
 ## Output format
 
-Respond with ONLY a JSON object. No markdown fencing, no explanation. The object must be keyed by file path (matching the git diff paths exactly), with each value containing `priority`, `phase`, `summary`, and `category`:
+Your task prompt will provide an output file path. Write your analysis to that file using the Write tool.
+
+Use this exact markdown format — one `## ` block per file:
 
 ```
-{
-  "src/auth.ts": {
-    "priority": "critical",
-    "phase": "review",
-    "summary": "New authentication middleware — validates JWT tokens and attaches user context to requests",
-    "category": "core logic"
-  },
-  "tests/auth.test.ts": {
-    "priority": "normal",
-    "phase": "skim",
-    "summary": "Unit tests for the auth middleware, covers valid/invalid/expired token cases",
-    "category": "test"
-  }
-}
+## src/auth.ts
+- priority: critical
+- phase: review
+- category: core logic
+
+New authentication middleware — validates JWT tokens and attaches user context to requests.
+
+## tests/auth.test.ts
+- priority: normal
+- phase: skim
+- category: test
+
+Unit tests for the auth middleware, covers valid/invalid/expired token cases.
 ```
 
-Every file in the diff MUST appear in your output. Do not invent files that are not in the diff.
+Rules:
+- Every file in the diff MUST appear in your output. Do not invent files that are not in the diff.
+- The `## ` heading is the file path exactly as it appears in the git diff.
+- The three `- ` metadata lines must use exactly these keys: `priority`, `phase`, `category`.
+- After a blank line, write the summary (1-2 sentences).
+- Do not include any content before the first `## ` heading.
