@@ -1019,3 +1019,11 @@ tr.expand-row:hover td {
 .overview-toggle:hover {
   color: var(--text);
 }
+
+/* --- File header summary --- */
+.file-header-summary {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+}

@@ -4,6 +4,7 @@ import {
   comments,
   claudeComments,
   resolvedComments,
+  analysis,
   getLineId,
   lineIdToKey,
   setActiveFileIdx,
@@ -144,7 +145,11 @@ export function renderDiff(fileIdx: number): void {
   const container = document.getElementById('diff-container')!;
   const lang = detectLang(file.path);
 
-  let html = `<div class="diff-file-header">${escapeHtml(file.path)} <a style="float:right;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none" data-action="show-whole-file" data-file-idx="${fileIdx}">Show whole file</a></div>`;
+  const fileAnalysis = analysis?.files[file.path];
+  const summaryHtml = fileAnalysis
+    ? `<div class="file-header-summary">${escapeHtml(fileAnalysis.summary)}</div>`
+    : '';
+  let html = `<div class="diff-file-header">${escapeHtml(file.path)} <a style="float:right;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none" data-action="show-whole-file" data-file-idx="${fileIdx}">Show whole file</a>${summaryHtml}</div>`;
   html += `<table class="diff-table">`;
 
   // Pre-compute word diffs for adjacent del/add pairs
