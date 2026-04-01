@@ -133,6 +133,76 @@ export function createApp(manager: SessionManager): express.Express {
     res.json({ analysis: res.locals.session.analysis });
   });
 
+  // --- User state routes ---
+
+  projectRouter.get('/user-state', (_req, res) => {
+    const session = res.locals.session;
+    res.json({
+      comments: session.userComments,
+      reviewedFiles: session.userReviewedFiles,
+      resolvedComments: session.userResolvedComments,
+      sidebarView: session.userSidebarView,
+    });
+  });
+
+  projectRouter.put('/user-state/comment', (req, res) => {
+    const session = res.locals.session;
+    const { key, text } = req.body;
+    if (!key) {
+      res.status(400).json({ error: 'key is required' });
+      return;
+    }
+    if (text) {
+      session.setUserComment(key, text);
+    } else {
+      session.deleteUserComment(key);
+    }
+    res.json({ ok: true });
+  });
+
+  projectRouter.put('/user-state/reviewed', (req, res) => {
+    const session = res.locals.session;
+    const { path } = req.body;
+    if (!path) {
+      res.status(400).json({ error: 'path is required' });
+      return;
+    }
+    const reviewed = session.toggleUserReviewedFile(path);
+    res.json({ ok: true, reviewed });
+  });
+
+  projectRouter.put('/user-state/resolved', (req, res) => {
+    const session = res.locals.session;
+    const { key } = req.body;
+    if (!key) {
+      res.status(400).json({ error: 'key is required' });
+      return;
+    }
+    const resolved = session.toggleUserResolvedComment(key);
+    res.json({ ok: true, resolved });
+  });
+
+  projectRouter.put('/user-state/sidebar-view', (req, res) => {
+    const session = res.locals.session;
+    const { view } = req.body;
+    if (!view || !['flat', 'grouped', 'phased'].includes(view)) {
+      res.status(400).json({ error: 'view must be flat, grouped, or phased' });
+      return;
+    }
+    session.setUserSidebarView(view);
+    res.json({ ok: true });
+  });
+
+  projectRouter.post('/user-state/clear', (_req, res) => {
+    const session = res.locals.session;
+    for (const key of Object.keys(session.userComments)) {
+      session.deleteUserComment(key);
+    }
+    session.setUserReviewedFiles([]);
+    session.setUserResolvedComments([]);
+    res.json({ ok: true });
+  });
+
   // --- POST routes ---
 
   projectRouter.post('/items', (req, res) => {
