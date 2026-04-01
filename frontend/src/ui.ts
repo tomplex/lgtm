@@ -36,6 +36,49 @@ import { saveState, clearPersistedState } from './persistence';
 
 // --- File list sidebar ---
 
+interface FileItemOptions {
+  showDir?: boolean;
+  showSummary?: boolean;
+  priorityClass?: string;
+  extraClass?: string;
+}
+
+function renderFileItem(file: { path: string; additions: number; deletions: number }, idx: number, opts: FileItemOptions = {}): HTMLDivElement {
+  const div = document.createElement('div');
+  const isReviewed = reviewedFiles.has(file.path);
+  let cls = 'file-item' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '');
+  if (opts.extraClass) cls += ' ' + opts.extraClass;
+  if (opts.priorityClass) cls += ' ' + opts.priorityClass;
+  div.className = cls;
+  div.dataset.idx = String(idx);
+
+  const commentCount = Object.keys(comments).filter((k) => k.startsWith(file.path + '::')).length;
+  const claudeCount = claudeComments.filter((c) => c.file === file.path).length;
+
+  const lastSlash = file.path.lastIndexOf('/');
+  const dir = lastSlash >= 0 ? file.path.slice(0, lastSlash + 1) : '';
+  const base = lastSlash >= 0 ? file.path.slice(lastSlash + 1) : file.path;
+  const fileSummary = opts.showSummary ? analysis?.files[file.path]?.summary : undefined;
+
+  div.innerHTML = `
+    <span class="review-check" title="Mark as reviewed (e)">${isReviewed ? '&#10003;' : '&#9675;'}</span>
+    <span class="filename" title="${escapeHtml(file.path)}">
+      ${opts.showDir && dir ? `<span class="dir">${escapeHtml(dir)}</span>` : ''}
+      <span class="base">${escapeHtml(base)}</span>
+      ${fileSummary ? `<span class="file-summary">${escapeHtml(fileSummary)}</span>` : ''}
+    </span>
+    ${claudeCount > 0 ? `<span class="badge claude-badge" title="Claude comments">${claudeCount}</span>` : ''}
+    ${commentCount > 0 ? `<span class="badge comments-badge" title="Your comments">${commentCount}</span>` : ''}
+    <span class="file-stats">
+      <span class="add">+${file.additions}</span>
+      <span class="del">-${file.deletions}</span>
+    </span>
+  `;
+  div.querySelector('.review-check')!.addEventListener('click', (ev) => { ev.stopPropagation(); toggleReviewed(file.path, ev); });
+  div.onclick = () => selectFile(idx);
+  return div;
+}
+
 export function renderFileList(): void {
   if (analysis && sidebarView === 'grouped') {
     renderGroupedFileList();
@@ -61,39 +104,12 @@ export function renderFileList(): void {
     totalAdd += file.additions;
     totalDel += file.deletions;
 
-    const div = document.createElement('div');
-    const isReviewed = reviewedFiles.has(file.path);
-    div.className = 'file-item' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '');
-    div.dataset.idx = String(idx);
-
-    if (analysis?.files[file.path]) {
-      div.classList.add(`priority-${analysis.files[file.path].priority}`);
-    }
-
-    const commentCount = Object.keys(comments).filter((k) => k.startsWith(file.path + '::')).length;
-    const claudeCount = claudeComments.filter((c) => c.file === file.path).length;
-
-    const lastSlash = file.path.lastIndexOf('/');
-    const dir = lastSlash >= 0 ? file.path.slice(0, lastSlash + 1) : '';
-    const base = lastSlash >= 0 ? file.path.slice(lastSlash + 1) : file.path;
-    const fileSummary = analysis?.files[file.path]?.summary;
-
-    div.innerHTML = `
-      <span class="review-check" title="Mark as reviewed (e)">${isReviewed ? '&#10003;' : '&#9675;'}</span>
-      <span class="filename" title="${escapeHtml(file.path)}">
-        ${dir ? `<span class="dir">${escapeHtml(dir)}</span>` : ''}
-        <span class="base">${escapeHtml(base)}</span>
-        ${fileSummary ? `<span class="file-summary">${escapeHtml(fileSummary)}</span>` : ''}
-      </span>
-      ${claudeCount > 0 ? `<span class="badge claude-badge" title="Claude comments">${claudeCount}</span>` : ''}
-      ${commentCount > 0 ? `<span class="badge comments-badge" title="Your comments">${commentCount}</span>` : ''}
-      <span class="file-stats">
-        <span class="add">+${file.additions}</span>
-        <span class="del">-${file.deletions}</span>
-      </span>
-    `;
-    div.querySelector('.review-check')!.addEventListener('click', (ev) => toggleReviewed(file.path, ev));
-    div.onclick = () => selectFile(idx);
+    const priority = analysis?.files[file.path]?.priority;
+    const div = renderFileItem(file, idx, {
+      showDir: true,
+      showSummary: true,
+      priorityClass: priority ? `priority-${priority}` : undefined,
+    });
     el.appendChild(div);
   });
 
@@ -155,28 +171,11 @@ function renderGroupedFileList(): void {
 
     for (const file of group.files) {
       const idx = files.indexOf(file);
-      const div = document.createElement('div');
-      const isReviewed = reviewedFiles.has(file.path);
       const priority = analysis!.files[file.path]?.priority;
-      div.className = 'file-item grouped' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '') + (priority ? ` priority-${priority}` : '');
-      div.dataset.idx = String(idx);
-
-      const base = file.path.split('/').pop() || file.path;
-      const commentCount = Object.keys(comments).filter(k => k.startsWith(file.path + '::')).length;
-      const claudeCount = claudeComments.filter(c => c.file === file.path).length;
-
-      div.innerHTML = `
-        <span class="review-check" title="Mark as reviewed (e)">${isReviewed ? '&#10003;' : '&#9675;'}</span>
-        <span class="filename"><span class="base">${escapeHtml(base)}</span></span>
-        ${claudeCount > 0 ? `<span class="badge claude-badge" title="Claude comments">${claudeCount}</span>` : ''}
-        ${commentCount > 0 ? `<span class="badge comments-badge" title="Your comments">${commentCount}</span>` : ''}
-        <span class="file-stats">
-          <span class="add">+${file.additions}</span>
-          <span class="del">-${file.deletions}</span>
-        </span>
-      `;
-      div.querySelector('.review-check')!.addEventListener('click', (ev) => { ev.stopPropagation(); toggleReviewed(file.path); });
-      div.onclick = () => selectFile(idx);
+      const div = renderFileItem(file, idx, {
+        extraClass: 'grouped',
+        priorityClass: priority ? `priority-${priority}` : undefined,
+      });
       fileContainer.appendChild(div);
     }
 
@@ -227,27 +226,7 @@ function renderPhasedFileList(): void {
 
     for (const file of phaseFiles_) {
       const idx = files.indexOf(file);
-      const div = document.createElement('div');
-      const isReviewed = reviewedFiles.has(file.path);
-      div.className = 'file-item phased' + (idx === activeFileIdx ? ' active' : '') + (isReviewed ? ' reviewed' : '');
-      div.dataset.idx = String(idx);
-
-      const base = file.path.split('/').pop() || file.path;
-      const commentCount = Object.keys(comments).filter(k => k.startsWith(file.path + '::')).length;
-      const claudeCount = claudeComments.filter(c => c.file === file.path).length;
-
-      div.innerHTML = `
-        <span class="review-check" title="Mark as reviewed (e)">${isReviewed ? '&#10003;' : '&#9675;'}</span>
-        <span class="filename"><span class="base">${escapeHtml(base)}</span></span>
-        ${claudeCount > 0 ? `<span class="badge claude-badge" title="Claude comments">${claudeCount}</span>` : ''}
-        ${commentCount > 0 ? `<span class="badge comments-badge" title="Your comments">${commentCount}</span>` : ''}
-        <span class="file-stats">
-          <span class="add">+${file.additions}</span>
-          <span class="del">-${file.deletions}</span>
-        </span>
-      `;
-      div.querySelector('.review-check')!.addEventListener('click', (ev) => { ev.stopPropagation(); toggleReviewed(file.path); });
-      div.onclick = () => selectFile(idx);
+      const div = renderFileItem(file, idx, { extraClass: 'phased' });
       el.appendChild(div);
     }
   }
