@@ -59,7 +59,9 @@ setupViewToggle();
 
 // SSE — auto-reload on server events
 function connectSSE(): void {
-  const es = new EventSource('/events');
+  const slug = window.location.pathname.match(/^\/project\/([^/]+)/)?.[1] ?? '';
+  const eventsUrl = slug ? `/project/${slug}/events` : '/events';
+  const es = new EventSource(eventsUrl);
   es.addEventListener('comments_changed', () => {
     switchToItem(activeItemId);
     showToast('New comments from Claude', 2000);
