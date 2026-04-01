@@ -1,7 +1,7 @@
 import 'highlight.js/styles/github-dark.css';
 import './style.css';
 
-import { fetchItemData, fetchAnalysis } from './api';
+import { fetchItemData, fetchAnalysis, baseUrl } from './api';
 import { applyHash } from './diff';
 import { escapeHtml } from './utils';
 import { activeItemId, setAnalysis } from './state';
@@ -59,8 +59,7 @@ setupViewToggle();
 
 // SSE — auto-reload on server events
 function connectSSE(): void {
-  const slug = window.location.pathname.match(/^\/project\/([^/]+)/)?.[1] ?? '';
-  const eventsUrl = slug ? `/project/${slug}/events` : '/events';
+  const eventsUrl = `${baseUrl()}/events`;
   const es = new EventSource(eventsUrl);
   es.addEventListener('comments_changed', () => {
     switchToItem(activeItemId);

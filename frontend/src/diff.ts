@@ -259,7 +259,8 @@ export function renderDiff(fileIdx: number): void {
   html += `</table>`;
   container.innerHTML = html;
 
-  // Attach event listeners via delegation
+  // Attach event listeners via delegation (remove first to avoid stacking on re-render)
+  container.removeEventListener('click', handleDiffContainerClick);
   container.addEventListener('click', handleDiffContainerClick);
 
   // Auto-expand small gaps
@@ -626,7 +627,8 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
     html += `</table>`;
     container.innerHTML = html;
 
-    // Event delegation for dismiss buttons
+    // Event delegation for dismiss buttons (remove first to avoid stacking on re-render)
+    container.removeEventListener('click', handleDiffContainerClick);
     container.addEventListener('click', handleDiffContainerClick);
 
     // Back-to-diff click handler

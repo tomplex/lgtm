@@ -76,6 +76,11 @@ export type SidebarView = 'flat' | 'grouped' | 'phased';
 
 // --- Mutable state ---
 export let files: DiffFile[] = [];
+// Key format conventions for the comments record:
+//   "filepath::lineIdx"          — diff line comment (user note on a specific line)
+//   "doc:itemId:blockIdx"        — document block comment
+//   "claude:itemId:serverIndex"  — Claude reply text for a review comment
+//   "md::blockIdx"               — markdown block comment
 export const comments: Record<string, string> = {};
 export let activeFileIdx = 0;
 export let appMode: 'diff' | 'file' = 'diff';
@@ -95,22 +100,25 @@ export let sidebarView: SidebarView = 'flat';
 // Line ID tracking
 let lineIdCounter = 0;
 const lineKeyToId: Record<string, string> = {};
+const idToLineKey: Record<string, string> = {};
 
 export function getLineId(lineKey: string): string {
-  if (!lineKeyToId[lineKey]) lineKeyToId[lineKey] = 'lc-' + lineIdCounter++;
+  if (!lineKeyToId[lineKey]) {
+    const id = 'lc-' + lineIdCounter++;
+    lineKeyToId[lineKey] = id;
+    idToLineKey[id] = lineKey;
+  }
   return lineKeyToId[lineKey];
 }
 
 export function lineIdToKey(lineId: string): string | null {
-  for (const [key, id] of Object.entries(lineKeyToId)) {
-    if (id === lineId) return key;
-  }
-  return null;
+  return idToLineKey[lineId] ?? null;
 }
 
 export function resetLineIds(): void {
   lineIdCounter = 0;
   for (const key of Object.keys(lineKeyToId)) delete lineKeyToId[key];
+  for (const key of Object.keys(idToLineKey)) delete idToLineKey[key];
 }
 
 // Setters for reassignable state (since `export let` can't be reassigned from outside)

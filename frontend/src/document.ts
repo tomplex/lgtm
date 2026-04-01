@@ -254,7 +254,8 @@ export function renderMarkdownComments(): void {
 }
 
 function updateMdStats(): void {
-  const count = Object.keys(comments).length;
+  const prefix = activeItemId === 'diff' ? 'md::' : `doc:${activeItemId}:`;
+  const count = Object.keys(comments).filter(k => k.startsWith(prefix)).length;
   document.getElementById('stats')!.innerHTML =
     `${mdMeta.filename || 'Document'}` + (count > 0 ? ` &middot; ${count} comment${count !== 1 ? 's' : ''}` : '');
 }

@@ -5,9 +5,21 @@ function getProjectSlug(): string {
   return match?.[1] ?? '';
 }
 
-function baseUrl(): string {
+export function baseUrl(): string {
   const slug = getProjectSlug();
   return slug ? `/project/${slug}` : '';
+}
+
+async function checkedJson<T>(resp: Response): Promise<T> {
+  if (!resp.ok) {
+    let message = `HTTP ${resp.status}`;
+    try {
+      const body = await resp.json();
+      if (body.error) message = body.error;
+    } catch { /* ignore parse failure */ }
+    throw new Error(message);
+  }
+  return resp.json();
 }
 
 interface DiffData {
@@ -37,7 +49,7 @@ type ItemData = DiffData | FileData | ErrorData;
 
 export async function fetchItems(): Promise<SessionItem[]> {
   const resp = await fetch(`${baseUrl()}/items`);
-  const data = await resp.json();
+  const data = await checkedJson<{ items?: SessionItem[] }>(resp);
   return data.items || [];
 }
 
@@ -45,12 +57,12 @@ export async function fetchItemData(itemId: string, commits?: string): Promise<I
   let url = `${baseUrl()}/data?item=${encodeURIComponent(itemId)}`;
   if (commits) url += `&commits=${commits}`;
   const resp = await fetch(url);
-  return resp.json();
+  return checkedJson<ItemData>(resp);
 }
 
 export async function fetchCommits(): Promise<Commit[]> {
   const resp = await fetch(`${baseUrl()}/commits`);
-  const data = await resp.json();
+  const data = await checkedJson<{ commits?: Commit[] }>(resp);
   return data.commits || [];
 }
 
@@ -63,13 +75,13 @@ export async function fetchContext(
   const resp = await fetch(
     `${baseUrl()}/context?file=${encodeURIComponent(filepath)}&line=${line}&count=${count}&direction=${direction}`,
   );
-  const data = await resp.json();
+  const data = await checkedJson<{ lines?: { num: number; content: string }[] }>(resp);
   return data.lines || [];
 }
 
 export async function fetchFile(filepath: string): Promise<{ num: number; content: string }[]> {
   const resp = await fetch(`${baseUrl()}/file?path=${encodeURIComponent(filepath)}`);
-  const data = await resp.json();
+  const data = await checkedJson<{ lines?: { num: number; content: string }[] }>(resp);
   return data.lines || [];
 }
 
@@ -82,15 +94,16 @@ export async function submitReview(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ comments, raw }),
   });
-  return resp.json();
+  return checkedJson<{ ok: boolean; round: number }>(resp);
 }
 
 export async function deleteClaudeComment(itemId: string, index: number): Promise<void> {
-  await fetch(`${baseUrl()}/comments?item=${encodeURIComponent(itemId)}&index=${index}`, { method: 'DELETE' });
+  const resp = await fetch(`${baseUrl()}/comments?item=${encodeURIComponent(itemId)}&index=${index}`, { method: 'DELETE' });
+  await checkedJson<{ ok: boolean }>(resp);
 }
 
 export async function fetchAnalysis(): Promise<Analysis | null> {
   const resp = await fetch(`${baseUrl()}/analysis`);
-  const data = await resp.json();
+  const data = await checkedJson<{ analysis?: Analysis | null }>(resp);
   return data.analysis || null;
 }
