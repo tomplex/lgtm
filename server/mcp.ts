@@ -3,7 +3,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { existsSync, readFileSync } from 'node:fs';
 import type express from 'express';
-import { getBranchDiff, getDiffManifest } from './git-ops.js';
+import { getBranchDiffForLLM, getDiffManifest } from './git-ops.js';
 import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 
@@ -184,7 +184,21 @@ function createMcpServer(manager: SessionManager): McpServer {
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
       const manifest = getDiffManifest(found.session.repoPath, found.session.baseBranch);
-      const diff = getBranchDiff(found.session.repoPath, found.session.baseBranch);
+
+      const EXCLUDE_PATTERNS = [
+        /\.lock$/,
+        /-lock\.(json|yaml)$/,
+        /\.min\.(js|css)$/,
+        /^dist\//,
+        /\.(png|jpg|gif|ico|woff2?|ttf|eot)$/,
+      ];
+      const excludeFiles = new Set(
+        manifest
+          .filter(f => EXCLUDE_PATTERNS.some(p => p.test(f.path)))
+          .map(f => f.path),
+      );
+
+      const diff = getBranchDiffForLLM(found.session.repoPath, found.session.baseBranch, excludeFiles);
       const lines = [
         '## Description\n',
         found.session.description || 'No description provided.',

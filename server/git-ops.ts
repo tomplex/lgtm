@@ -54,6 +54,38 @@ export function getBranchDiff(repoPath: string, baseBranch: string): string {
   return gitRun(repoPath, 'diff', mergeBase, '--', ...Array.from(branchFiles).sort());
 }
 
+// LLM-optimized variant: reduced context (-U1) and optional file exclusion.
+// The UI's diff endpoint uses getBranchDiff above (full context, all files).
+export function getBranchDiffForLLM(repoPath: string, baseBranch: string, excludeFiles?: Set<string>): string {
+  const mergeBase = gitRun(repoPath, 'merge-base', baseBranch, 'HEAD');
+  if (!mergeBase) return '';
+
+  const filesOutput = gitRun(
+    repoPath,
+    'log', '--first-parent', '--no-merges',
+    '--diff-filter=ACDMR', '--name-only', '--format=',
+    `${baseBranch}..HEAD`,
+  );
+  const branchFiles = new Set(filesOutput.split('\n').filter(f => f.trim()));
+
+  try {
+    const uncommitted = gitRun(repoPath, 'diff', '--name-only', 'HEAD');
+    const staged = gitRun(repoPath, 'diff', '--name-only', '--cached');
+    for (const output of [uncommitted, staged]) {
+      for (const f of output.split('\n').filter(f => f.trim())) {
+        branchFiles.add(f);
+      }
+    }
+  } catch {
+    // working-tree/staged lookup failed
+  }
+
+  const filesToDiff = Array.from(branchFiles).sort().filter(f => !excludeFiles?.has(f));
+  if (filesToDiff.length === 0) return '';
+
+  return gitRun(repoPath, 'diff', '-U1', mergeBase, '--', ...filesToDiff);
+}
+
 export function getSelectedCommitsDiff(repoPath: string, shas: string[]): string {
   return shas
     .map(sha => gitRun(repoPath, 'diff-tree', '-p', '--no-commit-id', sha))
