@@ -42,15 +42,17 @@
 - [ ] When on main, commits should still show up and be reviewable
 
 ## MCP server
-Singleton session manager — one MCP server manages all review sessions. Does NOT own git ops or UI; those stay in the HTTP server. Keyed by repo path (worktrees are distinct paths, so they get separate sessions naturally).
+Singleton server with MCP at `/mcp`, multi-project via `/project/:slug/`. Keyed by repo path.
 
-- [ ] `review_start(repo, description?)` — spawn HTTP server or return existing one (idempotent)
-- [ ] `review_add_document(repo, path, title)` — proxy to the right HTTP server
-- [ ] `review_comment(repo, item, comments)` — seed Claude comments on the right server
-- [ ] `review_status()` — list running sessions, pending feedback
-- [ ] `review_read_feedback(repo)` — get submitted comments
-- [ ] `review_stop(repo)` — kill the server
+- [x] `review_start(repo, description?)` — register project, return URL (idempotent)
+- [x] `review_add_document(repo, path, title)` — add document tab
+- [x] `review_comment(repo, item, comments)` — seed Claude comments
+- [x] `review_status()` — list registered projects with feedback status
+- [x] `review_read_feedback(repo)` — read submitted review feedback
+- [x] `review_stop(repo)` — deregister project
 - [ ] Channel notification on submit (push feedback to Claude without polling)
+- [ ] Plugin packaging (bundle MCP config, skills, hooks for `claude plugin add`)
 
 ## Future
 - [ ] Rename to LGTM
+- [ ] Save user reviews to a perisistent location so that review preferences can be learned from

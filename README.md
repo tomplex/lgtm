@@ -95,31 +95,49 @@ Two view modes, switchable via tabs:
 - **Diff view**: file sidebar, syntax-highlighted unified diff, line-level commenting
 - **Document view**: rendered markdown with per-block commenting
 
-**Dev mode**: `npm run dev` inside `frontend/` starts Vite's dev server with HMR. API requests are proxied to the Python backend (start it separately).
+**Dev mode**: `npm run dev` inside `frontend/` starts Vite's dev server with HMR. API requests are proxied to the backend (start it separately).
 
-**Production mode**: `npm run build` outputs to `frontend/dist/`. The Python server serves these static files directly - no separate frontend process needed.
+**Production mode**: `npm run build` outputs to `frontend/dist/`. The server serves these static files directly - no separate frontend process needed.
 
 ## API
 
-### GET endpoints
+### Project management
 
 | Endpoint | Description |
 |----------|-------------|
-| `/` | Serves the HTML UI |
-| `/items` | List of review items in the session |
-| `/data?item=<id>` | Data for a specific item (diff or document content) |
-| `/data?item=diff&commits=sha1,sha2` | Diff scoped to specific commits |
-| `/commits` | Branch commit list with metadata |
-| `/context?file=<path>&line=<n>&count=<n>&direction=up\|down` | File lines for context expansion |
-| `/file?path=<path>` | Full file content (for "show whole file") |
+| `POST /projects` | Register a project `{ repoPath, description?, baseBranch? }` |
+| `GET /projects` | List registered projects |
+| `DELETE /projects/:slug` | Deregister a project |
 
-### POST endpoints
+### Project-scoped endpoints (under `/project/:slug/`)
 
-| Endpoint | Body | Description |
-|----------|------|-------------|
-| `/items` | `{path, title, id?}` | Add a document to the session |
-| `/comments` | `{item, comments: [{file, line, comment}]}` | Claude seeds comments on an item |
-| `/submit` | `{comments}` | User submits review feedback |
+| Endpoint | Description |
+|----------|-------------|
+| `GET /items` | List of review items in the session |
+| `GET /data?item=<id>` | Data for a specific item (diff or document content) |
+| `GET /data?item=diff&commits=sha1,sha2` | Diff scoped to specific commits |
+| `GET /commits` | Branch commit list with metadata |
+| `GET /context?file=<path>&line=<n>&count=<n>&direction=up\|down` | File lines for context expansion |
+| `GET /file?path=<path>` | Full file content (for "show whole file") |
+| `GET /events` | SSE stream for live updates |
+| `POST /items` | Add a document `{path, title, id?}` |
+| `POST /comments` | Claude seeds comments `{item, comments: [{file, line, comment}]}` |
+| `POST /submit` | User submits review feedback `{comments}` |
+| `DELETE /comments` | Remove Claude comments |
+
+### MCP endpoint
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /mcp` | MCP Streamable HTTP transport (tools + sessions) |
+| `GET /mcp` | MCP SSE stream (for active sessions) |
+
+Connect from Claude Code:
+```bash
+claude mcp add --transport http lgtm http://localhost:9900/mcp
+```
+
+MCP tools: `review_start`, `review_add_document`, `review_comment`, `review_status`, `review_read_feedback`, `review_stop`
 
 ## Features
 
@@ -140,17 +158,18 @@ Two view modes, switchable via tabs:
 - Claude can comment on specific blocks
 
 ### Session model
-- One server per branch, always includes "Code Changes" tab
-- Documents added dynamically via `POST /items` (shows as new tabs)
+- Singleton server managing multiple projects (one per repo path)
+- Projects registered dynamically via `POST /projects` or MCP `review_start`
+- Each project has its own "Code Changes" tab plus dynamically added documents
 - Comments namespaced per item, submitted together
 - Tab bar with comment count badges (blue = user, purple = Claude)
 
 ### Integration
-- Description banner: `--description` flag for review context
+- MCP server at `/mcp` for native Claude Code tool access
+- Description banner via `--description` flag or MCP `review_start`
 - Meta bar: branch name, base branch, repo path, PR link (via `gh`)
 - Anchor links: `#file=path/to/file` for deep linking
-- Deterministic ports: stable hash of repo path (range 9850-9950)
-- Output: `/tmp/claude-review/<branch-slug>.md` with signal file for polling
+- Output: `/tmp/claude-review/<slug>.md` with signal file for polling
 
 ## Keyboard shortcuts
 
@@ -167,7 +186,6 @@ Two view modes, switchable via tabs:
 
 ## Future work
 
-- **MCP server**: wrap the HTTP API in MCP tools for cleaner Claude integration
-- **Notification on submit**: auto-notify the Claude session when the user submits feedback
+- **Channel notifications**: auto-notify the Claude session when the user submits feedback
 - **Side-by-side diff**: optional two-column diff view
-- **Persistent state**: save comments to disk so they survive page refresh
+- **Plugin packaging**: bundle as a Claude Code plugin with MCP config, skills, and hooks
