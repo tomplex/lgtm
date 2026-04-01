@@ -55,12 +55,17 @@ class Session:
         ]
         self._claude_comments: dict[str, list[dict]] = {}
         self._sse_clients: list[asyncio.Queue] = []
+        self._analysis: dict | None = None
 
     # --- Queries ---
 
     @property
     def items(self) -> list[dict]:
         return self._items
+
+    @property
+    def analysis(self) -> dict | None:
+        return self._analysis
 
     def get_item_data(self, item_id: str, commits: str | None = None) -> dict:
         claude_comments = self._claude_comments.get(item_id, [])
@@ -98,6 +103,9 @@ class Session:
         }
 
     # --- Mutations ---
+
+    def set_analysis(self, analysis: dict) -> None:
+        self._analysis = analysis
 
     def add_item(self, item_id: str, title: str, filepath: str) -> dict:
         existing = next((i for i in self._items if i['id'] == item_id), None)
@@ -265,6 +273,18 @@ async def post_submit(body: dict) -> dict:
     current_round = session.submit_review(comments_text)
     print(f'REVIEW_ROUND={current_round}', flush=True)
     return {'ok': True, 'round': current_round}
+
+
+@app.post('/analysis')
+async def post_analysis(body: dict):
+    session.set_analysis(body)
+    print(f"ANALYSIS_SET files={len(body.get('files', {}))}", flush=True)
+    return {'ok': True}
+
+
+@app.get('/analysis')
+async def get_analysis():
+    return {'analysis': session.analysis}
 
 
 # --- DELETE routes ---

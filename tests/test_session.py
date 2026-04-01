@@ -140,3 +140,36 @@ def test_sse_unsubscribe(tmp_path: Path) -> None:
     s.unsubscribe(q)
     s.broadcast('test', {})
     assert q.empty()
+
+
+def test_set_analysis(tmp_path: Path) -> None:
+    s = make_session(tmp_path)
+    analysis = {
+        'overview': 'Test PR overview',
+        'reviewStrategy': 'Review auth first',
+        'files': {
+            'auth.py': {
+                'priority': 'critical',
+                'phase': 'review',
+                'summary': 'Core auth logic',
+                'category': 'core logic',
+            }
+        },
+        'groups': [
+            {'name': 'Auth', 'files': ['auth.py']},
+        ],
+    }
+    s.set_analysis(analysis)
+    assert s.analysis == analysis
+
+
+def test_get_analysis_default_none(tmp_path: Path) -> None:
+    s = make_session(tmp_path)
+    assert s.analysis is None
+
+
+def test_set_analysis_replaces(tmp_path: Path) -> None:
+    s = make_session(tmp_path)
+    s.set_analysis({'overview': 'v1', 'reviewStrategy': '', 'files': {}, 'groups': []})
+    s.set_analysis({'overview': 'v2', 'reviewStrategy': '', 'files': {}, 'groups': []})
+    assert s.analysis['overview'] == 'v2'
