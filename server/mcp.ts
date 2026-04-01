@@ -3,7 +3,6 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { existsSync, readFileSync } from 'node:fs';
 import type express from 'express';
-import { getBranchDiffForLLM, getDiffManifest } from './git-ops.js';
 import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 
@@ -170,46 +169,6 @@ function createMcpServer(manager: SessionManager): McpServer {
       const { found } = lookup;
       found.session.setAnalysis(analysis);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }] };
-    },
-  );
-
-  server.tool(
-    'review_get_diff',
-    'Get the branch diff in a format optimized for LLM analysis (file manifest + unified diff)',
-    {
-      repoPath: z.string().describe('Absolute path to the git repository'),
-    },
-    async ({ repoPath }) => {
-      const lookup = requireProject(manager, repoPath);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
-      const manifest = getDiffManifest(found.session.repoPath, found.session.baseBranch);
-
-      const EXCLUDE_PATTERNS = [
-        /\.lock$/,
-        /-lock\.(json|yaml)$/,
-        /\.min\.(js|css)$/,
-        /^dist\//,
-        /\.(png|jpg|gif|ico|woff2?|ttf|eot)$/,
-      ];
-      const excludeFiles = new Set(
-        manifest
-          .filter(f => EXCLUDE_PATTERNS.some(p => p.test(f.path)))
-          .map(f => f.path),
-      );
-
-      const diff = getBranchDiffForLLM(found.session.repoPath, found.session.baseBranch, excludeFiles);
-      const lines = [
-        '## Description\n',
-        found.session.description || 'No description provided.',
-        '\n## File Manifest\n',
-        ...manifest.map(f => `${f.path} | ${f.changeType} | +${f.additions} | -${f.deletions}`),
-        '\n## Diff\n',
-        diff,
-      ];
-      return {
-        content: [{ type: 'text' as const, text: lines.join('\n') }],
-      };
     },
   );
 
