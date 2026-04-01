@@ -131,6 +131,57 @@ export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
   return meta;
 }
 
+export interface DiffManifestEntry {
+  path: string;
+  changeType: 'added' | 'modified' | 'deleted' | 'renamed';
+  additions: number;
+  deletions: number;
+}
+
+export function getDiffManifest(repoPath: string, baseBranch: string): DiffManifestEntry[] {
+  const mergeBase = gitRun(repoPath, 'merge-base', baseBranch, 'HEAD');
+  if (!mergeBase) return [];
+
+  // Get additions/deletions per file
+  const numstat = gitRun(repoPath, 'diff', '--numstat', mergeBase, 'HEAD');
+  const stats = new Map<string, { additions: number; deletions: number }>();
+  for (const line of numstat.split('\n')) {
+    if (!line.trim()) continue;
+    const [add, del, ...pathParts] = line.split('\t');
+    const filePath = pathParts.join('\t'); // handles renames with => in path
+    stats.set(filePath, {
+      additions: add === '-' ? 0 : parseInt(add),
+      deletions: del === '-' ? 0 : parseInt(del),
+    });
+  }
+
+  // Get change types per file
+  const nameStatus = gitRun(repoPath, 'diff', '--name-status', mergeBase, 'HEAD');
+  const manifest: DiffManifestEntry[] = [];
+  for (const line of nameStatus.split('\n')) {
+    if (!line.trim()) continue;
+    const parts = line.split('\t');
+    const statusChar = parts[0][0];
+    // For renames, parts[2] is the new path; otherwise parts[1]
+    const filePath = statusChar === 'R' ? parts[2] : parts[1];
+    const changeType: DiffManifestEntry['changeType'] =
+      statusChar === 'A' ? 'added' :
+      statusChar === 'D' ? 'deleted' :
+      statusChar === 'R' ? 'renamed' : 'modified';
+
+    const numstatKey = statusChar === 'R' ? `${parts[1]} => ${parts[2]}` : filePath;
+    const fileStat = stats.get(numstatKey) ?? stats.get(filePath) ?? { additions: 0, deletions: 0 };
+
+    manifest.push({
+      path: filePath,
+      changeType,
+      additions: fileStat.additions,
+      deletions: fileStat.deletions,
+    });
+  }
+  return manifest;
+}
+
 export interface FileLine {
   num: number;
   content: string;

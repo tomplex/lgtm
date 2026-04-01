@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { existsSync, readFileSync } from 'node:fs';
 import type express from 'express';
+import { getBranchDiff, getDiffManifest } from './git-ops.js';
 import type { SessionManager } from './session-manager.js';
 
 function createMcpServer(manager: SessionManager): McpServer {
@@ -163,6 +164,32 @@ function createMcpServer(manager: SessionManager): McpServer {
       }
       found.session.setAnalysis(analysis);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }] };
+    },
+  );
+
+  server.tool(
+    'review_get_diff',
+    'Get the branch diff in a format optimized for LLM analysis (file manifest + unified diff)',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+    },
+    async ({ repoPath }) => {
+      const found = manager.findByRepoPath(repoPath);
+      if (!found) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] };
+      }
+      const manifest = getDiffManifest(found.session.repoPath, found.session.baseBranch);
+      const diff = getBranchDiff(found.session.repoPath, found.session.baseBranch);
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            description: found.session.description,
+            manifest,
+            diff,
+          }),
+        }],
+      };
     },
   );
 
