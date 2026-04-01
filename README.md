@@ -131,3 +131,4 @@ npm run build       # compile server + build frontend
 | `r` | Refresh |
 | `Cmd+Enter` | Save comment |
 | `Esc` | Cancel comment / clear search |
+# test line for auto-reload

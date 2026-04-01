@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, watch, type FSWatcher } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
@@ -306,48 +306,48 @@ export class Session {
 
   // --- Git watcher ---
 
-  private _watchers: FSWatcher[] = [];
-  private _watchDebounce: ReturnType<typeof setTimeout> | null = null;
-  private _watchCooldown = false;
+  private _pollTimer: ReturnType<typeof setInterval> | null = null;
+  private _lastIndexMtime = 0;
+  private _lastHeadContent = '';
 
   watchRepo(): void {
-    if (this._watchers.length > 0) return;
+    if (this._pollTimer) return;
     const gitDir = join(this.repoPath, '.git');
     if (!existsSync(gitDir)) return;
 
-    const notify = () => {
-      if (this._watchCooldown) return;
-      if (this._watchDebounce) clearTimeout(this._watchDebounce);
-      this._watchDebounce = setTimeout(() => {
-        this._watchCooldown = true;
-        setTimeout(() => { this._watchCooldown = false; }, 2000);
+    const indexPath = join(gitDir, 'index');
+    const headPath = join(gitDir, 'HEAD');
+
+    // Snapshot current state
+    try { this._lastIndexMtime = statSync(indexPath).mtimeMs; } catch { /* ignore */ }
+    try { this._lastHeadContent = readFileSync(headPath, 'utf-8'); } catch { /* ignore */ }
+
+    this._pollTimer = setInterval(() => {
+      let changed = false;
+      try {
+        const mtime = statSync(indexPath).mtimeMs;
+        if (mtime !== this._lastIndexMtime) {
+          this._lastIndexMtime = mtime;
+          changed = true;
+        }
+      } catch { /* ignore */ }
+      try {
+        const head = readFileSync(headPath, 'utf-8');
+        if (head !== this._lastHeadContent) {
+          this._lastHeadContent = head;
+          changed = true;
+        }
+      } catch { /* ignore */ }
+
+      if (changed && this._sseClients.length > 0) {
         console.log(`GIT_CHANGED slug=${this._slug} clients=${this._sseClients.length}`);
         this.broadcast('git_changed', {});
-      }, 500);
-    };
-
-    // Watch .git/index (staging changes, commits)
-    const indexPath = join(gitDir, 'index');
-    if (existsSync(indexPath)) {
-      try { this._watchers.push(watch(indexPath, notify)); } catch { /* ignore */ }
-    }
-
-    // Watch .git/refs (branch changes, new commits)
-    const refsPath = join(gitDir, 'refs');
-    if (existsSync(refsPath)) {
-      try { this._watchers.push(watch(refsPath, { recursive: true }, notify)); } catch { /* ignore */ }
-    }
-
-    // Watch .git/HEAD (checkout, rebase)
-    const headPath = join(gitDir, 'HEAD');
-    if (existsSync(headPath)) {
-      try { this._watchers.push(watch(headPath, notify)); } catch { /* ignore */ }
-    }
+      }
+    }, 2000);
   }
 
   unwatchRepo(): void {
-    for (const w of this._watchers) w.close();
-    this._watchers = [];
-    if (this._watchDebounce) clearTimeout(this._watchDebounce);
+    if (this._pollTimer) clearInterval(this._pollTimer);
+    this._pollTimer = null;
   }
 }
