@@ -4,15 +4,13 @@ import {
   comments,
   claudeComments,
   activeItemId,
-  resolvedComments,
   mdMeta,
   setMdMeta,
-  setClaudeComments,
   type MdMeta,
 } from './state';
 import { escapeHtml } from './utils';
-import { deleteClaudeComment } from './api';
 import { saveState } from './persistence';
+import { renderClaudeCommentHtml, handleClaudeCommentAction } from './claude-comments';
 
 const marked = new Marked({
   renderer: {
@@ -43,40 +41,6 @@ function mdCommentId(blockIdx: number): string {
   return `md-comment-${activeItemId}-${blockIdx}`;
 }
 
-function renderClaudeCommentHtml(cc: { comment: string; _item: string; _serverIndex: number }, ccIdx: number): string {
-  const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-  const isResolved = resolvedComments.has(ccKey);
-  const replyText = comments[ccKey];
-
-  let inner = `<div class="claude-header">
-      <span class="claude-label">Claude</span>
-      <span class="claude-text">${escapeHtml(cc.comment)}</span>`;
-
-  if (isResolved) {
-    inner += `<span class="resolve-badge">Resolved</span>
-      <span class="inline-actions"><a data-unresolve-claude-md="${ccIdx}">unresolve</a></span>`;
-  } else {
-    inner += `<span class="inline-actions">
-        <a data-reply-claude-md="${ccIdx}">reply</a>
-        <a data-resolve-claude-md="${ccIdx}">resolve</a>
-        <a data-dismiss-claude-md="${ccIdx}">dismiss</a>
-      </span>`;
-  }
-  inner += `</div>`;
-
-  if (replyText) {
-    inner += `<div class="claude-reply" data-edit-reply-md="${ccIdx}">
-      <span class="reply-label">You</span>
-      <span class="reply-text">${escapeHtml(replyText)}</span>
-      <span class="inline-actions">
-        <a>edit</a>
-        <a class="del-action" data-delete-reply-md="${ccIdx}">delete</a>
-      </span>
-    </div>`;
-  }
-
-  return `<div class="claude-comment${isResolved ? ' resolved' : ''}">${inner}</div>`;
-}
 
 export function renderMarkdown(data: MdMeta & { content: string; claudeComments?: any[] }): void {
   setMdMeta(data);
@@ -134,76 +98,11 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
       editMdComment(parseInt(el.dataset.editMdComment!));
     });
   });
-  container.querySelectorAll<HTMLElement>('[data-dismiss-claude-md]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const idx = parseInt(el.dataset.dismissClaudeMd!);
-      const cc = claudeComments[idx];
-      if (cc) {
-        deleteClaudeComment(cc._item, cc._serverIndex);
-        setClaudeComments(claudeComments.filter((_, i) => i !== idx));
-        renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
-      }
-    });
-  });
 
-  // Resolve Claude comment
-  container.querySelectorAll<HTMLElement>('[data-resolve-claude-md]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const idx = parseInt(el.dataset.resolveClaudeMd!);
-      const cc = claudeComments[idx];
-      if (cc) {
-        resolvedComments.add(`claude:${cc._item}:${cc._serverIndex}`);
-        renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
-      }
-    });
-  });
-
-  // Unresolve Claude comment
-  container.querySelectorAll<HTMLElement>('[data-unresolve-claude-md]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const idx = parseInt(el.dataset.unresolveClaudeMd!);
-      const cc = claudeComments[idx];
-      if (cc) {
-        resolvedComments.delete(`claude:${cc._item}:${cc._serverIndex}`);
-        renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
-      }
-    });
-  });
-
-  // Reply to Claude comment
-  container.querySelectorAll<HTMLElement>('[data-reply-claude-md]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const idx = parseInt(el.dataset.replyClaudeMd!);
-      const cc = claudeComments[idx];
-      if (cc) openMdReplyTextarea(idx, cc);
-    });
-  });
-
-  // Edit reply
-  container.querySelectorAll<HTMLElement>('[data-edit-reply-md]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const idx = parseInt(el.dataset.editReplyMd!);
-      const cc = claudeComments[idx];
-      if (cc) openMdReplyTextarea(idx, cc);
-    });
-  });
-
-  // Delete reply
-  container.querySelectorAll<HTMLElement>('[data-delete-reply-md]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const idx = parseInt(el.dataset.deleteReplyMd!);
-      const cc = claudeComments[idx];
-      if (cc) {
-        delete comments[`claude:${cc._item}:${cc._serverIndex}`];
-        renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
-      }
-    });
+  // Claude comment actions (dismiss, resolve, unresolve, reply, edit-reply, delete-reply)
+  const rerenderMd = () => renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
+  container.addEventListener('click', (e) => {
+    handleClaudeCommentAction(e.target as HTMLElement, rerenderMd);
   });
 
   // Delete user comment via inline action
@@ -370,58 +269,3 @@ function saveMdComment(blockIdx: number): void {
   renderMarkdownComments();
 }
 
-function openMdReplyTextarea(ccIdx: number, cc: { _item: string; _serverIndex: number }): void {
-  const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-  const existing = comments[ccKey] || '';
-
-  const commentEl = document
-    .querySelector(`[data-reply-claude-md="${ccIdx}"], [data-edit-reply-md="${ccIdx}"]`)
-    ?.closest('.claude-comment');
-  if (!commentEl) return;
-
-  const existingReply = commentEl.querySelector('.claude-reply');
-  if (existingReply) existingReply.remove();
-  const existingTextarea = commentEl.querySelector('.reply-textarea-wrap');
-  if (existingTextarea) existingTextarea.remove();
-
-  const wrap = document.createElement('div');
-  wrap.className = 'reply-textarea-wrap';
-  wrap.innerHTML = `
-    <textarea class="reply-input" style="width:100%;min-height:36px;padding:6px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:13px;resize:vertical;outline:none;font-family:inherit;" onclick="event.stopPropagation()">${escapeHtml(existing)}</textarea>
-    <div class="comment-actions" style="margin-top:4px">
-      <button class="cancel-btn" data-action="cancel-reply">Cancel</button>
-      <button class="save-btn" data-action="save-reply">Save</button>
-    </div>
-  `;
-
-  commentEl.appendChild(wrap);
-  const textarea = wrap.querySelector('textarea')!;
-  textarea.focus();
-  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-
-  textarea.addEventListener('keydown', (e) => {
-    e.stopPropagation();
-    if (e.key === 'Escape') {
-      wrap.remove();
-      e.preventDefault();
-    } else if (e.key === 'Enter' && e.metaKey) {
-      saveMdReply(ccKey, textarea.value);
-      e.preventDefault();
-    }
-  });
-  wrap.querySelector('[data-action="cancel-reply"]')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    wrap.remove();
-  });
-  wrap.querySelector('[data-action="save-reply"]')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    saveMdReply(ccKey, textarea.value);
-  });
-}
-
-function saveMdReply(ccKey: string, text: string): void {
-  const trimmed = text.trim();
-  if (trimmed) comments[ccKey] = trimmed;
-  else delete comments[ccKey];
-  renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
-}

@@ -3,16 +3,15 @@ import {
   activeFileIdx,
   comments,
   claudeComments,
-  resolvedComments,
   analysis,
   getLineId,
   lineIdToKey,
   setActiveFileIdx,
   setWholeFileView,
-  setClaudeComments,
   type DiffFile,
 } from './state';
-import { fetchContext, fetchFile, deleteClaudeComment } from './api';
+import { fetchContext, fetchFile } from './api';
+import { renderClaudeCommentHtml, handleClaudeCommentAction } from './claude-comments';
 import { escapeHtml, detectLang, highlightLine, showToast } from './utils';
 import { toggleComment, editComment } from './comments';
 import { renderFileList } from './ui';
@@ -104,40 +103,6 @@ function renderWordDiff(parts: { text: string; changed: boolean }[], cls: string
     .join('');
 }
 
-function renderClaudeCommentHtml(cc: { comment: string; _item: string; _serverIndex: number }, ccIdx: number): string {
-  const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-  const isResolved = resolvedComments.has(ccKey);
-  const replyText = comments[ccKey];
-
-  let inner = `<div class="claude-header">
-      <span class="claude-label">Claude</span>
-      <span class="claude-text">${escapeHtml(cc.comment)}</span>`;
-
-  if (isResolved) {
-    inner += `<span class="resolve-badge">Resolved</span>
-      <span class="inline-actions"><a data-unresolve-claude="${ccIdx}">unresolve</a></span>`;
-  } else {
-    inner += `<span class="inline-actions">
-        <a data-reply-claude="${ccIdx}">reply</a>
-        <a data-resolve-claude="${ccIdx}">resolve</a>
-        <a data-dismiss-claude="${ccIdx}">dismiss</a>
-      </span>`;
-  }
-  inner += `</div>`;
-
-  if (replyText) {
-    inner += `<div class="claude-reply" data-edit-reply="${ccIdx}">
-      <span class="reply-label">You</span>
-      <span class="reply-text">${escapeHtml(replyText)}</span>
-      <span class="inline-actions">
-        <a>edit</a>
-        <a class="del-action" data-delete-reply="${ccIdx}">delete</a>
-      </span>
-    </div>`;
-  }
-
-  return `<div class="claude-comment${isResolved ? ' resolved' : ''}">${inner}</div>`;
-}
 
 export function renderDiff(fileIdx: number): void {
   const file = files[fileIdx];
@@ -344,73 +309,9 @@ export function renderDiff(fileIdx: number): void {
 function handleDiffContainerClick(e: Event): void {
   const target = e.target as HTMLElement;
 
-  // Dismiss Claude comment
-  const dismissEl = target.closest<HTMLElement>('[data-dismiss-claude]');
-  if (dismissEl) {
-    const idx = parseInt(dismissEl.dataset.dismissClaude!);
-    const cc = claudeComments[idx];
-    if (cc) {
-      deleteClaudeComment(cc._item, cc._serverIndex);
-      setClaudeComments(claudeComments.filter((_, i) => i !== idx));
-      renderDiff(activeFileIdx);
-    }
-    return;
-  }
-
-  // Resolve Claude comment
-  const resolveEl = target.closest<HTMLElement>('[data-resolve-claude]');
-  if (resolveEl) {
-    const idx = parseInt(resolveEl.dataset.resolveClaude!);
-    const cc = claudeComments[idx];
-    if (cc) {
-      resolvedComments.add(`claude:${cc._item}:${cc._serverIndex}`);
-      renderDiff(activeFileIdx);
-    }
-    return;
-  }
-
-  // Unresolve Claude comment
-  const unresolveEl = target.closest<HTMLElement>('[data-unresolve-claude]');
-  if (unresolveEl) {
-    const idx = parseInt(unresolveEl.dataset.unresolveClaude!);
-    const cc = claudeComments[idx];
-    if (cc) {
-      resolvedComments.delete(`claude:${cc._item}:${cc._serverIndex}`);
-      renderDiff(activeFileIdx);
-    }
-    return;
-  }
-
-  // Reply to Claude comment
-  const replyEl = target.closest<HTMLElement>('[data-reply-claude]');
-  if (replyEl) {
-    const idx = parseInt(replyEl.dataset.replyClaude!);
-    const cc = claudeComments[idx];
-    if (cc) openReplyTextarea(idx, cc);
-    return;
-  }
-
-  // Edit reply
-  const editReplyEl = target.closest<HTMLElement>('[data-edit-reply]');
-  if (editReplyEl) {
-    const idx = parseInt(editReplyEl.dataset.editReply!);
-    const cc = claudeComments[idx];
-    if (cc) openReplyTextarea(idx, cc);
-    return;
-  }
-
-  // Delete reply
-  const deleteReplyEl = target.closest<HTMLElement>('[data-delete-reply]');
-  if (deleteReplyEl) {
-    const idx = parseInt(deleteReplyEl.dataset.deleteReply!);
-    const cc = claudeComments[idx];
-    if (cc) {
-      delete comments[`claude:${cc._item}:${cc._serverIndex}`];
-      renderDiff(activeFileIdx);
-      renderFileList();
-    }
-    return;
-  }
+  // Claude comment actions (dismiss, resolve, unresolve, reply, edit-reply, delete-reply)
+  const rerenderDiff = () => { renderDiff(activeFileIdx); renderFileList(); };
+  if (handleClaudeCommentAction(target, rerenderDiff)) return;
 
   // Delete comment via inline action
   const deleteCommentEl = target.closest<HTMLElement>('[data-delete-comment]');
@@ -470,67 +371,6 @@ function handleDiffContainerClick(e: Event): void {
   }
 }
 
-function openReplyTextarea(ccIdx: number, cc: { _item: string; _serverIndex: number }): void {
-  const ccKey = `claude:${cc._item}:${cc._serverIndex}`;
-  const existing = comments[ccKey] || '';
-
-  const commentEl = document
-    .querySelector(`[data-reply-claude="${ccIdx}"], [data-edit-reply="${ccIdx}"]`)
-    ?.closest('.claude-comment');
-  if (!commentEl) return;
-
-  const existingReply = commentEl.querySelector('.claude-reply');
-  if (existingReply) existingReply.remove();
-  const existingTextarea = commentEl.querySelector('.reply-textarea-wrap');
-  if (existingTextarea) existingTextarea.remove();
-
-  const wrap = document.createElement('div');
-  wrap.className = 'reply-textarea-wrap';
-  wrap.innerHTML = `
-    <textarea class="reply-input" style="width:100%;min-height:36px;padding:6px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:13px;resize:vertical;outline:none;font-family:inherit;">${escapeHtml(existing)}</textarea>
-    <div class="comment-actions" style="margin-top:4px">
-      <button class="cancel-btn" data-action="cancel-reply">Cancel</button>
-      <button class="save-btn" data-action="save-reply" data-cc-key="${ccKey}">Save</button>
-    </div>
-  `;
-
-  commentEl.appendChild(wrap);
-  const textarea = wrap.querySelector('textarea')!;
-  textarea.focus();
-  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-
-  textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      wrap.remove();
-      e.preventDefault();
-      e.stopPropagation();
-    } else if (e.key === 'Enter' && e.metaKey) {
-      saveReply(ccKey, textarea.value);
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
-  textarea.addEventListener('click', (e) => e.stopPropagation());
-  wrap.querySelector('[data-action="cancel-reply"]')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    wrap.remove();
-  });
-  wrap.querySelector('[data-action="save-reply"]')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    saveReply(ccKey, textarea.value);
-  });
-}
-
-function saveReply(ccKey: string, text: string): void {
-  const trimmed = text.trim();
-  if (trimmed) {
-    comments[ccKey] = trimmed;
-  } else {
-    delete comments[ccKey];
-  }
-  renderDiff(activeFileIdx);
-  renderFileList();
-}
 
 async function expandContext(
   filepath: string,
