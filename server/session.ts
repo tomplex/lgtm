@@ -308,6 +308,7 @@ export class Session {
 
   private _watchers: FSWatcher[] = [];
   private _watchDebounce: ReturnType<typeof setTimeout> | null = null;
+  private _watchCooldown = false;
 
   watchRepo(): void {
     if (this._watchers.length > 0) return;
@@ -315,11 +316,14 @@ export class Session {
     if (!existsSync(gitDir)) return;
 
     const notify = () => {
+      if (this._watchCooldown) return;
       if (this._watchDebounce) clearTimeout(this._watchDebounce);
       this._watchDebounce = setTimeout(() => {
+        this._watchCooldown = true;
+        setTimeout(() => { this._watchCooldown = false; }, 2000);
         console.log(`GIT_CHANGED slug=${this._slug} clients=${this._sseClients.length}`);
         this.broadcast('git_changed', {});
-      }, 300);
+      }, 500);
     };
 
     // Watch .git/index (staging changes, commits)
