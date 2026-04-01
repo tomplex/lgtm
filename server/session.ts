@@ -317,6 +317,7 @@ export class Session {
     const notify = () => {
       if (this._watchDebounce) clearTimeout(this._watchDebounce);
       this._watchDebounce = setTimeout(() => {
+        console.log(`GIT_CHANGED slug=${this._slug} clients=${this._sseClients.length}`);
         this.broadcast('git_changed', {});
       }, 300);
     };
