@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import open from 'open';
 import { createApp } from './app.js';
 import { SessionManager } from './session-manager.js';
+import { mountMcp } from './mcp.js';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const args: Record<string, string> = {};
@@ -24,6 +25,7 @@ function main(): void {
 
   const manager = new SessionManager(port);
   const app = createApp(manager);
+  mountMcp(app, manager);
   const url = `http://127.0.0.1:${port}`;
 
   app.listen(port, '127.0.0.1', () => {
