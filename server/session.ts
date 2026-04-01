@@ -178,6 +178,16 @@ export class Session {
     return { ok: true, id: itemId, items: this._items };
   }
 
+  removeItem(itemId: string): boolean {
+    if (itemId === 'diff') return false;
+    const idx = this._items.findIndex(i => i.id === itemId);
+    if (idx === -1) return false;
+    this._items.splice(idx, 1);
+    delete this._claudeComments[itemId];
+    this.persist();
+    return true;
+  }
+
   addComments(itemId: string, comments: ClaudeComment[]): number {
     if (!this._claudeComments[itemId]) {
       this._claudeComments[itemId] = [];

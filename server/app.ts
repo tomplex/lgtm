@@ -257,6 +257,17 @@ export function createApp(manager: SessionManager): express.Express {
 
   // --- DELETE routes ---
 
+  projectRouter.delete('/items/:itemId', (req, res) => {
+    const session = res.locals.session;
+    const removed = session.removeItem(req.params.itemId);
+    if (!removed) {
+      res.status(404).json({ error: 'Item not found or cannot be removed' });
+      return;
+    }
+    session.broadcast('items_changed', { removed: req.params.itemId });
+    res.json({ ok: true });
+  });
+
   projectRouter.delete('/comments', (req, res) => {
     const session = res.locals.session;
     const itemId = req.query.item as string | undefined;

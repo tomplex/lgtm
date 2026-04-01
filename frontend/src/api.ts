@@ -100,6 +100,10 @@ export async function addItem(filepath: string, title?: string): Promise<void> {
   });
 }
 
+export async function removeItem(itemId: string): Promise<void> {
+  await fetch(`${baseUrl()}/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+}
+
 export async function fetchFile(filepath: string): Promise<{ num: number; content: string }[]> {
   const resp = await fetch(`${baseUrl()}/file?path=${encodeURIComponent(filepath)}`);
   const data = await checkedJson<{ lines?: { num: number; content: string }[] }>(resp);

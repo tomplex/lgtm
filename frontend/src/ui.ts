@@ -18,7 +18,7 @@ import {
   setActiveItemId,
   setAppMode,
 } from './state';
-import { fetchItems, fetchItemData, submitReview as apiSubmitReview, fetchRepoFiles, addItem } from './api';
+import { fetchItems, fetchItemData, submitReview as apiSubmitReview, fetchRepoFiles, addItem, removeItem } from './api';
 import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
 import { renderMarkdown, renderMarkdownComments } from './document';
@@ -51,7 +51,10 @@ function renderTabs(): void {
     if (claudeCount > 0) badges += `<span class="tab-badge claude">${claudeCount}</span>`;
     if (effUserCount > 0) badges += `<span class="tab-badge user">${effUserCount}</span>`;
 
-    tab.innerHTML = `${escapeHtml(item.title)}${badges}`;
+    const closeHtml = item.id !== 'diff'
+      ? `<span class="tab-close" data-close-tab="${item.id}">&times;</span>`
+      : '';
+    tab.innerHTML = `<span class="tab-title">${escapeHtml(item.title)}</span>${badges}${closeHtml}`;
     tab.onclick = () => switchToItem(item.id);
     bar.appendChild(tab);
   }
@@ -62,6 +65,26 @@ function renderTabs(): void {
   addBtn.textContent = '+';
   addBtn.onclick = (e) => { e.stopPropagation(); openFilePicker(); };
   bar.appendChild(addBtn);
+
+  // Delegated close handler
+  bar.addEventListener('click', (e) => {
+    const closeEl = (e.target as HTMLElement).closest<HTMLElement>('[data-close-tab]');
+    if (!closeEl) return;
+    e.stopPropagation();
+    const itemId = closeEl.dataset.closeTab!;
+    closeTab(itemId);
+  });
+}
+
+async function closeTab(itemId: string): Promise<void> {
+  try {
+    await removeItem(itemId);
+    await loadItems();
+    if (activeItemId === itemId) await switchToItem('diff');
+    else renderTabs();
+  } catch (e: any) {
+    showToast('Failed to remove: ' + e.message);
+  }
 }
 
 // --- File picker for adding document tabs ---
