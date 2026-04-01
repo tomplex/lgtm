@@ -41,13 +41,13 @@ function renderTabs(): void {
     tab.className = 'tab-item' + (item.id === activeItemId ? ' active' : '');
     tab.dataset.id = item.id;
 
-    let badges = '';
     const effUserCount =
       item.id === 'diff'
-        ? Object.keys(comments).filter((k) => !k.startsWith('doc:')).length
+        ? Object.keys(comments).filter((k) => !k.startsWith('doc:') && !k.startsWith('claude:')).length
         : Object.keys(comments).filter((k) => k.startsWith(`doc:${item.id}:`)).length;
     const claudeCount = claudeComments.filter((c) => c._item === item.id).length;
 
+    let badges = '';
     if (claudeCount > 0) badges += `<span class="tab-badge claude">${claudeCount}</span>`;
     if (effUserCount > 0) badges += `<span class="tab-badge user">${effUserCount}</span>`;
 

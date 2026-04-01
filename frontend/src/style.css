@@ -710,19 +710,29 @@ kbd {
   background: var(--bg-secondary);
   border-color: var(--border);
 }
+.tab-item {
+  position: relative;
+}
 .tab-item .tab-badge {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 8px;
-  font-weight: 600;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  font-size: 0;
+  padding: 0;
+  position: absolute;
+  top: 4px;
+  right: 4px;
 }
 .tab-item .tab-badge.user {
   background: var(--accent);
-  color: var(--bg);
 }
 .tab-item .tab-badge.claude {
   background: #6e40c9;
-  color: white;
+  right: 4px;
+}
+.tab-item .tab-badge.user + .tab-badge.claude,
+.tab-item .tab-badge.claude + .tab-badge.user {
+  right: 13px;
 }
 .tab-close {
   font-size: 15px;
