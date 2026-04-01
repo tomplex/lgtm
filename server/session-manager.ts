@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { detectBaseBranch } from './git-ops.js';
 import { Session } from './session.js';
+import { storeList, storeDelete } from './store.js';
 
 const REVIEW_DIR = '/tmp/claude-review';
 
@@ -18,6 +19,14 @@ export class SessionManager {
   constructor(port: number) {
     this._port = port;
     mkdirSync(REVIEW_DIR, { recursive: true });
+
+    // Restore persisted sessions
+    for (const blob of storeList()) {
+      const outputPath = `${REVIEW_DIR}/${blob.slug}.md`;
+      const session = Session.fromBlob(blob, outputPath);
+      this._sessions.set(blob.slug, session);
+      console.log(`SESSION_RESTORED=${blob.slug} path=${blob.repoPath}`);
+    }
   }
 
   register(
@@ -43,8 +52,10 @@ export class SessionManager {
       baseBranch,
       description: opts?.description ?? '',
       outputPath,
+      slug,
     });
 
+    session.persist();
     this._sessions.set(slug, session);
     return { slug, url: `http://127.0.0.1:${this._port}/project/${slug}/` };
   }
@@ -76,7 +87,9 @@ export class SessionManager {
   }
 
   deregister(slug: string): boolean {
-    return this._sessions.delete(slug);
+    const removed = this._sessions.delete(slug);
+    if (removed) storeDelete(slug);
+    return removed;
   }
 
   private _deriveSlug(absPath: string): string {
