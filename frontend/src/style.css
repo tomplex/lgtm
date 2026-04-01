@@ -513,6 +513,11 @@ tr.comment-row td {
 .reply-text li + li {
   margin-top: 1px;
 }
+.comment-text li p,
+.claude-text li p,
+.reply-text li p {
+  margin: 0;
+}
 .comment-text blockquote,
 .claude-text blockquote,
 .reply-text blockquote {
