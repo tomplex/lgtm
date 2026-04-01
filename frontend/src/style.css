@@ -740,10 +740,9 @@ kbd {
   border-radius: 4px;
   font-size: 13px;
   line-height: 1.4;
-  white-space: pre-wrap;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .claude-comment .claude-header {
   display: flex;
@@ -806,10 +805,12 @@ tr.claude-comment-row td {
   background: var(--bg);
   border-radius: 3px;
   border-left: 2px solid var(--accent);
+  cursor: pointer;
+}
+.claude-reply-header {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  cursor: pointer;
 }
 .claude-reply:hover {
   border-color: var(--accent);
