@@ -680,7 +680,7 @@ kbd {
   gap: 2px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  padding: 0 8px;
+  padding: 6px 8px 0;
   flex-shrink: 0;
   overflow-x: auto;
 }
