@@ -27,9 +27,11 @@ export function detectBaseBranch(repoPath: string): string {
       continue;
     }
   }
-  return 'master';
+  return 'main';
 }
 
+// Intentionally includes working-tree and staged changes alongside committed
+// branch changes, so the review UI reflects the live state of the checkout.
 export function getBranchDiff(repoPath: string, baseBranch: string): string {
   const mergeBase = gitRun(repoPath, 'merge-base', baseBranch, 'HEAD');
   if (!mergeBase) return '';

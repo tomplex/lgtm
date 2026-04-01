@@ -5,6 +5,17 @@ import { existsSync, readFileSync } from 'node:fs';
 import type express from 'express';
 import { getBranchDiff, getDiffManifest } from './git-ops.js';
 import type { SessionManager } from './session-manager.js';
+import { slugify } from './slugify.js';
+
+type McpTextResult = { content: [{ type: 'text'; text: string }] };
+
+function requireProject(manager: SessionManager, repoPath: string): { found: ReturnType<SessionManager['findByRepoPath']> & object } | { error: McpTextResult } {
+  const found = manager.findByRepoPath(repoPath);
+  if (!found) {
+    return { error: { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] } };
+  }
+  return { found };
+}
 
 function createMcpServer(manager: SessionManager): McpServer {
   const server = new McpServer({
@@ -37,12 +48,11 @@ function createMcpServer(manager: SessionManager): McpServer {
       title: z.string().optional().describe('Tab title (defaults to filename)'),
     },
     async ({ repoPath, path, title }) => {
-      const found = manager.findByRepoPath(repoPath);
-      if (!found) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] };
-      }
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
       const itemTitle = title || path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Untitled';
-      const itemId = itemTitle.toLowerCase().replace(/[ /]/g, '-').slice(0, 40);
+      const itemId = slugify(itemTitle);
       const result = found.session.addItem(itemId, itemTitle, path);
       found.session.broadcast('items_changed', { id: itemId });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
@@ -63,10 +73,9 @@ function createMcpServer(manager: SessionManager): McpServer {
       })).describe('Array of comments to add'),
     },
     async ({ repoPath, item, comments }) => {
-      const found = manager.findByRepoPath(repoPath);
-      if (!found) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] };
-      }
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
       const itemId = item ?? 'diff';
       const count = found.session.addComments(itemId, comments);
       found.session.broadcast('comments_changed', { item: itemId, count: comments.length });
@@ -106,10 +115,9 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const found = manager.findByRepoPath(repoPath);
-      if (!found) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] };
-      }
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
       let feedback = '';
       try {
         feedback = readFileSync(found.session.outputPath, 'utf-8');
@@ -127,10 +135,9 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const found = manager.findByRepoPath(repoPath);
-      if (!found) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered.' }) }] };
-      }
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
       manager.deregister(found.slug);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, slug: found.slug }) }] };
     },
@@ -158,10 +165,9 @@ function createMcpServer(manager: SessionManager): McpServer {
       }).describe('The analysis data'),
     },
     async ({ repoPath, analysis }) => {
-      const found = manager.findByRepoPath(repoPath);
-      if (!found) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] };
-      }
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
       found.session.setAnalysis(analysis);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }] };
     },
@@ -174,10 +180,9 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const found = manager.findByRepoPath(repoPath);
-      if (!found) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] };
-      }
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
       const manifest = getDiffManifest(found.session.repoPath, found.session.baseBranch);
       const diff = getBranchDiff(found.session.repoPath, found.session.baseBranch);
       return {

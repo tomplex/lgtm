@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { appendFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   getBranchDiff, getSelectedCommitsDiff, getRepoMeta,
@@ -145,12 +146,12 @@ export class Session {
     }
   }
 
-  submitReview(commentsText: string): number {
+  async submitReview(commentsText: string): Promise<number> {
     this._round++;
     const currentRound = this._round;
 
-    appendFileSync(this.outputPath, `\n---\n# Review Round ${currentRound}\n\n${commentsText}\n`);
-    writeFileSync(this.outputPath + '.signal', String(currentRound));
+    await appendFile(this.outputPath, `\n---\n# Review Round ${currentRound}\n\n${commentsText}\n`);
+    await writeFile(this.outputPath + '.signal', String(currentRound));
 
     return currentRound;
   }

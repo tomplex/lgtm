@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { getFileLines, getBranchCommits } from './git-ops.js';
 import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
+import { slugify } from './slugify.js';
 
 declare global {
   namespace Express {
@@ -155,10 +156,10 @@ export function createApp(manager: SessionManager): express.Express {
     res.json({ ok: true, count });
   });
 
-  projectRouter.post('/submit', (req, res) => {
+  projectRouter.post('/submit', async (req, res) => {
     const session = res.locals.session;
     const commentsText = req.body.comments ?? '';
-    const currentRound = session.submitReview(commentsText);
+    const currentRound = await session.submitReview(commentsText);
     console.log(`REVIEW_ROUND=${currentRound}`);
     res.json({ ok: true, round: currentRound });
   });
@@ -203,6 +204,3 @@ export function createApp(manager: SessionManager): express.Express {
   return app;
 }
 
-function slugify(title: string): string {
-  return title.toLowerCase().replace(/[ /]/g, '-').slice(0, 40);
-}
