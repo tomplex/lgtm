@@ -88,35 +88,42 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
 
   container.innerHTML = `<div class="md-content">${html}</div>`;
 
-  // Attach click handlers
-  container.querySelectorAll<HTMLElement>('.md-block').forEach((el) => {
-    el.addEventListener('click', () => toggleMdComment(parseInt(el.dataset.block!)));
-  });
-  container.querySelectorAll<HTMLElement>('[data-edit-md-comment]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      editMdComment(parseInt(el.dataset.editMdComment!));
-    });
-  });
+  // Single delegated click handler for all interactive elements
+  container.addEventListener('click', handleMdContainerClick);
+
+  updateMdStats();
+}
+
+function handleMdContainerClick(e: Event): void {
+  const target = e.target as HTMLElement;
 
   // Claude comment actions (dismiss, resolve, unresolve, reply, edit-reply, delete-reply)
   const rerenderMd = () => renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
-  container.addEventListener('click', (e) => {
-    handleClaudeCommentAction(e.target as HTMLElement, rerenderMd);
-  });
+  if (handleClaudeCommentAction(target, rerenderMd)) return;
 
-  // Delete user comment via inline action
-  container.querySelectorAll<HTMLElement>('[data-delete-md-comment]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const blockIdx = parseInt(el.dataset.deleteMdComment!);
-      const key = mdKey(blockIdx);
-      delete comments[key];
-      renderMarkdownComments();
-    });
-  });
+  // Edit saved comment
+  const editEl = target.closest<HTMLElement>('[data-edit-md-comment]');
+  if (editEl) {
+    editMdComment(parseInt(editEl.dataset.editMdComment!));
+    return;
+  }
 
-  updateMdStats();
+  // Delete user comment
+  const deleteEl = target.closest<HTMLElement>('[data-delete-md-comment]');
+  if (deleteEl) {
+    const blockIdx = parseInt(deleteEl.dataset.deleteMdComment!);
+    delete comments[mdKey(blockIdx)];
+    renderMarkdownComments();
+    return;
+  }
+
+  // Block click -> toggle comment (skip if clicking inside a comment or textarea)
+  if (target.closest('.md-comment') || target.closest('.reply-textarea-wrap')) return;
+  const blockEl = target.closest<HTMLElement>('.md-block[data-block]');
+  if (blockEl) {
+    toggleMdComment(parseInt(blockEl.dataset.block!));
+    return;
+  }
 }
 
 export function renderMarkdownComments(): void {
@@ -142,10 +149,6 @@ export function renderMarkdownComments(): void {
           </div>
         </div>
       `;
-      div.querySelector<HTMLElement>('[data-edit-md-comment]')!.addEventListener('click', (e) => {
-        e.stopPropagation();
-        editMdComment(idx);
-      });
       el.after(div);
     }
   });
@@ -180,7 +183,7 @@ function toggleMdComment(blockIdx: number): void {
   div.id = mdCommentId(blockIdx);
   div.innerHTML = `
     <div class="comment-box">
-      <textarea placeholder="Leave a comment..." autofocus onclick="event.stopPropagation()"></textarea>
+      <textarea placeholder="Leave a comment..." autofocus></textarea>
       <div class="comment-actions">
         <button class="cancel-btn" data-action="cancel">Cancel</button>
         <button class="save-btn" data-action="save">Save</button>
@@ -190,13 +193,14 @@ function toggleMdComment(blockIdx: number): void {
 
   const textarea = div.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
-    e.stopPropagation();
     if (e.key === 'Escape') {
       div.remove();
       e.preventDefault();
+      e.stopPropagation();
     } else if (e.key === 'Enter' && e.metaKey) {
       saveMdComment(blockIdx);
       e.preventDefault();
+      e.stopPropagation();
     }
   });
   textarea.addEventListener('click', (e) => e.stopPropagation());
@@ -220,7 +224,7 @@ function editMdComment(blockIdx: number): void {
 
   div.innerHTML = `
     <div class="comment-box">
-      <textarea onclick="event.stopPropagation()">${escapeHtml(comments[key])}</textarea>
+      <textarea>${escapeHtml(comments[key])}</textarea>
       <div class="comment-actions">
         <button class="cancel-btn" data-action="cancel-edit">Cancel</button>
         <button class="cancel-btn" data-action="delete" style="color: var(--del-text)">Delete</button>
@@ -231,13 +235,14 @@ function editMdComment(blockIdx: number): void {
 
   const textarea = div.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
-    e.stopPropagation();
     if (e.key === 'Escape') {
       renderMarkdownComments();
       e.preventDefault();
+      e.stopPropagation();
     } else if (e.key === 'Enter' && e.metaKey) {
       saveMdComment(blockIdx);
       e.preventDefault();
+      e.stopPropagation();
     }
   });
   textarea.addEventListener('click', (e) => e.stopPropagation());
