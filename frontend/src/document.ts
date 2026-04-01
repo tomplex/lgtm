@@ -6,6 +6,7 @@ import {
 } from './state';
 import { escapeHtml } from './utils';
 import { deleteClaudeComment } from './api';
+import { saveState } from './persistence';
 
 const marked = new Marked({
   renderer: {
@@ -210,6 +211,7 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
 }
 
 export function renderMarkdownComments(): void {
+  saveState();
   document.querySelectorAll<HTMLElement>('.md-block').forEach(el => {
     const idx = parseInt(el.dataset.block!);
     const key = mdKey(idx);

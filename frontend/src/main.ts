@@ -6,12 +6,14 @@ import { applyHash } from './diff';
 import { escapeHtml } from './utils';
 import { activeItemId } from './state';
 import { showToast } from './utils';
+import { loadState } from './persistence';
 import {
   loadItems, switchToItem, refreshDiff, handleSubmitReview,
   toggleCommitPanel, setupKeyboardShortcuts, setupResizableSidebar, setupFileSearch,
 } from './ui';
 
 async function init(): Promise<void> {
+  loadState();
   try {
     await loadItems();
 

@@ -11,10 +11,12 @@ import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
 import { renderMarkdown, renderMarkdownComments } from './document';
 import { jumpToComment, formatAllComments } from './comments';
+import { saveState, clearPersistedState } from './persistence';
 
 // --- File list sidebar ---
 
 export function renderFileList(): void {
+  saveState();
   const el = document.getElementById('file-list')!;
   el.innerHTML = '';
   let totalAdd = 0, totalDel = 0;
@@ -303,6 +305,7 @@ export async function handleSubmitReview(): Promise<void> {
     const result = await apiSubmitReview(formatted, { ...comments });
     showToast(`Review round ${result.round} submitted!`, 3000);
     for (const key of Object.keys(comments)) delete comments[key];
+    clearPersistedState();
     if (appMode === 'file') {
       renderMarkdownComments();
     } else {
