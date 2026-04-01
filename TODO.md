@@ -18,7 +18,7 @@
 - [ ] Multi-round reply/resolve stability — reply keys use `claude:<item>:<serverIndex>` which shifts when Claude adds new comments between rounds. Needs stable IDs (UUID per comment, server-side).
 
 ## Diff & commits
-- [ ] Auto-reload diff when git state changes (SSE push or polling)
+- [x] Auto-reload diff when git state changes (SSE push or polling)
 - [ ] Filter commits by message, date, author
 - [ ] Commits window should auto-update as new commits land
 - [ ] Base branch picker in the UI

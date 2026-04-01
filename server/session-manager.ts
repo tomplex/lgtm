@@ -24,6 +24,7 @@ export class SessionManager {
     for (const blob of storeList()) {
       const outputPath = `${REVIEW_DIR}/${blob.slug}.md`;
       const session = Session.fromBlob(blob, outputPath);
+      session.watchRepo();
       this._sessions.set(blob.slug, session);
       console.log(`SESSION_RESTORED=${blob.slug} path=${blob.repoPath}`);
     }
@@ -56,6 +57,7 @@ export class SessionManager {
     });
 
     session.persist();
+    session.watchRepo();
     this._sessions.set(slug, session);
     return { slug, url: `http://127.0.0.1:${this._port}/project/${slug}/` };
   }
@@ -87,6 +89,8 @@ export class SessionManager {
   }
 
   deregister(slug: string): boolean {
+    const session = this._sessions.get(slug);
+    if (session) session.unwatchRepo();
     const removed = this._sessions.delete(slug);
     if (removed) storeDelete(slug);
     return removed;

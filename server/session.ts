@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, watch, type FSWatcher } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   getBranchDiff, getSelectedCommitsDiff, getRepoMeta,
 } from './git-ops.js';
@@ -302,5 +302,47 @@ export class Session {
         // client disconnected
       }
     }
+  }
+
+  // --- Git watcher ---
+
+  private _watchers: FSWatcher[] = [];
+  private _watchDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  watchRepo(): void {
+    if (this._watchers.length > 0) return;
+    const gitDir = join(this.repoPath, '.git');
+    if (!existsSync(gitDir)) return;
+
+    const notify = () => {
+      if (this._watchDebounce) clearTimeout(this._watchDebounce);
+      this._watchDebounce = setTimeout(() => {
+        this.broadcast('git_changed', {});
+      }, 300);
+    };
+
+    // Watch .git/index (staging changes, commits)
+    const indexPath = join(gitDir, 'index');
+    if (existsSync(indexPath)) {
+      try { this._watchers.push(watch(indexPath, notify)); } catch { /* ignore */ }
+    }
+
+    // Watch .git/refs (branch changes, new commits)
+    const refsPath = join(gitDir, 'refs');
+    if (existsSync(refsPath)) {
+      try { this._watchers.push(watch(refsPath, { recursive: true }, notify)); } catch { /* ignore */ }
+    }
+
+    // Watch .git/HEAD (checkout, rebase)
+    const headPath = join(gitDir, 'HEAD');
+    if (existsSync(headPath)) {
+      try { this._watchers.push(watch(headPath, notify)); } catch { /* ignore */ }
+    }
+  }
+
+  unwatchRepo(): void {
+    for (const w of this._watchers) w.close();
+    this._watchers = [];
+    if (this._watchDebounce) clearTimeout(this._watchDebounce);
   }
 }

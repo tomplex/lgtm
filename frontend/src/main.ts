@@ -81,6 +81,9 @@ function connectSSE(): void {
   es.addEventListener('items_changed', () => {
     loadItems().then(() => showToast('Review items updated', 2000));
   });
+  es.addEventListener('git_changed', () => {
+    refreshDiff();
+  });
   es.onerror = () => {
     es.close();
     setTimeout(connectSSE, 5000);
