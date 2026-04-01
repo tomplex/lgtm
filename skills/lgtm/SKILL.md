@@ -3,7 +3,7 @@ description: >
   Use when the user asks to register a project for review, start a code review,
   open LGTM, analyze changes, or mentions LGTM. Also use when you want to offer
   the user a review of completed work.
-allowed-tools: "mcp__lgtm__start,mcp__lgtm__status,mcp__lgtm__add_document,mcp__lgtm__comment,mcp__lgtm__read_feedback,mcp__lgtm__stop,Skill(lgtm:analyze)"
+allowed-tools: "mcp__lgtm__start,mcp__lgtm__add_document,mcp__lgtm__comment,mcp__lgtm__read_feedback,mcp__lgtm__stop,Skill(lgtm:analyze)"
 ---
 
 # LGTM
@@ -50,14 +50,11 @@ The user reviews in the browser and clicks "Submit Review" to send feedback. Rea
 their feedback with the `read_feedback` tool. Address each comment, then let the user
 know you've responded. They can submit multiple rounds.
 
-Check `status` to see if feedback has been submitted and how many rounds have occurred.
-
 ## MCP Tools
 
 | Tool | Purpose |
 |------|---------|
 | `start` | Register a project — returns the browser URL |
-| `status` | List registered projects and feedback status |
 | `add_document` | Add a document tab (spec, design doc, markdown file) |
 | `comment` | Seed inline comments on a diff or document |
 | `read_feedback` | Read submitted review feedback |
