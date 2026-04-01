@@ -52,6 +52,28 @@ export interface Commit {
   date: string;
 }
 
+export interface FileAnalysis {
+  priority: 'critical' | 'important' | 'normal' | 'low';
+  phase: 'review' | 'skim' | 'rubber-stamp';
+  summary: string;
+  category: string;
+}
+
+export interface AnalysisGroup {
+  name: string;
+  description?: string;
+  files: string[];
+}
+
+export interface Analysis {
+  overview: string;
+  reviewStrategy: string;
+  files: Record<string, FileAnalysis>;
+  groups: AnalysisGroup[];
+}
+
+export type SidebarView = 'flat' | 'grouped' | 'phased';
+
 // --- Mutable state ---
 export let files: DiffFile[] = [];
 export const comments: Record<string, string> = {};
@@ -67,6 +89,8 @@ export const selectedShas = new Set<string>();
 export const reviewedFiles = new Set<string>();
 export const resolvedComments = new Set<string>();
 export let wholeFileView = false;
+export let analysis: Analysis | null = null;
+export let sidebarView: SidebarView = 'flat';
 
 // Line ID tracking
 let lineIdCounter = 0;
@@ -120,3 +144,5 @@ export function setAllCommits(c: Commit[]) {
 export function setWholeFileView(v: boolean) {
   wholeFileView = v;
 }
+export function setAnalysis(a: Analysis | null) { analysis = a; }
+export function setSidebarView(v: SidebarView) { sidebarView = v; }

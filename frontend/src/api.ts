@@ -1,4 +1,4 @@
-import type { SessionItem, Commit, RepoMeta, ClaudeComment } from './state';
+import type { SessionItem, Commit, RepoMeta, ClaudeComment, Analysis } from './state';
 
 export interface DiffData {
   mode: 'diff';
@@ -82,4 +82,10 @@ export async function deleteClaudeComment(itemId: string, index: number): Promis
 export async function deleteAllClaudeComments(itemId?: string): Promise<void> {
   const url = itemId ? `/comments?item=${encodeURIComponent(itemId)}` : '/comments';
   await fetch(url, { method: 'DELETE' });
+}
+
+export async function fetchAnalysis(): Promise<Analysis | null> {
+  const resp = await fetch('/analysis');
+  const data = await resp.json();
+  return data.analysis || null;
 }

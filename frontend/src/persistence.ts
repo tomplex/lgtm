@@ -1,4 +1,6 @@
-import { comments, reviewedFiles, resolvedComments } from './state';
+import { comments, reviewedFiles, resolvedComments, sidebarView } from './state';
+import type { SidebarView } from './state';
+import { setSidebarView } from './state';
 
 const STORAGE_KEY = 'lgtm-review-state';
 
@@ -6,6 +8,7 @@ interface PersistedState {
   comments: Record<string, string>;
   reviewedFiles: string[];
   resolvedComments: string[];
+  sidebarView?: string;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -18,6 +21,7 @@ export function saveState(): void {
       comments: { ...comments },
       reviewedFiles: Array.from(reviewedFiles),
       resolvedComments: Array.from(resolvedComments),
+      sidebarView,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -49,6 +53,10 @@ export function loadState(): void {
       for (const key of state.resolvedComments) {
         resolvedComments.add(key);
       }
+    }
+
+    if (state.sidebarView && ['flat', 'grouped', 'phased'].includes(state.sidebarView)) {
+      setSidebarView(state.sidebarView as SidebarView);
     }
   } catch {
     /* corrupt or unavailable */
