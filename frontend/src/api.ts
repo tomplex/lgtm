@@ -22,6 +22,13 @@ async function checkedJson<T>(resp: Response): Promise<T> {
   return resp.json();
 }
 
+interface UserState {
+  comments: Record<string, string>;
+  reviewedFiles: string[];
+  resolvedComments: string[];
+  sidebarView: string;
+}
+
 interface DiffData {
   mode: 'diff';
   diff: string;
@@ -106,4 +113,45 @@ export async function fetchAnalysis(): Promise<Analysis | null> {
   const resp = await fetch(`${baseUrl()}/analysis`);
   const data = await checkedJson<{ analysis?: Analysis | null }>(resp);
   return data.analysis || null;
+}
+
+export async function fetchUserState(): Promise<UserState> {
+  const resp = await fetch(`${baseUrl()}/user-state`);
+  return checkedJson<UserState>(resp);
+}
+
+export async function putUserComment(key: string, text: string | null): Promise<void> {
+  await fetch(`${baseUrl()}/user-state/comment`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, text }),
+  });
+}
+
+export async function putUserReviewed(path: string): Promise<void> {
+  await fetch(`${baseUrl()}/user-state/reviewed`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+}
+
+export async function putUserResolved(key: string): Promise<void> {
+  await fetch(`${baseUrl()}/user-state/resolved`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key }),
+  });
+}
+
+export async function putUserSidebarView(view: string): Promise<void> {
+  await fetch(`${baseUrl()}/user-state/sidebar-view`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ view }),
+  });
+}
+
+export async function clearUserState(): Promise<void> {
+  await fetch(`${baseUrl()}/user-state/clear`, { method: 'POST' });
 }
