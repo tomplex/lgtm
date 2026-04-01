@@ -185,15 +185,16 @@ function createMcpServer(manager: SessionManager): McpServer {
       const { found } = lookup;
       const manifest = getDiffManifest(found.session.repoPath, found.session.baseBranch);
       const diff = getBranchDiff(found.session.repoPath, found.session.baseBranch);
+      const lines = [
+        '## Description\n',
+        found.session.description || 'No description provided.',
+        '\n## File Manifest\n',
+        ...manifest.map(f => `${f.path} | ${f.changeType} | +${f.additions} | -${f.deletions}`),
+        '\n## Diff\n',
+        diff,
+      ];
       return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            description: found.session.description,
-            manifest,
-            diff,
-          }),
-        }],
+        content: [{ type: 'text' as const, text: lines.join('\n') }],
       };
     },
   );
