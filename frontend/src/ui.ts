@@ -11,6 +11,7 @@ import {
   selectedShas,
   appMode,
   wholeFileView,
+  analysis,
   setWholeFileView,
   setFiles,
   setActiveFileIdx,
@@ -194,6 +195,8 @@ export async function switchToItem(itemId: string): Promise<void> {
       bar.style.display = '';
     }
 
+    renderOverviewBanner();
+
     setFiles(parseDiff(data.diff));
     renderFileList();
     if (files.length > 0) selectFile(0);
@@ -211,6 +214,32 @@ export async function switchToItem(itemId: string): Promise<void> {
     setAppMode('file');
     renderMarkdown(data);
   }
+}
+
+// --- Overview banner ---
+
+export function renderOverviewBanner(): void {
+  const banner = document.getElementById('overview-banner')!;
+  if (!analysis) {
+    banner.style.display = 'none';
+    return;
+  }
+  banner.style.display = '';
+  document.getElementById('overview-text')!.textContent = analysis.overview;
+  document.getElementById('overview-strategy')!.textContent = analysis.reviewStrategy;
+
+  // Restore collapsed state
+  const collapsed = localStorage.getItem('lgtm-overview-collapsed') === 'true';
+  banner.classList.toggle('collapsed', collapsed);
+
+  // Toggle handler (remove old listener by replacing element)
+  const toggle = document.getElementById('overview-toggle')!;
+  const newToggle = toggle.cloneNode(true) as HTMLElement;
+  toggle.replaceWith(newToggle);
+  newToggle.addEventListener('click', () => {
+    const isCollapsed = banner.classList.toggle('collapsed');
+    localStorage.setItem('lgtm-overview-collapsed', String(isCollapsed));
+  });
 }
 
 // --- Commit picker ---
