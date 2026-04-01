@@ -35,7 +35,11 @@ async function init(): Promise<void> {
       const base = data.meta.baseBranch || 'main';
       document.title = `${repo} — ${branch}`;
       const h1 = document.querySelector('h1')!;
-      h1.innerHTML = `<strong>${escapeHtml(repo)}</strong> <span class="header-branch">${escapeHtml(branch)} → ${escapeHtml(base)}</span>`;
+      let headerHtml = `<strong>${escapeHtml(repo)}</strong> <span class="header-branch">${escapeHtml(branch)} → ${escapeHtml(base)}</span>`;
+      if (data.meta.pr) {
+        headerHtml += ` <a class="header-pr" href="${escapeHtml(data.meta.pr.url)}" target="_blank">PR #${data.meta.pr.number}</a>`;
+      }
+      h1.innerHTML = headerHtml;
     }
 
     // Load the default item (diff)

@@ -60,6 +60,15 @@ header h1 {
   margin-left: 6px;
 }
 
+.header-pr {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--accent);
+  text-decoration: none;
+  margin-left: 6px;
+}
+.header-pr:hover { text-decoration: underline; }
+
 header .stats {
   font-size: 13px;
   color: var(--text-muted);
@@ -647,29 +656,6 @@ kbd {
 .tab-item .tab-badge.claude {
   background: #6e40c9;
   color: white;
-}
-
-/* --- Meta bar --- */
-.meta-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 6px 20px;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.meta-bar .branch {
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  color: var(--accent);
-}
-.meta-bar .pr-link {
-  color: var(--accent);
-  text-decoration: none;
-}
-.meta-bar .pr-link:hover {
-  text-decoration: underline;
 }
 
 /* --- Description banner --- */

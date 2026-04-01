@@ -5,7 +5,6 @@ import {
   claudeComments,
   sessionItems,
   activeItemId,
-  repoMeta,
   allCommits,
   reviewedFiles,
   wholeFileView,
@@ -88,18 +87,6 @@ function setupDiffView(data: { diff: string; description: string; meta: any; cla
     document.getElementById('description-banner')!.style.display = 'none';
   }
 
-  if (repoMeta.branch) {
-    const bar = document.getElementById('meta-bar')!;
-    let metaHtml = `<span class="branch">${escapeHtml(repoMeta.branch)}</span>`;
-    metaHtml += `<span>vs ${escapeHtml(repoMeta.baseBranch || 'master')}</span>`;
-    if (repoMeta.repoPath) metaHtml += `<span>${escapeHtml(repoMeta.repoPath)}</span>`;
-    if (repoMeta.pr) {
-      metaHtml += `<a class="pr-link" href="${escapeHtml(repoMeta.pr.url)}" target="_blank">PR #${repoMeta.pr.number}: ${escapeHtml(repoMeta.pr.title)}</a>`;
-    }
-    bar.innerHTML = metaHtml;
-    bar.style.display = '';
-  }
-
   renderOverviewBanner();
 
   setFiles(parseDiff(data.diff));
@@ -113,7 +100,6 @@ function setupDiffView(data: { diff: string; description: string; meta: any; cla
 function setupFileView(data: { content: string; claudeComments?: any[]; [key: string]: any }): void {
   document.querySelector<HTMLElement>('.sidebar')!.style.display = 'none';
   document.getElementById('resize-handle')!.style.display = 'none';
-  document.getElementById('meta-bar')!.style.display = 'none';
   document.getElementById('description-banner')!.style.display = 'none';
   document.getElementById('overview-banner')!.style.display = 'none';
   document.getElementById('commit-panel')!.style.display = 'none';
