@@ -1,4 +1,4 @@
-# Claude Review
+# LGTM
 
 A web-based review UI for collaborating with Claude Code on code changes and documents. One review session per branch, with multiple reviewable items (diffs, specs, design docs) accessible via tabs.
 
@@ -6,28 +6,69 @@ A web-based review UI for collaborating with Claude Code on code changes and doc
 
 Make it easy for a human and Claude to have a structured review conversation. Claude starts a review server at the beginning of a session, adds items as work progresses (specs, code changes), leaves comments for the human to respond to, and reads feedback when the human submits.
 
+## Install
+
+Requires [uv](https://docs.astral.sh/uv/).
+
+```bash
+# from PyPI (once published)
+uvx lgtm --repo .
+
+# from a local clone
+uv run lgtm --repo .
+```
+
+## Usage
+
+```bash
+# start a review session for the current branch
+lgtm --repo /path/to/repo
+
+# with a description banner
+lgtm --repo /path/to/repo --description "Added auth middleware, please check error handling"
+
+# add a document mid-session
+curl -X POST http://127.0.0.1:<port>/items \
+  -H 'Content-Type: application/json' \
+  -d '{"path": "/path/to/spec.md", "title": "Design Spec"}'
+
+# Claude leaves a comment on code
+curl -X POST http://127.0.0.1:<port>/comments \
+  -H 'Content-Type: application/json' \
+  -d '{"item": "diff", "comments": [{"file": "src/foo.ts", "line": 42, "comment": "Does this handle null?"}]}'
+
+# Claude leaves a comment on a document
+curl -X POST http://127.0.0.1:<port>/comments \
+  -H 'Content-Type: application/json' \
+  -d '{"item": "design-spec", "comments": [{"block": 3, "comment": "Should we cover error handling here?"}]}'
+
+# read user feedback after they submit
+cat /tmp/claude-review/<branch-slug>.md
+```
+
 ## Architecture
 
-A Vite + vanilla TypeScript frontend with a Python backend:
+Vite + vanilla TypeScript frontend, Python backend. No frameworks on either side - just typed modules and `http.server`.
 
 ```
-server.py              -- Python HTTP server, serves API + built frontend
-git_ops.py             -- Git operations (diff, commits, file context, branch detection)
+pyproject.toml             -- package config, entry point
+server.py                  -- Python HTTP server, serves API + built frontend
+git_ops.py                 -- git operations (diff, commits, file context, branch detection)
 frontend/
   src/
-    main.ts            -- Entry point
-    api.ts             -- HTTP client for server API
-    state.ts           -- Shared application state
-    utils.ts           -- Helpers (escaping, debounce, syntax detection)
-    diff.ts            -- Diff parsing, rendering, context expansion
-    document.ts        -- Markdown document view with block commenting
-    comments.ts        -- Comment creation, display, navigation
-    ui.ts              -- Sidebar, tabs, header, keyboard shortcuts
-  index.html           -- Shell HTML
-  style.css            -- All styles
-  vite.config.ts       -- Vite config with dev proxy to Python server
+    main.ts                -- entry point
+    api.ts                 -- HTTP client for server API
+    state.ts               -- shared application state
+    utils.ts               -- helpers (escaping, debounce, syntax detection)
+    diff.ts                -- diff parsing, rendering, context expansion
+    document.ts            -- markdown document view with block commenting
+    comments.ts            -- comment creation, display, navigation
+    ui.ts                  -- sidebar, tabs, header, keyboard shortcuts
+  index.html               -- shell HTML
+  style.css                -- all styles
+  vite.config.ts           -- Vite config with dev proxy to Python server
   package.json
-frontend/dist/         -- Production build output (served by server.py)
+frontend/dist/             -- production build output (served by server.py)
 ```
 
 ### Backend (`server.py` + `git_ops.py`)
@@ -36,7 +77,7 @@ A `http.server`-based Python server that:
 
 - Manages a **session** with multiple **review items** (always starts with "Code Changes" diff)
 - In production, serves the built frontend from `frontend/dist/`
-- Exposes a JSON API for diffs, commits, file context, comments, and review submission
+- Exposes a JSON API for diffs, commits, file context, comments and review submission
 - Stores Claude's comments in memory, writes user feedback to disk
 - Auto-detects base branch (master/main), computes stable port from repo path hash
 
@@ -44,7 +85,7 @@ Git operations (running git commands, parsing output) are in `git_ops.py`.
 
 ### Frontend (`frontend/`)
 
-A Vite + vanilla TypeScript application. No framework — just typed modules and direct DOM manipulation. External deps: highlight.js (syntax highlighting), marked.js (markdown rendering).
+Vite + vanilla TypeScript. No framework - just typed modules and direct DOM manipulation. External deps: highlight.js (syntax highlighting), marked.js (markdown rendering).
 
 Two view modes, switchable via tabs:
 - **Diff view**: file sidebar, syntax-highlighted unified diff, line-level commenting
@@ -52,7 +93,7 @@ Two view modes, switchable via tabs:
 
 **Dev mode**: `npm run dev` inside `frontend/` starts Vite's dev server with HMR. API requests are proxied to the Python backend (start it separately).
 
-**Production mode**: `npm run build` outputs to `frontend/dist/`. The Python server serves these static files directly — no separate frontend process needed.
+**Production mode**: `npm run build` outputs to `frontend/dist/`. The Python server serves these static files directly - no separate frontend process needed.
 
 ## API
 
@@ -106,34 +147,6 @@ Two view modes, switchable via tabs:
 - Anchor links: `#file=path/to/file` for deep linking
 - Deterministic ports: stable hash of repo path (range 9850-9950)
 - Output: `/tmp/claude-review/<branch-slug>.md` with signal file for polling
-
-## Usage
-
-```bash
-# Start a review session for the current branch
-python3 server.py --repo /path/to/repo
-
-# With description
-python3 server.py --repo /path/to/repo --description "Added auth middleware, please check error handling"
-
-# Add a document mid-session
-curl -X POST http://127.0.0.1:<port>/items \
-  -H 'Content-Type: application/json' \
-  -d '{"path": "/path/to/spec.md", "title": "Design Spec"}'
-
-# Claude leaves a comment on code
-curl -X POST http://127.0.0.1:<port>/comments \
-  -H 'Content-Type: application/json' \
-  -d '{"item": "diff", "comments": [{"file": "src/foo.ts", "line": 42, "comment": "Does this handle null?"}]}'
-
-# Claude leaves a comment on a document
-curl -X POST http://127.0.0.1:<port>/comments \
-  -H 'Content-Type: application/json' \
-  -d '{"item": "design-spec", "comments": [{"block": 3, "comment": "Should we cover error handling here?"}]}'
-
-# Read user feedback after they submit
-cat /tmp/claude-review/<branch-slug>.md
-```
 
 ## Keyboard shortcuts
 
