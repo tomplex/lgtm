@@ -3,25 +3,17 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 function gitRun(repoPath: string, ...args: string[]): string {
-  try {
-    return execFileSync('git', args, {
-      cwd: repoPath,
-      encoding: 'utf-8',
-      maxBuffer: 50 * 1024 * 1024,
-    }).trim();
-  } catch {
-    return '';
-  }
+  return execFileSync('git', args, {
+    cwd: repoPath,
+    encoding: 'utf-8',
+    maxBuffer: 50 * 1024 * 1024,
+  }).trim();
 }
 
 export function detectBaseBranch(repoPath: string): string {
   for (const candidate of ['master', 'main']) {
     try {
-      execFileSync('git', ['rev-parse', '--verify', candidate], {
-        cwd: repoPath,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      gitRun(repoPath, 'rev-parse', '--verify', candidate);
       return candidate;
     } catch {
       continue;
@@ -44,12 +36,17 @@ export function getBranchDiff(repoPath: string, baseBranch: string): string {
   );
   const branchFiles = new Set(filesOutput.split('\n').filter(f => f.trim()));
 
-  const uncommitted = gitRun(repoPath, 'diff', '--name-only', 'HEAD');
-  const staged = gitRun(repoPath, 'diff', '--name-only', '--cached');
-  for (const output of [uncommitted, staged]) {
-    for (const f of output.split('\n').filter(f => f.trim())) {
-      branchFiles.add(f);
+  // Uncommitted and staged files are nice-to-have — don't fail if these error
+  try {
+    const uncommitted = gitRun(repoPath, 'diff', '--name-only', 'HEAD');
+    const staged = gitRun(repoPath, 'diff', '--name-only', '--cached');
+    for (const output of [uncommitted, staged]) {
+      for (const f of output.split('\n').filter(f => f.trim())) {
+        branchFiles.add(f);
+      }
     }
+  } catch {
+    // working-tree/staged lookup failed — continue with committed files only
   }
 
   if (branchFiles.size === 0) return '';
@@ -120,6 +117,7 @@ export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
     repoName: basename(repoPath),
   };
   try {
+    // gh is optional — not a git command, so call execFileSync directly
     const result = execFileSync('gh', ['pr', 'view', '--json', 'url,number,title'], {
       cwd: repoPath,
       encoding: 'utf-8',

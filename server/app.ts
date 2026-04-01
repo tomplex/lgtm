@@ -190,6 +190,12 @@ export function createApp(manager: SessionManager): express.Express {
   // Mount project router
   app.use('/project/:slug', projectRouter);
 
+  // JSON error handler — surfaces git and other errors as { error: message }
+  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err.message);
+    res.status(500).json({ error: err.message });
+  });
+
   // --- Static files ---
 
   const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend', 'dist');
