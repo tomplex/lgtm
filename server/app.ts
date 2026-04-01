@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction, Router } from 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getFileLines, getBranchCommits } from './git-ops.js';
+import { getFileLines, getBranchCommits, gitRun } from './git-ops.js';
 import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
@@ -96,6 +96,18 @@ export function createApp(manager: SessionManager): express.Express {
       content: line,
     }));
     res.json({ lines });
+  });
+
+  projectRouter.get('/files', (req, res) => {
+    const session = res.locals.session;
+    const glob = (req.query.glob as string) || '**/*.md';
+    try {
+      const output = gitRun(session.repoPath, 'ls-files', '--', glob);
+      const files = output ? output.split('\n').filter(Boolean).sort() : [];
+      res.json({ files });
+    } catch {
+      res.json({ files: [] });
+    }
   });
 
   projectRouter.get('/commits', (_req, res) => {
@@ -208,9 +220,11 @@ export function createApp(manager: SessionManager): express.Express {
   projectRouter.post('/items', (req, res) => {
     const session = res.locals.session;
     const { path: filepath = '', title = '', id = '' } = req.body;
+    // Resolve relative paths against the repo root
+    const absPath = filepath.startsWith('/') ? filepath : join(session.repoPath, filepath);
     const itemTitle = title || filepath.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Untitled';
     const itemId = id || slugify(itemTitle);
-    const result = session.addItem(itemId, itemTitle, filepath);
+    const result = session.addItem(itemId, itemTitle, absPath);
     console.log(`ITEM_ADDED=${itemId}`);
     session.broadcast('items_changed', { id: itemId });
     res.json(result);

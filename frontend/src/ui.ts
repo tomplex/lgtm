@@ -18,7 +18,7 @@ import {
   setActiveItemId,
   setAppMode,
 } from './state';
-import { fetchItems, fetchItemData, submitReview as apiSubmitReview } from './api';
+import { fetchItems, fetchItemData, submitReview as apiSubmitReview, fetchRepoFiles, addItem } from './api';
 import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
 import { renderMarkdown, renderMarkdownComments } from './document';
@@ -54,6 +54,113 @@ function renderTabs(): void {
     tab.innerHTML = `${escapeHtml(item.title)}${badges}`;
     tab.onclick = () => switchToItem(item.id);
     bar.appendChild(tab);
+  }
+
+  // Add "+" button
+  const addBtn = document.createElement('div');
+  addBtn.className = 'tab-item tab-add';
+  addBtn.textContent = '+';
+  addBtn.onclick = (e) => { e.stopPropagation(); openFilePicker(); };
+  bar.appendChild(addBtn);
+}
+
+// --- File picker for adding document tabs ---
+
+let pickerOpen = false;
+
+async function openFilePicker(): Promise<void> {
+  if (pickerOpen) { closeFilePicker(); return; }
+  pickerOpen = true;
+
+  const bar = document.getElementById('tab-bar')!;
+  const existing = document.getElementById('file-picker');
+  if (existing) existing.remove();
+
+  const picker = document.createElement('div');
+  picker.id = 'file-picker';
+  picker.innerHTML = `
+    <input type="text" id="file-picker-input" placeholder="Filter files..." autocomplete="off">
+    <div id="file-picker-list"></div>
+  `;
+  bar.after(picker);
+
+  const input = picker.querySelector('#file-picker-input') as HTMLInputElement;
+  const listEl = picker.querySelector('#file-picker-list') as HTMLDivElement;
+
+  let allFiles: string[] = [];
+  try {
+    allFiles = await fetchRepoFiles('**/*.md');
+  } catch { /* empty */ }
+
+  // Filter out files already added as tabs
+  const existingPaths = new Set(sessionItems.filter(i => i.path).map(i => i.path));
+
+  function renderList(query: string): void {
+    const q = query.toLowerCase();
+    const filtered = allFiles.filter(f =>
+      !existingPaths.has(f) && (!q || f.toLowerCase().includes(q))
+    );
+    listEl.innerHTML = '';
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="file-picker-empty">No matching files</div>';
+      return;
+    }
+    for (const file of filtered.slice(0, 20)) {
+      const row = document.createElement('div');
+      row.className = 'file-picker-row';
+      row.textContent = file;
+      row.onclick = () => selectPickerFile(file);
+      listEl.appendChild(row);
+    }
+    if (filtered.length > 20) {
+      const more = document.createElement('div');
+      more.className = 'file-picker-empty';
+      more.textContent = `${filtered.length - 20} more — type to filter`;
+      listEl.appendChild(more);
+    }
+  }
+
+  input.addEventListener('input', () => renderList(input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeFilePicker(); e.preventDefault(); }
+    if (e.key === 'Enter') {
+      const first = listEl.querySelector<HTMLElement>('.file-picker-row');
+      if (first) first.click();
+      e.preventDefault();
+    }
+  });
+
+  renderList('');
+  input.focus();
+
+  // Close on click outside
+  setTimeout(() => {
+    document.addEventListener('click', closePickerOnClickOutside);
+  }, 0);
+}
+
+function closePickerOnClickOutside(e: Event): void {
+  const picker = document.getElementById('file-picker');
+  if (picker && !picker.contains(e.target as Node)) {
+    closeFilePicker();
+  }
+}
+
+function closeFilePicker(): void {
+  pickerOpen = false;
+  document.getElementById('file-picker')?.remove();
+  document.removeEventListener('click', closePickerOnClickOutside);
+}
+
+async function selectPickerFile(filepath: string): Promise<void> {
+  closeFilePicker();
+  try {
+    await addItem(filepath);
+    await loadItems();
+    await switchToItem(sessionItems[sessionItems.length - 1]?.id ?? 'diff');
+    showToast(`Added ${filepath.split('/').pop()}`);
+  } catch (e: any) {
+    showToast('Failed to add: ' + e.message);
   }
 }
 

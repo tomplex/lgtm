@@ -86,6 +86,20 @@ export async function fetchContext(
   return data.lines || [];
 }
 
+export async function fetchRepoFiles(glob = '**/*.md'): Promise<string[]> {
+  const resp = await fetch(`${baseUrl()}/files?glob=${encodeURIComponent(glob)}`);
+  const data = await checkedJson<{ files?: string[] }>(resp);
+  return data.files || [];
+}
+
+export async function addItem(filepath: string, title?: string): Promise<void> {
+  await fetch(`${baseUrl()}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filepath, title }),
+  });
+}
+
 export async function fetchFile(filepath: string): Promise<{ num: number; content: string }[]> {
   const resp = await fetch(`${baseUrl()}/file?path=${encodeURIComponent(filepath)}`);
   const data = await checkedJson<{ lines?: { num: number; content: string }[] }>(resp);

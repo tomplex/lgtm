@@ -25,8 +25,8 @@
 - [ ] Round-over-round diff (show what changed since last review submission)
 
 ## Content management
-- [ ] "+" button in tab bar to add document items from the UI (path input, POSTs to `/items`)
-- [ ] `GET /files?glob=**/*.md` endpoint to list repo files for a document picker
+- [x] "+" button in tab bar to add document items from the UI (path input, POSTs to `/items`)
+- [x] `GET /files?glob=**/*.md` endpoint to list repo files for a document picker
 
 ## MCP / integration
 - [ ] Channel notification on submit — push feedback to Claude immediately (requires channels, see docs/channels-research.md)

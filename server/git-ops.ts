@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-function gitRun(repoPath: string, ...args: string[]): string {
+export function gitRun(repoPath: string, ...args: string[]): string {
   return execFileSync('git', args, {
     cwd: repoPath,
     encoding: 'utf-8',
