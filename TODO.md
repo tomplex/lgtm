@@ -31,7 +31,7 @@
 ## MCP / integration
 - [ ] Channel notification on submit — push feedback to Claude immediately (requires channels, see docs/channels-research.md)
 - [ ] "Ask Claude" button on comments — send a single comment to the Claude session via channel notification, Claude responds inline without waiting for full review submit
-- [ ] Plugin packaging (bundle MCP config, skills, hooks for `claude plugin add`)
+- [x] Plugin packaging (bundle MCP config, skills, hooks for `claude plugin add`)
 - [ ] Persistent review storage so review preferences can be learned from across sessions
 
 ## Tech debt
