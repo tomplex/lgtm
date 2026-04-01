@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-export function gitRun(repoPath: string, ...args: string[]): string {
+function gitRun(repoPath: string, ...args: string[]): string {
   try {
     return execFileSync('git', args, {
       cwd: repoPath,
@@ -61,7 +61,7 @@ export function getSelectedCommitsDiff(repoPath: string, shas: string[]): string
     .join('\n');
 }
 
-export interface Commit {
+interface Commit {
   sha: string;
   message: string;
   author: string;
@@ -131,7 +131,7 @@ export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
   return meta;
 }
 
-export interface DiffManifestEntry {
+interface DiffManifestEntry {
   path: string;
   changeType: 'added' | 'modified' | 'deleted' | 'renamed';
   additions: number;

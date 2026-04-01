@@ -1,4 +1,4 @@
-export interface DiffLine {
+interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk';
   content: string;
   oldLine: number | null;
@@ -52,14 +52,14 @@ export interface Commit {
   date: string;
 }
 
-export interface FileAnalysis {
+interface FileAnalysis {
   priority: 'critical' | 'important' | 'normal' | 'low';
   phase: 'review' | 'skim' | 'rubber-stamp';
   summary: string;
   category: string;
 }
 
-export interface AnalysisGroup {
+interface AnalysisGroup {
   name: string;
   description?: string;
   files: string[];

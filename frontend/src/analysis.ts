@@ -7,7 +7,7 @@ const PRIORITY_ORDER: Record<string, number> = {
   low: 3,
 };
 
-export interface FileGroup {
+interface FileGroup {
   name: string;
   description?: string;
   files: DiffFile[];
@@ -46,7 +46,7 @@ export function groupFiles(files: DiffFile[], analysis: Analysis): FileGroup[] {
   return result;
 }
 
-export interface PhasedFiles {
+interface PhasedFiles {
   review: DiffFile[];
   skim: DiffFile[];
   'rubber-stamp': DiffFile[];

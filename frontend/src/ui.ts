@@ -253,7 +253,7 @@ function renderPhasedFileList(): void {
   }
 }
 
-export function renderViewToggle(): void {
+function renderViewToggle(): void {
   const toggle = document.getElementById('view-toggle')!;
   if (!analysis) {
     toggle.style.display = 'none';
@@ -291,7 +291,7 @@ function matchesGlob(path: string, pattern: string): boolean {
   return regex.test(path) || regex.test(basename);
 }
 
-export function filterFiles(query: string): void {
+function filterFiles(query: string): void {
   const q = query.trim().toLowerCase();
   if (!q) {
     document.querySelectorAll<HTMLElement>('.file-item').forEach((el) => el.classList.remove('hidden'));
@@ -315,7 +315,7 @@ export function filterFiles(query: string): void {
 
 // --- Tabs ---
 
-export function renderTabs(): void {
+function renderTabs(): void {
   const bar = document.getElementById('tab-bar')!;
   bar.innerHTML = '';
   for (const item of sessionItems) {
@@ -412,7 +412,7 @@ export async function switchToItem(itemId: string): Promise<void> {
 
 // --- Overview banner ---
 
-export function renderOverviewBanner(): void {
+function renderOverviewBanner(): void {
   const banner = document.getElementById('overview-banner')!;
   if (!analysis) {
     banner.style.display = 'none';
@@ -438,7 +438,7 @@ export function renderOverviewBanner(): void {
 
 // --- Commit picker ---
 
-export async function loadCommits(): Promise<void> {
+async function loadCommits(): Promise<void> {
   try {
     const commits = await fetchCommits();
     setAllCommits(commits);

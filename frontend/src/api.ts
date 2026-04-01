@@ -10,7 +10,7 @@ function baseUrl(): string {
   return slug ? `/project/${slug}` : '';
 }
 
-export interface DiffData {
+interface DiffData {
   mode: 'diff';
   diff: string;
   description: string;
@@ -18,7 +18,7 @@ export interface DiffData {
   claudeComments: ClaudeComment[];
 }
 
-export interface FileData {
+interface FileData {
   mode: 'file';
   content: string;
   filename: string;
@@ -28,12 +28,12 @@ export interface FileData {
   claudeComments: ClaudeComment[];
 }
 
-export interface ErrorData {
+interface ErrorData {
   mode: 'error';
   error: string;
 }
 
-export type ItemData = DiffData | FileData | ErrorData;
+type ItemData = DiffData | FileData | ErrorData;
 
 export async function fetchItems(): Promise<SessionItem[]> {
   const resp = await fetch(`${baseUrl()}/items`);
@@ -87,11 +87,6 @@ export async function submitReview(
 
 export async function deleteClaudeComment(itemId: string, index: number): Promise<void> {
   await fetch(`${baseUrl()}/comments?item=${encodeURIComponent(itemId)}&index=${index}`, { method: 'DELETE' });
-}
-
-export async function deleteAllClaudeComments(itemId?: string): Promise<void> {
-  const url = itemId ? `${baseUrl()}/comments?item=${encodeURIComponent(itemId)}` : `${baseUrl()}/comments`;
-  await fetch(url, { method: 'DELETE' });
 }
 
 export async function fetchAnalysis(): Promise<Analysis | null> {

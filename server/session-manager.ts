@@ -5,7 +5,7 @@ import { Session } from './session.js';
 
 const REVIEW_DIR = '/tmp/claude-review';
 
-export interface ProjectInfo {
+interface ProjectInfo {
   slug: string;
   repoPath: string;
   description: string;

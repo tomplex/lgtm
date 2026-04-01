@@ -531,7 +531,7 @@ function saveReply(ccKey: string, text: string): void {
   renderFileList();
 }
 
-export async function expandContext(
+async function expandContext(
   filepath: string,
   lineNum: number,
   direction: string,

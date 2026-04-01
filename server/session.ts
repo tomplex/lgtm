@@ -1,20 +1,19 @@
 import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  getBranchDiff, getSelectedCommitsDiff, getRepoMeta, getFileLines,
-  type RepoMeta, type FileLine,
+  getBranchDiff, getSelectedCommitsDiff, getRepoMeta,
 } from './git-ops.js';
 
 // --- Types ---
 
-export interface SessionItem {
+interface SessionItem {
   id: string;
   type: 'diff' | 'document';
   title: string;
   path?: string;
 }
 
-export interface ClaudeComment {
+interface ClaudeComment {
   file?: string;
   line?: number;
   side?: 'new' | 'old';

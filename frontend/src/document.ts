@@ -253,13 +253,13 @@ export function renderMarkdownComments(): void {
   updateMdStats();
 }
 
-export function updateMdStats(): void {
+function updateMdStats(): void {
   const count = Object.keys(comments).length;
   document.getElementById('stats')!.innerHTML =
     `${mdMeta.filename || 'Document'}` + (count > 0 ? ` &middot; ${count} comment${count !== 1 ? 's' : ''}` : '');
 }
 
-export function toggleMdComment(blockIdx: number): void {
+function toggleMdComment(blockIdx: number): void {
   const key = mdKey(blockIdx);
   if (comments[key]) {
     editMdComment(blockIdx);
@@ -313,7 +313,7 @@ export function toggleMdComment(blockIdx: number): void {
   textarea.focus();
 }
 
-export function editMdComment(blockIdx: number): void {
+function editMdComment(blockIdx: number): void {
   const key = mdKey(blockIdx);
   const div = document.getElementById(mdCommentId(blockIdx));
   if (!div) return;
