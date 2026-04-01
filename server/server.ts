@@ -1,17 +1,9 @@
 #!/usr/bin/env node
 
-import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import open from 'open';
 import { createApp } from './app.js';
 import { SessionManager } from './session-manager.js';
-
-function stablePortForPath(path: string): number {
-  let h = 0;
-  for (let i = 0; i < path.length; i++) {
-    h += path.charCodeAt(i) * (i + 1);
-  }
-  return 9850 + (h % 100);
-}
 
 function parseArgs(argv: string[]): Record<string, string> {
   const args: Record<string, string> = {};
@@ -30,16 +22,25 @@ function main(): void {
 
   const port = args.port ? parseInt(args.port) : 9900;
 
-  mkdirSync('/tmp/claude-review', { recursive: true });
-
   const manager = new SessionManager(port);
   const app = createApp(manager);
   const url = `http://127.0.0.1:${port}`;
 
   app.listen(port, '127.0.0.1', () => {
-    console.log(`REVIEW_URL=${url}`);
-    console.log(`REVIEW_PID=${process.pid}`);
-    open(url);
+    console.log(`LGTM_URL=${url}`);
+    console.log(`LGTM_PID=${process.pid}`);
+
+    // Convenience: --repo auto-registers a project and opens the browser
+    if (args.repo) {
+      const repoPath = resolve(args.repo);
+      const result = manager.register(repoPath, {
+        description: args.description || '',
+        baseBranch: args.base || undefined,
+      });
+      console.log(`PROJECT_REGISTERED=${result.slug}`);
+      console.log(`REVIEW_URL=${result.url}`);
+      open(result.url);
+    }
   });
 }
 
