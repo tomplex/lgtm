@@ -25,7 +25,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'start',
-    'Register a project for code review and get the browser URL',
+    'Start a review session for a git repository. Opens a browser-based UI where the user can review diffs and documents with inline commenting. Returns the URL. Must be called before any other LGTM tools for that repo.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
       description: z.string().optional().describe('Review context shown as a banner'),
@@ -41,7 +41,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'add_document',
-    'Add a document tab to a review session',
+    'Add a document (spec, design doc, markdown file) as a reviewable tab alongside the diff. The user can comment on it in the review UI. Requires an active session.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
       path: z.string().describe('Absolute path to the document file'),
@@ -61,7 +61,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'comment',
-    'Add Claude comments to a review item (diff or document)',
+    'Add comments from Claude to a review item (diff or document). Comments appear inline in the review UI for the user to reply to, resolve, or dismiss. Use the file+line fields for diff comments, or the block field for document comments.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
       item: z.string().optional().describe('Item ID to comment on (default: "diff")'),
@@ -85,7 +85,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'status',
-    'List all registered review projects and their feedback status',
+    'List active review sessions and whether the user has submitted feedback. Use this to check if a session exists before calling other tools, or to poll for new feedback.',
     {},
     async () => {
       const projects = manager.list().map(p => {
@@ -110,7 +110,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'read_feedback',
-    'Read the submitted review feedback for a project',
+    'Read the review feedback the user submitted via the review UI. Returns markdown-formatted comments with file paths, line numbers, and the user\'s notes. Call this after the user says they submitted a review.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
@@ -130,7 +130,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'stop',
-    'Deregister a project and stop its review session',
+    'Stop a review session and close it. The review UI will no longer be accessible for this repo.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
@@ -145,7 +145,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'set_analysis',
-    'Parse file-analysis and synthesis markdown files into structured analysis data and set on the session',
+    'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. The review UI uses this to show priority indicators, file groupings, and a review strategy. Called by the analyze skill after agents have written their output.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
       fileAnalysisPath: z.string().describe('Absolute path to the file-analyzer markdown output'),
