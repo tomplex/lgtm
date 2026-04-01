@@ -246,6 +246,7 @@ function toggleReviewed(path: string, e?: Event): void {
   if (e) e.stopPropagation();
   if (reviewedFiles.has(path)) reviewedFiles.delete(path);
   else reviewedFiles.add(path);
+  saveState();
   renderFileList();
 }
 

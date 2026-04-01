@@ -23,7 +23,7 @@ import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
 import { renderMarkdown, renderMarkdownComments } from './document';
 import { jumpToComment, formatAllComments } from './comments';
-import { clearPersistedState } from './persistence';
+import { clearPersistedState, saveState } from './persistence';
 import { renderFileList, renderViewToggle } from './file-list';
 import { loadCommits, toggleCommitPanel } from './commit-picker';
 
@@ -217,6 +217,7 @@ export function setupKeyboardShortcuts(): void {
         const path = files[activeFileIdx].path;
         if (reviewedFiles.has(path)) reviewedFiles.delete(path);
         else reviewedFiles.add(path);
+        saveState();
         renderFileList();
       }
     } else if (e.key === 'w' && !e.metaKey && !e.ctrlKey) {
