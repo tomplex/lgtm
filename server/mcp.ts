@@ -135,6 +135,37 @@ function createMcpServer(manager: SessionManager): McpServer {
     },
   );
 
+  server.tool(
+    'review_set_analysis',
+    'Set analysis data for a project (file priorities, review strategy, groupings)',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+      analysis: z.object({
+        overview: z.string().describe('Brief overview of the changes'),
+        reviewStrategy: z.string().describe('Suggested review approach'),
+        files: z.record(z.string(), z.object({
+          priority: z.enum(['critical', 'important', 'normal', 'low']),
+          phase: z.enum(['review', 'skim', 'rubber-stamp']),
+          summary: z.string(),
+          category: z.string(),
+        })).describe('Per-file analysis keyed by file path'),
+        groups: z.array(z.object({
+          name: z.string(),
+          description: z.string().optional(),
+          files: z.array(z.string()),
+        })).describe('Logical file groupings'),
+      }).describe('The analysis data'),
+    },
+    async ({ repoPath, analysis }) => {
+      const found = manager.findByRepoPath(repoPath);
+      if (!found) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call review_start first.' }) }] };
+      }
+      found.session.setAnalysis(analysis);
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }] };
+    },
+  );
+
   return server;
 }
 
