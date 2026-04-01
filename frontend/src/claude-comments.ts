@@ -1,6 +1,7 @@
 import { comments, claudeComments, resolvedComments, setClaudeComments } from './state';
 import { escapeHtml } from './utils';
 import { deleteClaudeComment } from './api';
+import { saveState } from './persistence';
 
 // --- Rendering ---
 
@@ -65,6 +66,7 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
     const cc = claudeComments[idx];
     if (cc) {
       resolvedComments.add(`claude:${cc._item}:${cc._serverIndex}`);
+      saveState();
       rerender();
     }
     return true;
@@ -77,6 +79,7 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
     const cc = claudeComments[idx];
     if (cc) {
       resolvedComments.delete(`claude:${cc._item}:${cc._serverIndex}`);
+      saveState();
       rerender();
     }
     return true;
@@ -107,6 +110,7 @@ export function handleClaudeCommentAction(target: HTMLElement, rerender: () => v
     const cc = claudeComments[idx];
     if (cc) {
       delete comments[`claude:${cc._item}:${cc._serverIndex}`];
+      saveState();
       rerender();
     }
     return true;
@@ -154,6 +158,7 @@ function openReplyTextarea(
     const trimmed = textarea.value.trim();
     if (trimmed) comments[ccKey] = trimmed;
     else delete comments[ccKey];
+    saveState();
     rerender();
   };
 
