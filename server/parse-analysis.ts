@@ -20,9 +20,28 @@ export interface Synthesis {
 const VALID_PRIORITIES = new Set(['critical', 'important', 'normal', 'low']);
 const VALID_PHASES = new Set(['review', 'skim', 'rubber-stamp']);
 
-export function parseFileAnalysis(markdown: string): Record<string, FileAnalysis> {
+export function parseFileAnalysis(input: string): Record<string, FileAnalysis> {
+  // Handle JSON fallback — agents sometimes produce JSON instead of markdown
+  const trimmed = input.trim();
+  if (trimmed.startsWith('{')) {
+    const parsed = JSON.parse(trimmed);
+    const result: Record<string, FileAnalysis> = {};
+    for (const [path, entry] of Object.entries(parsed)) {
+      const e = entry as Record<string, string>;
+      if (!VALID_PRIORITIES.has(e.priority)) throw new Error(`Invalid priority "${e.priority}" for file "${path}"`);
+      if (!VALID_PHASES.has(e.phase)) throw new Error(`Invalid phase "${e.phase}" for file "${path}"`);
+      result[path] = {
+        priority: e.priority as FileAnalysis['priority'],
+        phase: e.phase as FileAnalysis['phase'],
+        summary: e.summary ?? '',
+        category: e.category ?? '',
+      };
+    }
+    return result;
+  }
+
   const result: Record<string, FileAnalysis> = {};
-  const blocks = markdown.split(/^## /m).slice(1); // skip content before first ##
+  const blocks = input.split(/^## /m).slice(1); // skip content before first ##
 
   for (const block of blocks) {
     const lines = block.split('\n');
@@ -70,9 +89,29 @@ export function parseFileAnalysis(markdown: string): Record<string, FileAnalysis
   return result;
 }
 
-export function parseSynthesis(markdown: string): Synthesis {
+export function parseSynthesis(input: string): Synthesis {
+  // Handle JSON fallback — agents sometimes produce JSON instead of markdown
+  const trimmed = input.trim();
+  if (trimmed.startsWith('{')) {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const overview = (parsed.overview as string) ?? '';
+    const reviewStrategy = (parsed.reviewStrategy as string) ?? '';
+    const rawGroups = (parsed.groups as Array<Record<string, unknown>>) ?? [];
+    if (!overview) throw new Error('Missing overview in JSON');
+    if (!reviewStrategy) throw new Error('Missing reviewStrategy in JSON');
+    const groups: AnalysisGroup[] = rawGroups.map(g => {
+      const group: AnalysisGroup = {
+        name: g.name as string,
+        files: g.files as string[],
+      };
+      if (g.description) group.description = g.description as string;
+      return group;
+    });
+    return { overview, reviewStrategy, groups };
+  }
+
   const sections = new Map<string, string>();
-  const parts = markdown.split(/^## /m).slice(1);
+  const parts = input.split(/^## /m).slice(1);
 
   for (const part of parts) {
     const newlineIdx = part.indexOf('\n');

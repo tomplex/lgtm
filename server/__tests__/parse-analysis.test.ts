@@ -80,6 +80,27 @@ Summary.
 `;
     assert.throws(() => parseFileAnalysis(md), /Invalid phase "glance"/);
   });
+
+  it('handles JSON fallback', () => {
+    const json = JSON.stringify({
+      'src/auth.ts': {
+        priority: 'critical',
+        phase: 'review',
+        summary: 'New auth middleware.',
+        category: 'core logic',
+      },
+    });
+    const result = parseFileAnalysis(json);
+    assert.equal(result['src/auth.ts'].priority, 'critical');
+    assert.equal(result['src/auth.ts'].summary, 'New auth middleware.');
+  });
+
+  it('throws on invalid priority in JSON fallback', () => {
+    const json = JSON.stringify({
+      'file.ts': { priority: 'ultra', phase: 'review', summary: 'x', category: 'y' },
+    });
+    assert.throws(() => parseFileAnalysis(json), /Invalid priority "ultra"/);
+  });
 });
 
 describe('parseSynthesis', () => {
@@ -179,5 +200,27 @@ Strategy text.
 `;
     const result = parseSynthesis(md);
     assert.equal(result.overview, 'First paragraph of the overview.\n\nSecond paragraph with more detail.');
+  });
+
+  it('handles JSON fallback', () => {
+    const json = JSON.stringify({
+      overview: 'PR overview text.',
+      reviewStrategy: 'Start with auth files.',
+      groups: [
+        { name: 'Auth', description: 'Auth logic', files: ['auth.ts'] },
+        { name: 'Tests', files: ['test.ts'] },
+      ],
+    });
+    const result = parseSynthesis(json);
+    assert.equal(result.overview, 'PR overview text.');
+    assert.equal(result.reviewStrategy, 'Start with auth files.');
+    assert.equal(result.groups.length, 2);
+    assert.equal(result.groups[0].description, 'Auth logic');
+    assert.equal(result.groups[1].description, undefined);
+  });
+
+  it('throws on missing overview in JSON fallback', () => {
+    const json = JSON.stringify({ reviewStrategy: 'x', groups: [] });
+    assert.throws(() => parseSynthesis(json), /Missing overview/);
   });
 });
