@@ -5,7 +5,7 @@ arguments:
   - name: description
     description: "Optional: review context shown as a banner in the UI"
     required: false
-allowed-tools: "mcp__lgtm__start"
+allowed-tools: "mcp__lgtm__start,mcp__plugin_lgtm_lgtm__start"
 ---
 
 # /lgtm command
