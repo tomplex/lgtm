@@ -132,6 +132,7 @@ export class Session {
         description: this.description,
         meta: getRepoMeta(this.repoPath, this.baseBranch),
         claudeComments,
+        userComments: this._userComments,
       };
     }
 
@@ -153,6 +154,7 @@ export class Session {
       markdown: isMarkdown,
       title: item.title ?? filename,
       claudeComments,
+      userComments: this._userComments,
     };
   }
 
