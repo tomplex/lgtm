@@ -30,14 +30,18 @@
       "Bash(/tmp/lgtm-analysis-synthesis.md:*)",
       "Skill(lgtm:analyze)",
       "Skill(lgtm:lgtm)",
-      "mcp__lgtm__start",
-      "mcp__lgtm__comment",
-      "mcp__lgtm__add_document",
-      "mcp__lgtm__read_feedback",
-      "mcp__lgtm__set_analysis",
-      "mcp__lgtm__stop",
+      "mcp__plugin_lgtm_lgtm__start",
+      "mcp__plugin_lgtm_lgtm__comment",
+      "mcp__plugin_lgtm_lgtm__add_document",
+      "mcp__plugin_lgtm_lgtm__read_feedback",
+      "mcp__plugin_lgtm_lgtm__set_analysis",
+      "mcp__plugin_lgtm_lgtm__stop",
       "Bash(chmod:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(rm -rf ~/.claude/plugins/cache/local/claude-review)",
+      "Bash(mkdir -p ~/.claude/plugins/cache/local/lgtm)",
+      "Bash(ln -sfn /Users/tom/dev/claude-review ~/.claude/plugins/cache/local/lgtm/0.2.0)",
+      "Bash(claude plugin:*)"
     ]
   }
 }
