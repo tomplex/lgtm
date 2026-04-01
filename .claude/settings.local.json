@@ -31,6 +31,7 @@
       "Skill(lgtm:analyze)",
       "Skill(lgtm:lgtm)",
       "mcp__lgtm__start",
+      "mcp__lgtm__status",
       "mcp__lgtm__comment",
       "mcp__lgtm__add_document",
       "mcp__lgtm__read_feedback",
