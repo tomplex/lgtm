@@ -30,7 +30,7 @@
 
 ### Missing capabilities
 - [ ] Markdown rendering in comments (both user and Claude)
-- [ ] Comment persistence (survive page refresh)
+- [x] Comment persistence (survive page refresh)
 - [x] Review progress indicator in header — remaining lines to review, subtracts reviewed files' lines
 - [ ] Round-over-round diff (see what changed since last review submission)
 - [ ] Multi-round reply/resolve stability — reply keys use `claude:<item>:<serverIndex>` which breaks if Claude adds new comments between rounds (indices shift). Needs stable IDs (UUID per comment, server-side change).
