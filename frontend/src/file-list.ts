@@ -234,6 +234,7 @@ export function setupViewToggle(): void {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('.view-btn');
     if (btn?.dataset.view) {
       setSidebarView(btn.dataset.view as SidebarView);
+      saveState();
       renderFileList();
       renderViewToggle();
     }
