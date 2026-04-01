@@ -39,7 +39,7 @@
 - [ ] "+" button in tab bar to add document items from the UI (path input, POSTs to `/items`)
 - [ ] `GET /files?glob=**/*.md` endpoint to list repo markdown files for a picker
 - [ ] Commits window should automatically update as new commits come in
-- [ ] When on main, commits should still show up and be reviewable
+- [x] When on main, commits should still show up and be reviewable
 
 ## MCP server
 Singleton server with MCP at `/mcp`, multi-project via `/project/:slug/`. Keyed by repo path.
