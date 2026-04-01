@@ -53,6 +53,16 @@ export class SessionManager {
     return this._sessions.get(slug);
   }
 
+  findByRepoPath(repoPath: string): { slug: string; session: Session } | undefined {
+    const absPath = resolve(repoPath);
+    for (const [slug, session] of this._sessions) {
+      if (session.repoPath === absPath) {
+        return { slug, session };
+      }
+    }
+    return undefined;
+  }
+
   list(): ProjectInfo[] {
     const projects: ProjectInfo[] = [];
     for (const [slug, session] of this._sessions) {
