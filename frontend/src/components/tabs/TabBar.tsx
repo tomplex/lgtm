@@ -59,10 +59,10 @@ export default function TabBar(props: Props) {
         }}
       >
         +
+        <Show when={showPicker()}>
+          <FilePicker onClose={() => setShowPicker(false)} onSelect={() => setShowPicker(false)} />
+        </Show>
       </div>
-      <Show when={showPicker()}>
-        <FilePicker onClose={() => setShowPicker(false)} onSelect={() => setShowPicker(false)} />
-      </Show>
     </div>
   );
 }
