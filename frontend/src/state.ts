@@ -84,6 +84,14 @@ export const [sessionItems, setSessionItems] = createSignal<SessionItem[]>([]);
 export const [allCommits, setAllCommits] = createSignal<Commit[]>([]);
 export const [analysis, setAnalysis] = createSignal<Analysis | null>(null);
 
+export interface PeekState {
+  filePath: string;
+  lineIdx: number;
+  symbol: string;
+}
+
+export const [peekState, setPeekState] = createSignal<PeekState | null>(null);
+
 // --- Stores (partial updates) ---
 
 export const [comments, setComments] = createStore<{ list: Comment[] }>({ list: [] });

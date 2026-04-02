@@ -150,3 +150,21 @@ export async function putUserSidebarView(view: string): Promise<void> {
     body: JSON.stringify({ view }),
   });
 }
+
+export interface SymbolResult {
+  file: string;
+  line: number;
+  kind: string;
+  body: string;
+  docstring: string | null;
+}
+
+interface SymbolResponse {
+  symbol: string;
+  results: SymbolResult[];
+}
+
+export async function fetchSymbol(name: string): Promise<SymbolResponse> {
+  const resp = await fetch(`${baseUrl()}/symbol?name=${encodeURIComponent(name)}`);
+  return checkedJson<SymbolResponse>(resp);
+}
