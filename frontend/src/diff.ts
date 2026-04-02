@@ -172,10 +172,14 @@ function renderDiffLineHtml(
   }
 
   // Root comments at this location (not replies, not dismissed)
-  const lineComments = comments.filter(c =>
-    c.item === 'diff' && c.file === file.path && !c.parentId && c.status !== 'dismissed' &&
-    c.line === lineIdx
-  );
+  // Claude comments use actual file line numbers; user review comments use diff lineIdx
+  const lineComments = comments.filter(c => {
+    if (c.item !== 'diff' || c.file !== file.path || c.parentId || c.status === 'dismissed') return false;
+    if (c.author === 'claude') {
+      return c.line === line.newLine || c.line === line.oldLine;
+    }
+    return c.line === lineIdx;
+  });
   for (const comment of lineComments) {
     html += `<tr class="${comment.author === 'claude' ? 'claude-comment-row' : 'comment-row'}">
       <td colspan="3">
@@ -190,21 +194,27 @@ function renderDiffLineHtml(
 }
 
 function insertOrphanedComments(file: DiffFile, container: HTMLElement): void {
-  const fileComments = comments.filter(c =>
-    c.item === 'diff' && c.file === file.path && c.line != null && !c.parentId && c.status !== 'dismissed'
+  // Claude comments use actual file line numbers — find ones not already rendered inline
+  const visibleNewLines = new Set(file.lines.map(l => l.newLine).filter((n): n is number => n != null));
+  const visibleOldLines = new Set(file.lines.map(l => l.oldLine).filter((n): n is number => n != null));
+
+  const claudeFileComments = comments.filter(c =>
+    c.item === 'diff' && c.file === file.path && c.author === 'claude' &&
+    c.line != null && !c.parentId && c.status !== 'dismissed'
   );
-  // Comments whose line index doesn't match any visible diff line index
-  const visibleLineIdxs = new Set(file.lines.map((_, idx) => idx));
-  const orphaned = fileComments.filter(c => !visibleLineIdxs.has(c.line!));
+  const orphaned = claudeFileComments.filter(c =>
+    !visibleNewLines.has(c.line!) && !visibleOldLines.has(c.line!)
+  );
 
   orphaned.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
   for (const comment of orphaned) {
     const targetLine = comment.line!;
 
-    // Find the closest preceding visible line index
+    // Find the closest preceding visible line by newLine number
     let anchorLineIdx = -1;
     for (let i = file.lines.length - 1; i >= 0; i--) {
-      if (i <= targetLine) {
+      const num = file.lines[i].newLine;
+      if (num != null && num <= targetLine) {
         anchorLineIdx = i;
         break;
       }
