@@ -1,11 +1,10 @@
 import { For, Show, createMemo } from 'solid-js';
-import { files, activeFileIdx, comments, analysis, wholeFileView, setWholeFileView } from '../../state';
+import { files, activeFileIdx, analysis, wholeFileView, setWholeFileView } from '../../state';
 import type { DiffFile, DiffLine as DiffLineType } from '../../state';
 import { fetchContext } from '../../api';
 import { escapeHtml, detectLang, highlightLine } from '../../utils';
 import { computeWordDiff, renderWordDiffHtml } from './WordDiff';
 import DiffLine from './DiffLine';
-import CommentRow from '../comments/CommentRow';
 import WholeFileView from './WholeFileView';
 
 function precomputeWordDiffs(lines: DiffLineType[]): Record<number, string> {
@@ -31,25 +30,6 @@ export default function DiffView() {
     return f && a ? a.files[f.path] : undefined;
   });
 
-  // Collect absolute line numbers visible in the diff
-  const orphanedComments = createMemo(() => {
-    const f = file();
-    if (!f) return [];
-    const visibleLines = new Set<number>();
-    for (const line of f.lines) {
-      if (line.newLine != null) visibleLines.add(line.newLine);
-      if (line.oldLine != null) visibleLines.add(line.oldLine);
-    }
-    return comments.list.filter(
-      (c) =>
-        c.item === 'diff' &&
-        c.file === f.path &&
-        c.line != null &&
-        !c.parentId &&
-        c.status !== 'dismissed' &&
-        !visibleLines.has(c.line!),
-    );
-  });
 
   return (
     <Show when={file()}>
@@ -79,17 +59,6 @@ export default function DiffView() {
                     wordDiffHtml={wordDiffs()[lineIdx()]}
                   />
                 </Show>
-              )}
-            </For>
-            <For each={orphanedComments()}>
-              {(comment) => (
-                <tr class={comment.author === 'claude' ? 'claude-comment-row' : 'comment-row'}>
-                  <td colspan="3">
-                    <div class="comment-box" style="max-width:calc(100vw - 360px)">
-                      <CommentRow comment={{ ...comment, text: `[line ${comment.line}] ${comment.text}` }} />
-                    </div>
-                  </td>
-                </tr>
               )}
             </For>
           </table>
