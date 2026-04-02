@@ -399,8 +399,8 @@ tr.diff-context .line-content .diff-text:not(code) {
 /* Comment rows */
 tr.comment-row td {
   padding: 10px 16px 10px 60px;
-  background: transparent;
-  border-left: 3px solid var(--comment-border);
+  background: none;
+  border-left: none;
   white-space: normal;
   max-width: 0;
 }
