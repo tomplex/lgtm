@@ -748,6 +748,7 @@ kbd {
 
 /* --- Tab bar --- */
 .tab-bar {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 2px;
@@ -839,9 +840,16 @@ kbd {
 
 /* --- File picker --- */
 #file-picker {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  width: 360px;
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 6px;
   padding: 8px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 #file-picker-input {
   width: 100%;
