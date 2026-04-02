@@ -116,19 +116,17 @@ export default function PeekPanel() {
                 )}
               </Show>
               <Show when={(data()?.results.length ?? 0) > 1}>
-                <span class="peek-tabs">
+                <select
+                  class="peek-select"
+                  value={activeTab()}
+                  onChange={(e) => setActiveTab(parseInt(e.currentTarget.value))}
+                >
                   <For each={data()!.results}>
                     {(result, i) => (
-                      <button
-                        class="peek-tab"
-                        classList={{ active: activeTab() === i() }}
-                        onClick={() => setActiveTab(i())}
-                      >
-                        {result.file.split('/').pop()}
-                      </button>
+                      <option value={i()}>{result.file} :{result.line}</option>
                     )}
                   </For>
-                </span>
+                </select>
               </Show>
             </div>
             <Show when={activeResult()}>

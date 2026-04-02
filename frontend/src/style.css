@@ -1598,29 +1598,21 @@ tr.expand-row:hover td {
   font-size: 11px;
 }
 
-.peek-tabs {
-  display: flex;
-  gap: 4px;
+.peek-select {
   margin-left: auto;
-}
-
-.peek-tab {
-  background: none;
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  padding: 2px 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 4px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  padding: 2px 6px;
+  max-width: 300px;
   cursor: pointer;
 }
-.peek-tab:hover {
-  color: var(--text);
-  background: var(--hover);
-}
-.peek-tab.active {
-  color: var(--text);
+.peek-select:focus {
   border-color: var(--accent);
-  background: var(--bg);
+  outline: none;
 }
 
 .peek-docstring {
