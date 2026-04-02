@@ -314,6 +314,27 @@ header .stats {
   top: 0;
   z-index: 10;
 }
+.diff-file-header-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.file-summary-toggle {
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform 0.15s;
+  user-select: none;
+}
+.file-summary-toggle:hover {
+  color: var(--text);
+}
+.file-summary-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+.file-header-summary.hidden {
+  display: none;
+}
 
 table.diff-table {
   width: 100%;

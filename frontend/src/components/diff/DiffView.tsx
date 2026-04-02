@@ -36,13 +36,27 @@ export default function DiffView() {
       {(f) => (
         <Show when={!wholeFileView()} fallback={<WholeFileView />}>
           <div class="diff-file-header">
-            {escapeHtml(f().path)}{' '}
-            <a
-              style="float:right;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none"
-              onClick={() => setWholeFileView(true)}
-            >
-              Show whole file
-            </a>
+            <span class="diff-file-header-top">
+              <span>{escapeHtml(f().path)}</span>
+              <Show when={fileAnalysis()}>
+                <span
+                  class="file-summary-toggle"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const el = (e.currentTarget as HTMLElement).closest('.diff-file-header')?.querySelector('.file-header-summary') as HTMLElement;
+                    if (el) el.classList.toggle('hidden');
+                    (e.currentTarget as HTMLElement).classList.toggle('collapsed');
+                  }}
+                  title="Toggle file description"
+                >&#9662;</span>
+              </Show>
+              <a
+                style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none"
+                onClick={() => setWholeFileView(true)}
+              >
+                Show whole file
+              </a>
+            </span>
             <Show when={fileAnalysis()}>
               {(fa) => <div class="file-header-summary">{escapeHtml(fa().summary)}</div>}
             </Show>
