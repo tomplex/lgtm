@@ -31,7 +31,7 @@ export class Session {
   readonly outputPath: string;
 
   private _slug: string = '';
-  private _round = 0;
+  private _rounds: Record<string, number> = {};
   private _items: SessionItem[] = [
     { id: 'diff', type: 'diff', title: 'Code Changes' },
   ];
@@ -66,7 +66,7 @@ export class Session {
       items: this._items,
       comments: this._commentStore.toJSON(),
       analysis: this._analysis,
-      round: this._round,
+      rounds: this._rounds,
       reviewedFiles: Array.from(this._reviewedFiles),
       sidebarView: this._sidebarView,
     };
@@ -89,7 +89,12 @@ export class Session {
     session._items = migrated.items as SessionItem[];
     session._commentStore = CommentStore.fromJSON(migrated.comments);
     session._analysis = migrated.analysis as Record<string, unknown> | null;
-    session._round = migrated.round as number;
+    // Migrate old single round to per-item rounds
+    if (migrated.rounds && typeof migrated.rounds === 'object' && !Array.isArray(migrated.rounds)) {
+      session._rounds = migrated.rounds as Record<string, number>;
+    } else if (typeof migrated.round === 'number' && migrated.round > 0) {
+      session._rounds = { diff: migrated.round as number };
+    }
     session._reviewedFiles = new Set(migrated.reviewedFiles as string[]);
     session._sidebarView = (migrated.sidebarView as string) ?? 'flat';
     return session;
@@ -176,13 +181,15 @@ export class Session {
     return true;
   }
 
-  async submitReview(commentsText: string): Promise<number> {
-    this._round++;
-    const currentRound = this._round;
+  async submitReview(commentsText: string, item?: string): Promise<number> {
+    const key = item || 'diff';
+    this._rounds[key] = (this._rounds[key] || 0) + 1;
+    const currentRound = this._rounds[key];
     this.persist();
 
-    await appendFile(this.outputPath, `\n---\n# Review Round ${currentRound}\n\n${commentsText}\n`);
-    await writeFile(this.outputPath + '.signal', String(currentRound));
+    const label = key === 'diff' ? '' : ` [${key}]`;
+    await appendFile(this.outputPath, `\n---\n# Review Round ${currentRound}${label}\n\n${commentsText}\n`);
+    await writeFile(this.outputPath + '.signal', `${key}:${currentRound}`);
 
     return currentRound;
   }

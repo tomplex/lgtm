@@ -11,7 +11,7 @@ export interface ProjectBlob {
   items: { id: string; type: 'diff' | 'document'; title: string; path?: string }[];
   comments: import('./comment-types.js').Comment[];
   analysis: Record<string, unknown> | null;
-  round: number;
+  rounds: Record<string, number>;
   reviewedFiles: string[];
   sidebarView: string;
 }

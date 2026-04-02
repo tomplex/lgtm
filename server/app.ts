@@ -270,7 +270,7 @@ export function createApp(manager: SessionManager): express.Express {
     const session = res.locals.session;
     const commentsText = req.body.comments ?? '';
     const item = req.body.item as string | undefined;
-    const currentRound = await session.submitReview(commentsText);
+    const currentRound = await session.submitReview(commentsText, item);
     console.log(`REVIEW_ROUND=${currentRound}${item ? ` item=${item}` : ''}`);
 
     // Push review feedback to Claude via channel notification
