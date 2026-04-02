@@ -1,28 +1,34 @@
-import { comments, files, activeFileIdx, claudeComments, resolvedComments, sessionItems, lineIdToKey } from './state';
+import { comments, files, activeFileIdx, activeItemId, sessionItems, addLocalComment, updateLocalComment, removeLocalComment } from './state';
 import { escapeHtml } from './utils';
 import { renderDiff } from './diff';
 import { renderFileList } from './ui';
-import { saveState } from './persistence';
+import { createComment as apiCreateComment, updateComment as apiUpdateComment, deleteComment as apiDeleteComment } from './comment-api';
+import type { Comment } from './comment-types';
 
-export function toggleComment(lineId: string): void {
-  const lineKey = lineIdToKey(lineId);
-  if (!lineKey) return;
-  if (comments[lineKey]) {
-    editComment(lineId);
-    return;
-  }
-  const existing = document.getElementById('cr-' + lineId);
+export function toggleComment(file: string, lineIdx: number): void {
+  // Check if there's already a user review comment at this location
+  const existing = comments.find(
+    c => c.author === 'user' && c.file === file && c.line === lineIdx && !c.parentId && c.item === 'diff',
+  );
   if (existing) {
-    existing.querySelector('textarea')?.focus();
+    editComment(existing);
     return;
   }
 
-  const lineRow = document.getElementById('line-' + lineId);
+  // Check if a textarea is already open for this location
+  const rowId = `cr-${file}-${lineIdx}`;
+  const existingRow = document.getElementById(rowId);
+  if (existingRow) {
+    existingRow.querySelector('textarea')?.focus();
+    return;
+  }
+
+  const lineRow = document.querySelector(`tr[data-file="${CSS.escape(file)}"][data-line-idx="${lineIdx}"]`);
   if (!lineRow) return;
 
   const commentRow = document.createElement('tr');
   commentRow.className = 'comment-row';
-  commentRow.id = 'cr-' + lineId;
+  commentRow.id = rowId;
   commentRow.innerHTML = `
     <td colspan="3">
       <div class="comment-box">
@@ -38,31 +44,63 @@ export function toggleComment(lineId: string): void {
   const textarea = commentRow.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      cancelComment(lineId);
+      commentRow.remove();
       e.preventDefault();
     } else if (e.key === 'Enter' && e.metaKey) {
-      saveComment(lineId);
+      saveNewComment(file, lineIdx, textarea);
       e.preventDefault();
     }
   });
-  commentRow.querySelector('[data-action="cancel"]')!.addEventListener('click', () => cancelComment(lineId));
-  commentRow.querySelector('[data-action="save"]')!.addEventListener('click', () => saveComment(lineId));
+  commentRow.querySelector('[data-action="cancel"]')!.addEventListener('click', () => commentRow.remove());
+  commentRow.querySelector('[data-action="save"]')!.addEventListener('click', () => saveNewComment(file, lineIdx, textarea));
 
   lineRow.after(commentRow);
   textarea.focus();
 }
 
-export function editComment(lineId: string): void {
-  const row = document.getElementById('cr-' + lineId);
-  if (!row) return;
-  const lineKey = lineIdToKey(lineId);
-  if (!lineKey) return;
+async function saveNewComment(file: string, lineIdx: number, textarea: HTMLTextAreaElement): Promise<void> {
+  const text = textarea.value.trim();
+  if (!text) {
+    textarea.closest('tr')?.remove();
+    return;
+  }
+  const tempId = `temp-${Date.now()}`;
+  const localComment: Comment = {
+    id: tempId,
+    author: 'user',
+    text,
+    status: 'active',
+    item: 'diff',
+    file,
+    line: lineIdx,
+    mode: 'review',
+  };
+  addLocalComment(localComment);
+  renderDiff(activeFileIdx);
+  renderFileList();
+  try {
+    const created = await apiCreateComment({
+      author: 'user',
+      text,
+      item: 'diff',
+      file,
+      line: lineIdx,
+      mode: 'review',
+    });
+    updateLocalComment(tempId, { id: created.id });
+  } catch { /* optimistic update already applied */ }
+}
 
-  const currentText = comments[lineKey];
+function editComment(comment: Comment): void {
+  // Find the rendered comment element or the row for this comment
+  const rowId = `cr-${comment.file}-${comment.line}`;
+  let row = document.getElementById(rowId);
+  if (!row) return;
+
   const td = row.querySelector('td')!;
   td.innerHTML = `
     <div class="comment-box">
-      <textarea>${escapeHtml(currentText)}</textarea>
+      <textarea>${escapeHtml(comment.text)}</textarea>
       <div class="comment-actions">
         <button class="cancel-btn" data-action="cancel-edit">Cancel</button>
         <button class="cancel-btn" data-action="delete" style="color: var(--del-text)">Delete</button>
@@ -77,45 +115,39 @@ export function editComment(lineId: string): void {
       renderDiff(activeFileIdx);
       e.preventDefault();
     } else if (e.key === 'Enter' && e.metaKey) {
-      saveComment(lineId);
+      saveEditedComment(comment, textarea);
       e.preventDefault();
     }
   });
   td.querySelector('[data-action="cancel-edit"]')!.addEventListener('click', () => renderDiff(activeFileIdx));
-  td.querySelector('[data-action="delete"]')!.addEventListener('click', () => deleteComment(lineId));
-  td.querySelector('[data-action="save"]')!.addEventListener('click', () => saveComment(lineId));
+  td.querySelector('[data-action="delete"]')!.addEventListener('click', () => deleteUserComment(comment));
+  td.querySelector('[data-action="save"]')!.addEventListener('click', () => saveEditedComment(comment, textarea));
 
   textarea.focus();
   textarea.setSelectionRange(textarea.value.length, textarea.value.length);
 }
 
-function saveComment(lineId: string): void {
-  const row = document.getElementById('cr-' + lineId);
-  if (!row) return;
-  const lineKey = lineIdToKey(lineId);
-  if (!lineKey) return;
-  const text = row.querySelector('textarea')?.value?.trim();
+async function saveEditedComment(comment: Comment, textarea: HTMLTextAreaElement): Promise<void> {
+  const text = textarea.value.trim();
   if (!text) {
-    deleteComment(lineId);
+    deleteUserComment(comment);
     return;
   }
-  comments[lineKey] = text;
-  saveState();
+  updateLocalComment(comment.id, { text });
   renderDiff(activeFileIdx);
   renderFileList();
+  try {
+    await apiUpdateComment(comment.id, { text });
+  } catch { /* optimistic update already applied */ }
 }
 
-function cancelComment(lineId: string): void {
-  const lineKey = lineIdToKey(lineId);
-  if (lineKey && !comments[lineKey]) document.getElementById('cr-' + lineId)?.remove();
-}
-
-function deleteComment(lineId: string): void {
-  const lineKey = lineIdToKey(lineId);
-  if (lineKey) delete comments[lineKey];
-  saveState();
+async function deleteUserComment(comment: Comment): Promise<void> {
+  removeLocalComment(comment.id);
   renderDiff(activeFileIdx);
   renderFileList();
+  try {
+    await apiDeleteComment(comment.id);
+  } catch { /* optimistic update already applied */ }
 }
 
 export function jumpToComment(direction: 'next' | 'prev'): void {
@@ -137,31 +169,32 @@ export function jumpToComment(direction: 'next' | 'prev'): void {
 }
 
 function formatDiffComments(): string {
-  const byFile: Record<string, { lineNum: number | string; lineType: string; lineContent: string; comment: string }[]> =
-    {};
-  for (const [key, text] of Object.entries(comments)) {
-    if (key.startsWith('doc:') || key.startsWith('md::') || key.startsWith('claude:')) continue;
-    const sepIdx = key.lastIndexOf('::');
-    const filePath = key.substring(0, sepIdx);
-    const lineIdxStr = key.substring(sepIdx + 2);
+  const byFile: Record<string, { lineNum: number | string; lineType: string; lineContent: string; comment: string }[]> = {};
+
+  const diffUserComments = comments.filter(
+    c => c.author === 'user' && c.item === 'diff' && c.file && c.line != null && !c.parentId && c.mode === 'review',
+  );
+
+  for (const c of diffUserComments) {
+    const filePath = c.file!;
     if (!byFile[filePath]) byFile[filePath] = [];
-    const lineIdx = parseInt(lineIdxStr);
     const file = files.find((f) => f.path === filePath);
-    const line = file?.lines[lineIdx];
+    const line = file?.lines[c.line!];
     byFile[filePath].push({
       lineNum: line?.newLine ?? line?.oldLine ?? '?',
       lineType: line?.type ?? 'context',
       lineContent: line?.content ?? '',
-      comment: text,
+      comment: c.text,
     });
   }
+
   let output = '';
   for (const [filePath, fileComments] of Object.entries(byFile)) {
     output += `## ${filePath}\n\n`;
-    for (const c of fileComments.sort((a, b) => Number(a.lineNum) - Number(b.lineNum))) {
-      const prefix = c.lineType === 'add' ? '+' : c.lineType === 'del' ? '-' : ' ';
-      output += `Line ${c.lineNum}: \`${prefix}${c.lineContent.trim()}\`\n`;
-      output += `> ${c.comment}\n\n`;
+    for (const fc of fileComments.sort((a, b) => Number(a.lineNum) - Number(b.lineNum))) {
+      const prefix = fc.lineType === 'add' ? '+' : fc.lineType === 'del' ? '-' : ' ';
+      output += `Line ${fc.lineNum}: \`${prefix}${fc.lineContent.trim()}\`\n`;
+      output += `> ${fc.comment}\n\n`;
     }
   }
   return output;
@@ -170,20 +203,23 @@ function formatDiffComments(): string {
 function formatClaudeInteractions(): string {
   const byFile: Record<string, { lineNum: number | string; comment: string; reply?: string; resolved: boolean }[]> = {};
 
-  for (const cc of claudeComments) {
-    if (cc.file == null || cc._item !== 'diff') continue;
-    const key = `claude:${cc.id}`;
-    const reply = comments[key];
-    const resolved = resolvedComments.has(key);
+  const claudeDiffComments = comments.filter(
+    c => c.author === 'claude' && c.item === 'diff' && c.file != null && !c.parentId,
+  );
+
+  for (const cc of claudeDiffComments) {
+    const replies = comments.filter(r => r.parentId === cc.id);
+    const reply = replies.find(r => r.author === 'user');
+    const resolved = cc.status === 'resolved';
 
     if (!reply && !resolved) continue;
 
-    const filePath = cc.file;
+    const filePath = cc.file!;
     if (!byFile[filePath]) byFile[filePath] = [];
     byFile[filePath].push({
       lineNum: cc.line ?? '?',
-      comment: cc.comment,
-      reply,
+      comment: cc.text,
+      reply: reply?.text,
       resolved,
     });
   }
@@ -204,19 +240,45 @@ function formatClaudeInteractions(): string {
   return output;
 }
 
+function formatDocComments(): string {
+  let output = '';
+  for (const item of sessionItems) {
+    if (item.id === 'diff') continue;
+
+    // User comments on this document
+    const docUserComments = comments.filter(
+      c => c.author === 'user' && c.item === item.id && c.block != null && !c.parentId,
+    );
+
+    if (docUserComments.length === 0) continue;
+    output += `## ${item.title}\n\n`;
+
+    const sorted = docUserComments.sort((a, b) => (a.block ?? 0) - (b.block ?? 0));
+    for (const c of sorted) {
+      const blockEl = document.getElementById(`md-block-${item.id}-${c.block}`);
+      const preview = blockEl?.textContent?.trim()?.slice(0, 80) || `Block ${c.block}`;
+      output += `**${preview}${preview.length >= 80 ? '...' : ''}**\n`;
+      output += `> ${c.text}\n\n`;
+    }
+  }
+  return output;
+}
+
 function formatDocClaudeInteractions(): string {
   let output = '';
   for (const item of sessionItems) {
     if (item.id === 'diff') continue;
-    const itemComments = claudeComments.filter((cc) => cc._item === item.id);
+    const itemClaudeComments = comments.filter(
+      c => c.author === 'claude' && c.item === item.id && !c.parentId,
+    );
     const interactions: { block: number; comment: string; reply?: string; resolved: boolean }[] = [];
 
-    for (const cc of itemComments) {
-      const key = `claude:${cc.id}`;
-      const reply = comments[key];
-      const resolved = resolvedComments.has(key);
+    for (const cc of itemClaudeComments) {
+      const replies = comments.filter(r => r.parentId === cc.id);
+      const reply = replies.find(r => r.author === 'user');
+      const resolved = cc.status === 'resolved';
       if (!reply && !resolved) continue;
-      interactions.push({ block: cc.block ?? 0, comment: cc.comment, reply, resolved });
+      interactions.push({ block: cc.block ?? 0, comment: cc.text, reply: reply?.text, resolved });
     }
 
     if (interactions.length === 0) continue;
@@ -240,24 +302,8 @@ export function formatAllComments(): string {
   const claudeDiffOutput = formatClaudeInteractions();
   if (claudeDiffOutput) output += claudeDiffOutput;
 
-  for (const item of sessionItems) {
-    if (item.id === 'diff') continue;
-    const docComments = Object.entries(comments).filter(([k]) => k.startsWith(`doc:${item.id}:`));
-    if (docComments.length === 0) continue;
-    output += `## ${item.title}\n\n`;
-    const sorted = docComments.sort((a, b) => {
-      const ai = parseInt(a[0].split(':').pop()!);
-      const bi = parseInt(b[0].split(':').pop()!);
-      return ai - bi;
-    });
-    for (const [key, text] of sorted) {
-      const blockIdx = parseInt(key.split(':').pop()!);
-      const blockEl = document.getElementById(`md-block-${item.id}-${blockIdx}`);
-      const preview = blockEl?.textContent?.trim()?.slice(0, 80) || `Block ${blockIdx}`;
-      output += `**${preview}${preview.length >= 80 ? '...' : ''}**\n`;
-      output += `> ${text}\n\n`;
-    }
-  }
+  const docOutput = formatDocComments();
+  if (docOutput) output += docOutput;
 
   const claudeDocOutput = formatDocClaudeInteractions();
   if (claudeDocOutput) output += claudeDocOutput;
