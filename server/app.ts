@@ -150,26 +150,9 @@ export function createApp(manager: SessionManager): express.Express {
   projectRouter.get('/user-state', (_req, res) => {
     const session = res.locals.session;
     res.json({
-      comments: session.userComments,
       reviewedFiles: session.userReviewedFiles,
-      resolvedComments: session.userResolvedComments,
       sidebarView: session.userSidebarView,
     });
-  });
-
-  projectRouter.put('/user-state/comment', (req, res) => {
-    const session = res.locals.session;
-    const { key, text } = req.body;
-    if (!key) {
-      res.status(400).json({ error: 'key is required' });
-      return;
-    }
-    if (text) {
-      session.setUserComment(key, text);
-    } else {
-      session.deleteUserComment(key);
-    }
-    res.json({ ok: true });
   });
 
   projectRouter.put('/user-state/reviewed', (req, res) => {
@@ -181,17 +164,6 @@ export function createApp(manager: SessionManager): express.Express {
     }
     const reviewed = session.toggleUserReviewedFile(path);
     res.json({ ok: true, reviewed });
-  });
-
-  projectRouter.put('/user-state/resolved', (req, res) => {
-    const session = res.locals.session;
-    const { key } = req.body;
-    if (!key) {
-      res.status(400).json({ error: 'key is required' });
-      return;
-    }
-    const resolved = session.toggleUserResolvedComment(key);
-    res.json({ ok: true, resolved });
   });
 
   projectRouter.put('/user-state/sidebar-view', (req, res) => {
@@ -207,11 +179,7 @@ export function createApp(manager: SessionManager): express.Express {
 
   projectRouter.post('/user-state/clear', (_req, res) => {
     const session = res.locals.session;
-    for (const key of Object.keys(session.userComments)) {
-      session.deleteUserComment(key);
-    }
     session.setUserReviewedFiles([]);
-    session.setUserResolvedComments([]);
     res.json({ ok: true });
   });
 
@@ -230,14 +198,52 @@ export function createApp(manager: SessionManager): express.Express {
     res.json(result);
   });
 
+  // --- Comment CRUD ---
+
+  projectRouter.get('/comments', (req, res) => {
+    const session = res.locals.session;
+    const filter: Record<string, string> = {};
+    for (const key of ['item', 'file', 'author', 'parentId', 'mode', 'status']) {
+      if (req.query[key]) filter[key] = req.query[key] as string;
+    }
+    const comments = session.listComments(Object.keys(filter).length > 0 ? filter : undefined);
+    res.json({ comments });
+  });
+
   projectRouter.post('/comments', (req, res) => {
     const session = res.locals.session;
-    const itemId = req.body.item ?? 'diff';
-    const newComments = req.body.comments ?? [];
-    const count = session.addComments(itemId, newComments);
-    console.log(`CLAUDE_COMMENTS_ADDED=${newComments.length} item=${itemId}`);
-    session.broadcast('comments_changed', { item: itemId, count: newComments.length });
-    res.json({ ok: true, count });
+    const { author, text, item, file, line, block, parentId, mode } = req.body;
+    if (!author || !text || !item) {
+      res.status(400).json({ error: 'author, text, and item are required' });
+      return;
+    }
+    const comment = session.addComment({ author, text, item, file, line, block, parentId, mode });
+    session.broadcast('comments_changed', { item, comment });
+    res.json({ ok: true, comment });
+  });
+
+  projectRouter.patch('/comments/:id', (req, res) => {
+    const session = res.locals.session;
+    const { text, status } = req.body;
+    const updated = session.updateComment(req.params.id, { text, status });
+    if (!updated) {
+      res.status(404).json({ error: 'Comment not found' });
+      return;
+    }
+    session.broadcast('comments_changed', { item: updated.item, comment: updated });
+    res.json({ ok: true, comment: updated });
+  });
+
+  projectRouter.delete('/comments/:id', (req, res) => {
+    const session = res.locals.session;
+    const comment = session.getComment(req.params.id);
+    if (!comment) {
+      res.status(404).json({ error: 'Comment not found' });
+      return;
+    }
+    session.deleteComment(comment.item, req.params.id);
+    session.broadcast('comments_changed', { item: comment.item, deleted: req.params.id });
+    res.json({ ok: true });
   });
 
   projectRouter.post('/submit', async (req, res) => {
@@ -265,20 +271,6 @@ export function createApp(manager: SessionManager): express.Express {
       return;
     }
     session.broadcast('items_changed', { removed: req.params.itemId });
-    res.json({ ok: true });
-  });
-
-  projectRouter.delete('/comments', (req, res) => {
-    const session = res.locals.session;
-    const itemId = req.query.item as string | undefined;
-    const commentId = req.query.id as string | undefined;
-    if (itemId && commentId) {
-      session.deleteComment(itemId, commentId);
-    } else if (itemId) {
-      session.clearComments(itemId);
-    } else {
-      session.clearComments();
-    }
     res.json({ ok: true });
   });
 
