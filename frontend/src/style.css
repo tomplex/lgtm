@@ -1014,6 +1014,14 @@ kbd {
   letter-spacing: 0.5px;
   flex-shrink: 0;
 }
+.pending-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
 
 /* Ask Claude button in comment textarea */
 .ask-claude-save-btn {

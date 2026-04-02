@@ -102,6 +102,9 @@ export default function CommentRow(props: Props) {
         <Show when={props.comment.mode === 'direct'}>
           <span class="ask-claude-badge">Asked Claude</span>
         </Show>
+        <Show when={props.comment.author === 'user' && props.comment.mode !== 'direct' && !props.comment.parentId}>
+          <span class="pending-badge">Pending</span>
+        </Show>
 
         <Show when={isResolved()}>
           <span class="resolve-badge">Resolved</span>
