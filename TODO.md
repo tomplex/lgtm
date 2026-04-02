@@ -13,6 +13,7 @@
 - [ ] Phased review groups should be collapsible, auto-collapse when all items reviewed
 - [ ] Flat file view: sort files with Claude comments to the top
 - [ ] Button to dismiss/hide files in the sidebar
+- [ ] Move comment save / delete buttons for inline interactions to the left hand side for easier access
 
 ## Commenting
 - [x] Markdown rendering in comments (both user and Claude)
@@ -32,8 +33,8 @@
 - [x] `GET /files?glob=**/*.md` endpoint to list repo files for a document picker
 
 ## MCP / integration
-- [ ] Channel notification on submit — push feedback to Claude immediately (requires channels, see docs/channels-research.md)
-- [ ] "Ask Claude" button on comments — send a single comment to the Claude session via channel notification, Claude responds inline without waiting for full review submit
+- [x] Channel notification on submit — push feedback to Claude immediately (requires `--dangerously-load-development-channels server:lgtm`)
+- [x] "Ask Claude" button on comments — send a single comment to the Claude session via channel notification, Claude responds inline via `reply` MCP tool
 - [x] Plugin packaging (bundle MCP config, skills, hooks for `claude plugin add`)
 - [ ] Persistent review storage so review preferences can be learned from across sessions
 
