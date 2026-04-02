@@ -1,5 +1,5 @@
 import { For, Show, createMemo } from 'solid-js';
-import { files, activeFileIdx, analysis, wholeFileView, setWholeFileView } from '../../state';
+import { files, activeFileIdx, analysis, wholeFileView, toggleWholeFileView } from '../../state';
 import type { DiffFile, DiffLine as DiffLineType } from '../../state';
 import { fetchContext } from '../../api';
 import { escapeHtml, detectLang, highlightLine } from '../../utils';
@@ -52,7 +52,7 @@ export default function DiffView() {
               </Show>
               <a
                 style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none"
-                onClick={() => setWholeFileView(true)}
+                onClick={() => toggleWholeFileView()}
               >
                 Show whole file
               </a>

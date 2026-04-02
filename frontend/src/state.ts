@@ -84,6 +84,40 @@ export const [sessionItems, setSessionItems] = createSignal<SessionItem[]>([]);
 export const [allCommits, setAllCommits] = createSignal<Commit[]>([]);
 export const [analysis, setAnalysis] = createSignal<Analysis | null>(null);
 
+/** Toggle between diff and whole-file view, preserving scroll position by line number. */
+export function toggleWholeFileView() {
+  const container = document.getElementById('diff-container');
+  let targetLineNum: number | null = null;
+
+  if (container) {
+    const top = container.scrollTop;
+    const rows = container.querySelectorAll<HTMLElement>('tr[data-line-idx]');
+    for (const row of rows) {
+      if (row.offsetTop >= top) {
+        const num = row.querySelector('.line-num')?.textContent?.trim();
+        if (num) { targetLineNum = parseInt(num); break; }
+      }
+    }
+  }
+
+  setWholeFileView(!wholeFileView());
+
+  if (targetLineNum != null) {
+    requestAnimationFrame(() => {
+      const c = document.getElementById('diff-container');
+      if (!c) return;
+      const rows = c.querySelectorAll<HTMLElement>('tr[data-line-idx]');
+      for (const row of rows) {
+        const num = row.querySelector('.line-num')?.textContent?.trim();
+        if (num && parseInt(num) >= targetLineNum!) {
+          c.scrollTop = row.offsetTop;
+          return;
+        }
+      }
+    });
+  }
+}
+
 export interface PeekState {
   filePath: string;
   lineIdx: number;

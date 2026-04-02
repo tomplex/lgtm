@@ -4,8 +4,8 @@ import {
   files,
   activeFileIdx,
   setActiveFileIdx,
-  wholeFileView,
   setWholeFileView,
+  toggleWholeFileView,
   allCommits,
   toggleReviewed,
 } from '../state';
@@ -54,7 +54,7 @@ export function useKeyboardShortcuts(options: Options) {
       if (file) toggleReviewed(file.path);
     } else if (e.key === 'w' && !e.metaKey && !e.ctrlKey) {
       if (appMode() === 'diff' && files()[activeFileIdx()]) {
-        setWholeFileView(!wholeFileView());
+        toggleWholeFileView();
       }
     } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
       options.onJumpComment('next');

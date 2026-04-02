@@ -1,5 +1,5 @@
 import { createResource, For, Show, createMemo } from 'solid-js';
-import { files, activeFileIdx, setWholeFileView } from '../../state';
+import { files, activeFileIdx, toggleWholeFileView } from '../../state';
 import { fetchFile } from '../../api';
 import { escapeHtml, detectLang } from '../../utils';
 import DiffLine from './DiffLine';
@@ -49,7 +49,7 @@ export default function WholeFileView() {
             {escapeHtml(f().path)}{' '}
             <a
               style="float:right;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer"
-              onClick={() => setWholeFileView(false)}
+              onClick={() => toggleWholeFileView()}
             >
               Back to diff
             </a>

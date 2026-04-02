@@ -49,6 +49,28 @@ import Toast from './components/shared/Toast';
 export default function App() {
   const [commitPanelOpen, setCommitPanelOpen] = createSignal(false);
 
+  // Per-item state: remembers file index and scroll position per tab
+  const itemState = new Map<string, { fileIdx: number; scrollTop: number }>();
+
+  function saveCurrentItemState() {
+    const id = activeItemId();
+    const container = document.getElementById('diff-container');
+    itemState.set(id, {
+      fileIdx: activeFileIdx(),
+      scrollTop: container?.scrollTop ?? 0,
+    });
+  }
+
+  function restoreItemState(itemId: string) {
+    const saved = itemState.get(itemId);
+    if (saved) {
+      requestAnimationFrame(() => {
+        const container = document.getElementById('diff-container');
+        if (container) container.scrollTop = saved.scrollTop;
+      });
+    }
+  }
+
   // --- Data loading ---
 
   async function loadItems() {
@@ -70,6 +92,7 @@ export default function App() {
   }
 
   async function switchToItem(itemId: string) {
+    saveCurrentItemState();
     setActiveItemId(itemId);
     localStorage.setItem('lgtm-active-item', itemId);
     const data = await fetchItemData(itemId);
@@ -78,7 +101,13 @@ export default function App() {
       setRepoMeta(data.meta || {});
       setAppMode('diff');
       setFiles(parseDiff(data.diff));
-      if (files().length > 0 && activeFileIdx() >= files().length) setActiveFileIdx(0);
+      const saved = itemState.get(itemId);
+      if (saved && saved.fileIdx < files().length) {
+        setActiveFileIdx(saved.fileIdx);
+      } else if (files().length > 0 && activeFileIdx() >= files().length) {
+        setActiveFileIdx(0);
+      }
+      setWholeFileView(false);
       await loadComments();
 
       // Load commits
@@ -106,6 +135,7 @@ export default function App() {
       });
       await loadComments();
     }
+    restoreItemState(itemId);
   }
 
   async function handleRefresh() {
