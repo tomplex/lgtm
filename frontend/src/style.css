@@ -548,25 +548,28 @@ tr.comment-row td {
 
 .toast {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 12px 20px;
-  background: #238636;
-  color: white;
-  border-radius: 8px;
-  font-size: 14px;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 10px 24px;
+  background: rgba(22, 27, 34, 0.92);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
   font-weight: 500;
   z-index: 200;
   opacity: 0;
-  transform: translateY(-10px);
   transition:
-    opacity 0.3s,
-    transform 0.3s;
+    opacity 0.25s,
+    transform 0.25s;
   pointer-events: none;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 .toast.show {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
 }
 
 .keyboard-hint {
