@@ -1,5 +1,4 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, expect } from 'vitest';
 import { parseFileAnalysis, parseSynthesis } from '../parse-analysis.js';
 
 describe('parseFileAnalysis', () => {
@@ -12,7 +11,7 @@ describe('parseFileAnalysis', () => {
 gitRun now throws on failure instead of returning empty string.
 `;
     const result = parseFileAnalysis(md);
-    assert.deepStrictEqual(result, {
+    expect(result).toEqual({
       'server/git-ops.ts': {
         priority: 'critical',
         phase: 'review',
@@ -38,9 +37,9 @@ New auth middleware.
 Unit tests for auth middleware.
 `;
     const result = parseFileAnalysis(md);
-    assert.equal(Object.keys(result).length, 2);
-    assert.equal(result['src/auth.ts'].priority, 'critical');
-    assert.equal(result['tests/auth.test.ts'].priority, 'normal');
+    expect(Object.keys(result)).toHaveLength(2);
+    expect(result['src/auth.ts'].priority).toBe('critical');
+    expect(result['tests/auth.test.ts'].priority).toBe('normal');
   });
 
   it('handles multi-line summaries', () => {
@@ -53,8 +52,7 @@ Adds a global JSON error handler middleware.
 The error handler placement relative to static file serving is worth verifying.
 `;
     const result = parseFileAnalysis(md);
-    assert.equal(
-      result['server/app.ts'].summary,
+    expect(result['server/app.ts'].summary).toBe(
       'Adds a global JSON error handler middleware. The error handler placement relative to static file serving is worth verifying.',
     );
   });
@@ -67,7 +65,7 @@ The error handler placement relative to static file serving is worth verifying.
 
 Summary.
 `;
-    assert.throws(() => parseFileAnalysis(md), /Invalid priority "ultra"/);
+    expect(() => parseFileAnalysis(md)).toThrow(/Invalid priority "ultra"/);
   });
 
   it('throws on invalid phase', () => {
@@ -78,7 +76,7 @@ Summary.
 
 Summary.
 `;
-    assert.throws(() => parseFileAnalysis(md), /Invalid phase "glance"/);
+    expect(() => parseFileAnalysis(md)).toThrow(/Invalid phase "glance"/);
   });
 
   it('handles JSON fallback', () => {
@@ -91,15 +89,15 @@ Summary.
       },
     });
     const result = parseFileAnalysis(json);
-    assert.equal(result['src/auth.ts'].priority, 'critical');
-    assert.equal(result['src/auth.ts'].summary, 'New auth middleware.');
+    expect(result['src/auth.ts'].priority).toBe('critical');
+    expect(result['src/auth.ts'].summary).toBe('New auth middleware.');
   });
 
   it('throws on invalid priority in JSON fallback', () => {
     const json = JSON.stringify({
       'file.ts': { priority: 'ultra', phase: 'review', summary: 'x', category: 'y' },
     });
-    assert.throws(() => parseFileAnalysis(json), /Invalid priority "ultra"/);
+    expect(() => parseFileAnalysis(json)).toThrow(/Invalid priority "ultra"/);
   });
 });
 
@@ -125,15 +123,17 @@ Git ops behavior change, MCP refactor
 - frontend/src/ui.ts
 `;
     const result = parseSynthesis(md);
-    assert.equal(result.overview, 'This PR refactors the frontend into focused modules.');
-    assert.equal(result.reviewStrategy, 'Start with server/git-ops.ts since the throw-on-failure change affects every caller.');
-    assert.equal(result.groups.length, 2);
-    assert.equal(result.groups[0].name, 'Server core changes');
-    assert.equal(result.groups[0].description, 'Git ops behavior change, MCP refactor');
-    assert.deepStrictEqual(result.groups[0].files, ['server/git-ops.ts', 'server/mcp.ts']);
-    assert.equal(result.groups[1].name, 'Frontend extraction');
-    assert.equal(result.groups[1].description, undefined);
-    assert.deepStrictEqual(result.groups[1].files, ['frontend/src/diff.ts', 'frontend/src/ui.ts']);
+    expect(result.overview).toBe('This PR refactors the frontend into focused modules.');
+    expect(result.reviewStrategy).toBe(
+      'Start with server/git-ops.ts since the throw-on-failure change affects every caller.',
+    );
+    expect(result.groups).toHaveLength(2);
+    expect(result.groups[0].name).toBe('Server core changes');
+    expect(result.groups[0].description).toBe('Git ops behavior change, MCP refactor');
+    expect(result.groups[0].files).toEqual(['server/git-ops.ts', 'server/mcp.ts']);
+    expect(result.groups[1].name).toBe('Frontend extraction');
+    expect(result.groups[1].description).toBeUndefined();
+    expect(result.groups[1].files).toEqual(['frontend/src/diff.ts', 'frontend/src/ui.ts']);
   });
 
   it('handles groups without descriptions', () => {
@@ -152,8 +152,8 @@ Strategy text.
 - tsconfig.json
 `;
     const result = parseSynthesis(md);
-    assert.equal(result.groups[0].description, undefined);
-    assert.deepStrictEqual(result.groups[0].files, ['package.json', 'tsconfig.json']);
+    expect(result.groups[0].description).toBeUndefined();
+    expect(result.groups[0].files).toEqual(['package.json', 'tsconfig.json']);
   });
 
   it('throws on missing overview', () => {
@@ -166,7 +166,7 @@ Strategy text.
 ### Group
 - file.ts
 `;
-    assert.throws(() => parseSynthesis(md), /Missing ## Overview/);
+    expect(() => parseSynthesis(md)).toThrow(/Missing ## Overview/);
   });
 
   it('throws on missing review strategy', () => {
@@ -179,7 +179,7 @@ Overview text.
 ### Group
 - file.ts
 `;
-    assert.throws(() => parseSynthesis(md), /Missing ## Review Strategy/);
+    expect(() => parseSynthesis(md)).toThrow(/Missing ## Review Strategy/);
   });
 
   it('handles multi-paragraph overview', () => {
@@ -199,7 +199,7 @@ Strategy text.
 - file.ts
 `;
     const result = parseSynthesis(md);
-    assert.equal(result.overview, 'First paragraph of the overview.\n\nSecond paragraph with more detail.');
+    expect(result.overview).toBe('First paragraph of the overview.\n\nSecond paragraph with more detail.');
   });
 
   it('handles JSON fallback', () => {
@@ -212,15 +212,15 @@ Strategy text.
       ],
     });
     const result = parseSynthesis(json);
-    assert.equal(result.overview, 'PR overview text.');
-    assert.equal(result.reviewStrategy, 'Start with auth files.');
-    assert.equal(result.groups.length, 2);
-    assert.equal(result.groups[0].description, 'Auth logic');
-    assert.equal(result.groups[1].description, undefined);
+    expect(result.overview).toBe('PR overview text.');
+    expect(result.reviewStrategy).toBe('Start with auth files.');
+    expect(result.groups).toHaveLength(2);
+    expect(result.groups[0].description).toBe('Auth logic');
+    expect(result.groups[1].description).toBeUndefined();
   });
 
   it('throws on missing overview in JSON fallback', () => {
     const json = JSON.stringify({ reviewStrategy: 'x', groups: [] });
-    assert.throws(() => parseSynthesis(json), /Missing overview/);
+    expect(() => parseSynthesis(json)).toThrow(/Missing overview/);
   });
 });
