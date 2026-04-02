@@ -902,6 +902,12 @@ kbd {
   flex-direction: column;
   gap: 4px;
 }
+.claude-comment,
+.user-comment {
+  max-width: 75%;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
 .claude-comment {
   background: #1a1528;
   border: 1px solid #6e40c9;
