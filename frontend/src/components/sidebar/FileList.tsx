@@ -13,6 +13,18 @@ import {
 import type { DiffFile } from '../../state';
 import { sortFilesByPriority, groupFiles, phaseFiles } from '../../analysis';
 
+// --- Dismissed files ---
+
+const [dismissedFiles, setDismissedFiles] = createSignal(new Set<string>());
+
+function dismissFile(path: string) {
+  setDismissedFiles((prev) => new Set([...prev, path]));
+}
+
+function undismissAll() {
+  setDismissedFiles(new Set<string>());
+}
+
 // --- Filter logic ---
 
 function matchesGlob(path: string, pattern: string): boolean {
@@ -49,6 +61,7 @@ interface FileItemProps {
 function FileItem(props: FileItemProps) {
   const isActive = () => activeFileIdx() === props.idx;
   const isReviewed = () => reviewedFiles[props.file.path] ?? false;
+  const isDismissed = () => dismissedFiles().has(props.file.path);
 
   const fileComments = createMemo(() =>
     comments.list.filter((c) => c.file === props.file.path && !c.parentId && c.status !== 'dismissed'),
@@ -69,7 +82,7 @@ function FileItem(props: FileItemProps) {
 
   return (
     <div
-      class={`file-item${isActive() ? ' active' : ''}${isReviewed() ? ' reviewed' : ''}${props.extraClass ? ' ' + props.extraClass : ''}${props.priorityClass ? ' ' + props.priorityClass : ''}${props.hidden ? ' hidden' : ''}`}
+      class={`file-item${isActive() ? ' active' : ''}${isReviewed() ? ' reviewed' : ''}${props.extraClass ? ' ' + props.extraClass : ''}${props.priorityClass ? ' ' + props.priorityClass : ''}${props.hidden || isDismissed() ? ' hidden' : ''}`}
       data-idx={props.idx}
       onClick={handleSelect}
     >
@@ -105,6 +118,16 @@ function FileItem(props: FileItemProps) {
       <span class="file-stats">
         <span class="add">+{props.file.additions}</span>
         <span class="del">-{props.file.deletions}</span>
+      </span>
+      <span
+        class="file-dismiss"
+        title="Hide file"
+        onClick={(e) => {
+          e.stopPropagation();
+          dismissFile(props.file.path);
+        }}
+      >
+        &times;
       </span>
     </div>
   );
@@ -235,12 +258,15 @@ function PhasedFileList(props: { filterQuery: string }) {
         const phaseFiles_ = () => phases()[phase];
         const config = PHASE_CONFIG[phase];
         const reviewedCount = () => phaseFiles_().filter((f) => reviewedFiles[f.path]).length;
+        const allReviewed = () => reviewedCount() === phaseFiles_().length;
         const pct = () => Math.round((reviewedCount() / phaseFiles_().length) * 100);
+        const [expanded, setExpanded] = createSignal(!allReviewed());
 
         return (
           <>
-            <div class="phase-header">
+            <div class="phase-header" onClick={() => setExpanded(!expanded())}>
               <div class="phase-header-top">
+                <span class="group-chevron">{expanded() ? '\u25BE' : '\u25B8'}</span>
                 <span class="phase-label" style={`color: ${config.color}`}>
                   {config.icon} {config.label}
                 </span>
@@ -252,6 +278,7 @@ function PhasedFileList(props: { filterQuery: string }) {
                 <div class="phase-progress-fill" style={`width: ${pct()}%; background: ${config.color}`} />
               </div>
             </div>
+            <Show when={expanded()}>
             <For each={phaseFiles_()}>
               {(file) => {
                 const idx = () => files().indexOf(file);
@@ -265,6 +292,7 @@ function PhasedFileList(props: { filterQuery: string }) {
                 );
               }}
             </For>
+            </Show>
           </>
         );
       }}
@@ -277,6 +305,11 @@ function PhasedFileList(props: { filterQuery: string }) {
 export default function FileList(props: { filterQuery: string }) {
   return (
     <div class="file-list" id="file-list">
+      <Show when={dismissedFiles().size > 0}>
+        <div class="dismissed-notice">
+          <a onClick={undismissAll}>{dismissedFiles().size} hidden file{dismissedFiles().size !== 1 ? 's' : ''} — show all</a>
+        </div>
+      </Show>
       <Show when={analysis() && sidebarView() === 'grouped'}>
         <GroupedFileList filterQuery={props.filterQuery} />
       </Show>

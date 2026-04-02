@@ -32,10 +32,10 @@ export default function CommitPanel(props: Props) {
                 onChange={(e) => setSelectedShas(c.sha, e.currentTarget.checked)}
               />
               <span class="commit-sha">{c.sha.slice(0, 7)}</span>
+              <span class="commit-date">{c.date}</span>
               <span class="commit-msg" title={c.message}>
                 {c.message}
               </span>
-              <span class="commit-date">{c.date}</span>
             </label>
           )}
         </For>

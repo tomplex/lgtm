@@ -11,10 +11,10 @@
 - [x] Page title and top bar should show repo/project name prominently, plus branch vs base
 - [ ] Too many horizontal bands at top (header, tabs, meta, commits, description) - consolidate; meta bar could fold into header or be on-demand
 - [ ] Grouped view group headers are too dense
-- [ ] Phased review groups should be collapsible, auto-collapse when all items reviewed
+- [x] Phased review groups should be collapsible, auto-collapse when all items reviewed
 - [x] Flat file view: sort files with Claude comments to the top
-- [ ] Button to dismiss/hide files in the sidebar
-- [ ] Move comment save / delete buttons for inline interactions to the left hand side for easier access
+- [x] Button to dismiss/hide files in the sidebar
+- [x] Move comment save / delete buttons for inline interactions to the left hand side for easier access
 
 ## Commenting
 - [x] Markdown rendering in comments (both user and Claude)

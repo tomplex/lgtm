@@ -267,9 +267,39 @@ header .stats {
   color: var(--del-text);
 }
 
+.file-dismiss {
+  opacity: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.file-item:hover .file-dismiss {
+  opacity: 1;
+}
+
+.file-dismiss:hover {
+  color: var(--del-text);
+}
+
+.dismissed-notice {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dismissed-notice a {
+  color: var(--accent);
+  cursor: pointer;
+}
+
 .diff-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
   padding: 0;
 }
 
@@ -402,7 +432,7 @@ tr.comment-row td {
 .comment-actions {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .comment-actions button {
@@ -665,6 +695,7 @@ kbd {
   font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
+  min-width: 80px;
 }
 
 .commit-actions {
@@ -1369,6 +1400,7 @@ tr.expand-row:hover td {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   user-select: none;
+  cursor: pointer;
 }
 .phase-header-top {
   display: flex;
