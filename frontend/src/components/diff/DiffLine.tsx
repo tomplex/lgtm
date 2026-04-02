@@ -177,11 +177,9 @@ export default function DiffLine(props: Props) {
 
       <For each={lineComments()}>
         {(comment) => (
-          <tr class="comment-overlay-row">
+          <tr class={comment.author === 'claude' ? 'claude-comment-row' : 'comment-row'}>
             <td colspan="3">
-              <div class="comment-overlay">
-                <CommentRow comment={comment} />
-              </div>
+              <CommentRow comment={comment} />
             </td>
           </tr>
         )}

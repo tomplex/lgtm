@@ -397,12 +397,12 @@ tr.diff-context .line-content .diff-text:not(code) {
 }
 
 /* Comment rows */
-tr.comment-row td {
+tr.comment-row td,
+tr.claude-comment-row td {
   padding: 10px 16px 10px 60px;
-  background: none;
-  border-left: none;
   white-space: normal;
-  max-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 tr.comment-overlay-row {
@@ -425,34 +425,11 @@ tr.comment-overlay-row td {
   max-width: 900px;
 }
 
-/* Saved comments inside overlays don't need the outer comment-box card */
-.comment-overlay > .claude-comment,
-.comment-overlay > .user-comment {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* Edit textarea inside a saved comment overlay shouldn't nest card styles */
-.comment-overlay .claude-comment .comment-box,
-.comment-overlay .user-comment .comment-box {
-  width: 100%;
-  max-width: none;
-  background: none;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  box-shadow: none;
-}
-
 .comment-box {
   display: flex;
   flex-direction: column;
   gap: 8px;
   width: 100%;
-  max-width: none;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -981,13 +958,6 @@ kbd {
 .user-comment .inline-actions a:hover {
   background: var(--hover);
   color: var(--comment-border);
-}
-tr.claude-comment-row td {
-  padding: 4px 12px 4px 60px;
-  background: #1a1528;
-  border-left: 3px solid #6e40c9;
-  white-space: normal;
-  max-width: 0;
 }
 
 /* Resolved state */
