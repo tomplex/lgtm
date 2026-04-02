@@ -1,4 +1,10 @@
-interface DiffLine {
+import { createSignal, createMemo } from 'solid-js';
+import { createStore } from 'solid-js/store';
+import type { Comment } from './comment-types';
+
+// --- Types (re-exported for consumers) ---
+
+export interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk';
   content: string;
   oldLine: number | null;
@@ -18,8 +24,6 @@ export interface SessionItem {
   title: string;
   path?: string;
 }
-
-import type { Comment } from './comment-types';
 
 export interface RepoMeta {
   branch?: string;
@@ -66,65 +70,59 @@ export interface Analysis {
 
 export type SidebarView = 'flat' | 'grouped' | 'phased';
 
-// --- Mutable state ---
-export let files: DiffFile[] = [];
-export let comments: Comment[] = [];
-export let activeFileIdx = 0;
-export let appMode: 'diff' | 'file' = 'diff';
-export let mdMeta: MdMeta = {};
-export let repoMeta: RepoMeta = {};
-export let sessionItems: SessionItem[] = [];
-export let activeItemId = 'diff';
-export let allCommits: Commit[] = [];
-export const selectedShas = new Set<string>();
-export const reviewedFiles = new Set<string>();
-export let wholeFileView = false;
-export let analysis: Analysis | null = null;
-export let sidebarView: SidebarView = 'flat';
+// --- Signals (replaced wholesale) ---
 
-// Setters for reassignable state (since `export let` can't be reassigned from outside)
-export function setFiles(f: DiffFile[]) {
-  files = f;
-}
-export function setActiveFileIdx(i: number) {
-  activeFileIdx = i;
-}
-export function setAppMode(m: 'diff' | 'file') {
-  appMode = m;
-}
-export function setMdMeta(m: MdMeta) {
-  mdMeta = m;
-}
-export function setRepoMeta(m: RepoMeta) {
-  repoMeta = m;
-}
-export function setComments(c: Comment[]) {
-  comments = c;
-}
+export const [files, setFiles] = createSignal<DiffFile[]>([]);
+export const [activeFileIdx, setActiveFileIdx] = createSignal(0);
+export const [activeItemId, setActiveItemId] = createSignal('diff');
+export const [appMode, setAppMode] = createSignal<'diff' | 'file'>('diff');
+export const [wholeFileView, setWholeFileView] = createSignal(false);
+export const [sidebarView, setSidebarView] = createSignal<SidebarView>('flat');
+export const [repoMeta, setRepoMeta] = createSignal<RepoMeta>({});
+export const [mdMeta, setMdMeta] = createSignal<MdMeta>({});
+export const [sessionItems, setSessionItems] = createSignal<SessionItem[]>([]);
+export const [allCommits, setAllCommits] = createSignal<Commit[]>([]);
+export const [analysis, setAnalysis] = createSignal<Analysis | null>(null);
+
+// --- Stores (partial updates) ---
+
+export const [comments, setComments] = createStore<{ list: Comment[] }>({ list: [] });
 
 export function addLocalComment(c: Comment) {
-  comments.push(c);
+  setComments('list', (prev) => [...prev, c]);
 }
 
 export function updateLocalComment(id: string, fields: Partial<Comment>) {
-  const idx = comments.findIndex(c => c.id === id);
-  if (idx >= 0) comments[idx] = { ...comments[idx], ...fields };
+  setComments('list', (item) => item.id === id, fields);
 }
 
 export function removeLocalComment(id: string) {
-  comments = comments.filter(c => c.id !== id);
+  setComments('list', (prev) => prev.filter((c) => c.id !== id));
 }
-export function setSessionItems(items: SessionItem[]) {
-  sessionItems = items;
+
+export const [reviewedFiles, setReviewedFiles] = createStore<Record<string, boolean>>({});
+
+export function toggleReviewed(path: string) {
+  setReviewedFiles(path, (v) => !v);
 }
-export function setActiveItemId(id: string) {
-  activeItemId = id;
-}
-export function setAllCommits(c: Commit[]) {
-  allCommits = c;
-}
-export function setWholeFileView(v: boolean) {
-  wholeFileView = v;
-}
-export function setAnalysis(a: Analysis | null) { analysis = a; }
-export function setSidebarView(v: SidebarView) { sidebarView = v; }
+
+export const [selectedShas, setSelectedShas] = createStore<Record<string, boolean>>({});
+
+// --- Derived state ---
+
+export const activeFile = createMemo(() => files()[activeFileIdx()]);
+
+export const commentsByFile = createMemo(() => {
+  const result: Record<string, Comment[]> = {};
+  for (const c of comments.list) {
+    if (c.file && !c.parentId && c.status !== 'dismissed') {
+      if (!result[c.file]) result[c.file] = [];
+      result[c.file].push(c);
+    }
+  }
+  return result;
+});
+
+export const userCommentCount = createMemo(() =>
+  comments.list.filter((c) => c.author === 'user' && !c.parentId && c.status !== 'dismissed').length,
+);
