@@ -1,4 +1,4 @@
-import { createSignal, createResource, Show, For } from 'solid-js';
+import { createSignal, createResource, Show, For, onMount, onCleanup } from 'solid-js';
 import { peekState, setPeekState } from '../../state';
 import { fetchSymbol, type SymbolResult } from '../../api';
 import { highlightLine, detectLang, escapeHtml } from '../../utils';
@@ -6,6 +6,7 @@ import { showToast } from '../shared/Toast';
 
 export default function PeekPanel() {
   const [activeTab, setActiveTab] = createSignal(0);
+  let panelRef: HTMLDivElement | undefined;
 
   const [data] = createResource(
     () => peekState()?.symbol,
@@ -52,16 +53,49 @@ export default function PeekPanel() {
     }
   }
 
+  function handleBodyClick(e: MouseEvent) {
+    if (!(e.metaKey || e.ctrlKey)) return;
+
+    const sel = (document as any).caretPositionFromPoint?.(e.clientX, e.clientY)
+      ?? (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (!sel) return;
+    const node = 'offsetNode' in sel ? sel.offsetNode : sel.startContainer;
+    const offset = 'offset' in sel ? sel.offset : sel.startOffset;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+
+    const text = node.textContent ?? '';
+    let start = offset;
+    let end = offset;
+    while (start > 0 && /[\w]/.test(text[start - 1])) start--;
+    while (end < text.length && /[\w]/.test(text[end])) end++;
+    const word = text.slice(start, end);
+    if (word.length < 2 || !/^[a-zA-Z_]/.test(word)) return;
+
+    const current = peekState();
+    if (current) {
+      setPeekState({ ...current, symbol: word });
+    }
+  }
+
+  function onDocClick(e: MouseEvent) {
+    if (panelRef && !panelRef.contains(e.target as Node)) {
+      handleClose();
+    }
+  }
+
+  onMount(() => {
+    setTimeout(() => {
+      panelRef?.focus();
+      document.addEventListener('click', onDocClick);
+    }, 0);
+  });
+  onCleanup(() => document.removeEventListener('click', onDocClick));
+
   return (
     <Show when={peekState() && data()?.results?.length}>
       <tr class="peek-row">
         <td colspan="3">
-          <div
-            class="peek-panel"
-            onKeyDown={handleKeyDown}
-            tabIndex={-1}
-            ref={(el) => setTimeout(() => el.focus(), 0)}
-          >
+          <div class="peek-panel" ref={panelRef} onKeyDown={handleKeyDown} tabIndex={-1}>
             <div class="peek-header">
               <button class="peek-close" onClick={handleClose} title="Close (Esc)">✕</button>
               <strong class="peek-symbol">{data()!.symbol}</strong>
@@ -92,7 +126,7 @@ export default function PeekPanel() {
                   <Show when={r().docstring}>
                     <div class="peek-docstring">{r().docstring}</div>
                   </Show>
-                  <pre class="peek-body"><code innerHTML={highlightBody(r())} /></pre>
+                  <pre class="peek-body" onClick={handleBodyClick}><code innerHTML={highlightBody(r())} /></pre>
                 </>
               )}
             </Show>
