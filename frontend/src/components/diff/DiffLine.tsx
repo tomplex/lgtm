@@ -17,6 +17,7 @@ interface Props {
 
 export default function DiffLine(props: Props) {
   const [showNewComment, setShowNewComment] = createSignal(false);
+  const [showAskClaude, setShowAskClaude] = createSignal(false);
 
   const cls = () => {
     if (props.line.type === 'add') return 'diff-add';
@@ -87,6 +88,36 @@ export default function DiffLine(props: Props) {
     }
   }
 
+  async function handleAskClaude(text: string) {
+    const tempId = `temp-${Date.now()}`;
+    const lineNum = absLine();
+    const localComment: Comment = {
+      id: tempId,
+      author: 'user',
+      text,
+      status: 'active',
+      item: 'diff',
+      file: props.filePath,
+      line: lineNum ?? undefined,
+      mode: 'direct',
+    };
+    addLocalComment(localComment);
+    setShowAskClaude(false);
+    try {
+      const created = await apiCreateComment({
+        author: 'user',
+        text,
+        item: 'diff',
+        file: props.filePath,
+        line: lineNum ?? undefined,
+        mode: 'direct',
+      });
+      updateLocalComment(tempId, { id: created.id });
+    } catch {
+      /* optimistic update already applied */
+    }
+  }
+
   return (
     <>
       <tr
@@ -101,6 +132,9 @@ export default function DiffLine(props: Props) {
         <td class="line-content">
           <span class="diff-prefix">{prefix()}</span>
           <span innerHTML={codeHtml()} />
+          <span class="line-actions">
+            <a class="ask-claude-btn" onClick={(e) => { e.stopPropagation(); setShowAskClaude(true); }}>Ask Claude</a>
+          </span>
         </td>
       </tr>
 
@@ -120,6 +154,18 @@ export default function DiffLine(props: Props) {
         <tr class="comment-row">
           <td colspan="3">
             <CommentTextarea onSave={handleSaveNew} onCancel={() => setShowNewComment(false)} />
+          </td>
+        </tr>
+      </Show>
+
+      <Show when={showAskClaude()}>
+        <tr class="comment-row ask-claude-row">
+          <td colspan="3">
+            <CommentTextarea
+              placeholder="Ask Claude a question about this line..."
+              onSave={handleAskClaude}
+              onCancel={() => setShowAskClaude(false)}
+            />
           </td>
         </tr>
       </Show>

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getFileLines, getBranchCommits, gitRun } from './git-ops.js';
+import type { CommentFilter } from './comment-types.js';
 import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
@@ -220,6 +221,24 @@ export function createApp(manager: SessionManager): express.Express {
     }
     const comment = session.addComment({ author, text, item, file, line, block, parentId, mode });
     session.broadcast('comments_changed', { item, comment });
+
+    // Push direct questions to Claude via channel notification
+    if (mode === 'direct' && !parentId) {
+      const slug = (req.params as Record<string, string>).slug;
+      let content = text;
+      if (file && line != null) {
+        content = `Question on ${file}:${line}:\n\n${text}`;
+        const context = getFileLines(session.repoPath, file, Math.max(1, line - 3), 7);
+        if (context.length > 0) {
+          content += `\n\nContext:\n${context.map(l => `${l.num}: ${l.content}`).join('\n')}`;
+        }
+      }
+      const meta: Record<string, string> = { event: 'question', project: slug, commentId: comment.id };
+      if (file) meta.file = file;
+      if (line != null) meta.line = String(line);
+      notifyChannel(content, meta);
+    }
+
     res.json({ ok: true, comment });
   });
 

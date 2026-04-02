@@ -99,6 +99,9 @@ export default function CommentRow(props: Props) {
     >
       <div class="claude-header">
         <span class="claude-label">{props.comment.author === 'claude' ? 'Claude' : 'You'}</span>
+        <Show when={props.comment.mode === 'direct'}>
+          <span class="ask-claude-badge">Asked Claude</span>
+        </Show>
 
         <Show when={isResolved()}>
           <span class="resolve-badge">Resolved</span>

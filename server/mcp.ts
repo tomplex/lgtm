@@ -119,6 +119,36 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
+    'reply',
+    'Reply to a user comment in the review UI. Use this to answer direct questions from the reviewer. The reply appears inline beneath the original comment.',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+      commentId: z.string().describe('The ID of the comment to reply to'),
+      text: z.string().describe('The reply text'),
+    },
+    async ({ repoPath, commentId, text }) => {
+      const lookup = requireProject(manager, repoPath);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
+      const parent = found.session.getComment(commentId);
+      if (!parent) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Comment not found: ${commentId}` }) }] };
+      }
+      const reply = found.session.addComment({
+        author: 'claude',
+        text,
+        parentId: commentId,
+        item: parent.item,
+        file: parent.file,
+        line: parent.line,
+        block: parent.block,
+      });
+      found.session.broadcast('comments_changed', { item: parent.item, comment: reply });
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: reply.id }) }] };
+    },
+  );
+
+  server.tool(
     'set_analysis',
     'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. The review UI uses this to show priority indicators, file groupings, and a review strategy. Called by the analyze skill after agents have written their output.',
     {

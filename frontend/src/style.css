@@ -921,6 +921,42 @@ tr.claude-comment-row td {
   flex-shrink: 0;
 }
 
+.ask-claude-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* Ask Claude button on diff lines */
+.line-actions {
+  float: right;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+tr:hover .line-actions {
+  opacity: 1;
+}
+
+.ask-claude-btn {
+  font-size: 11px;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+  padding: 0 4px;
+}
+
+.ask-claude-btn:hover {
+  text-decoration: underline;
+}
+
+tr.ask-claude-row {
+  border-left: 3px solid var(--accent);
+}
+
 /* Reply nested inside Claude comment */
 .claude-reply {
   padding: 6px 8px;
