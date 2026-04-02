@@ -41,7 +41,7 @@
 - [x] document review submissions should be connected to a specific claude instance rather than the project as a whole
 
 ## Tech debt
-- [ ] Comprehensive server tests
+- [x] Comprehensive server tests (103 tests: store, git-ops, session, session manager, routes)
 
 ## Future
 - [ ] Rename GitHub repo to `lgtm`
