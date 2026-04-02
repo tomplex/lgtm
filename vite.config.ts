@@ -1,13 +1,27 @@
 import { defineConfig, type Plugin } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 
-// SPA fallback: serve index.html for /project/* routes so Vite HMR works
-function spaFallback(): Plugin {
+const backendPort = process.env.REVIEW_PORT || 9900;
+const backendTarget = `http://127.0.0.1:${backendPort}`;
+
+// Proxy API routes to the Express backend, serve index.html for page navigations
+function projectProxy(): Plugin {
   return {
-    name: 'spa-fallback',
+    name: 'project-proxy',
     configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        if (req.url?.startsWith('/project/') && !req.url.includes('.')) {
+      // Runs before Vite's internal middleware.
+      // /project/:slug/<subpath> with a subpath → proxy to backend (API call)
+      // /project/:slug/ with no subpath → let Vite serve index.html (SPA navigation)
+      server.middlewares.use((req, res, next) => {
+        const url = req.url || '';
+        // Match /project/:slug/<something> — these are API calls
+        const apiMatch = url.match(/^\/project\/[^/]+(\/[^?].*)$/);
+        if (apiMatch) {
+          // Let Vite's built-in proxy handle it (configured below)
+          return next();
+        }
+        // /project/:slug/ or /project/:slug → SPA fallback
+        if (url.match(/^\/project\/[^/]+\/?(\?.*)?$/)) {
           req.url = '/';
         }
         next();
@@ -16,27 +30,29 @@ function spaFallback(): Plugin {
   };
 }
 
-const backendPort = process.env.REVIEW_PORT || 9900;
-
 export default defineConfig({
   root: 'frontend',
-  plugins: [solidPlugin(), spaFallback()],
+  plugins: [solidPlugin(), projectProxy()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,
   },
   server: {
     proxy: {
+      // API calls: /project/:slug/data, /project/:slug/comments, etc.
       '/project': {
-        target: `http://127.0.0.1:${backendPort}`,
+        target: backendTarget,
         bypass(req) {
-          // Only proxy API calls (JSON/SSE), not page navigations
-          const accept = req.headers.accept || '';
-          if (accept.includes('text/html')) return req.url;
+          // Only proxy paths with a sub-resource (API calls)
+          // Bare /project/:slug/ is handled by SPA fallback above
+          const url = req.url || '';
+          if (url.match(/^\/project\/[^/]+\/?(\?.*)?$/)) {
+            return url; // skip proxy, serve from Vite
+          }
         },
       },
       '/projects': {
-        target: `http://127.0.0.1:${backendPort}`,
+        target: backendTarget,
       },
     },
   },
