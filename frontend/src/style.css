@@ -930,31 +930,21 @@ tr.claude-comment-row td {
   flex-shrink: 0;
 }
 
-/* Ask Claude button on diff lines */
-.line-actions {
-  float: right;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-tr:hover .line-actions {
-  opacity: 1;
-}
-
-.ask-claude-btn {
-  font-size: 11px;
+/* Ask Claude button in comment textarea */
+.ask-claude-save-btn {
+  background: transparent;
   color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
   cursor: pointer;
-  text-decoration: none;
-  padding: 0 4px;
+  font-family: inherit;
 }
 
-.ask-claude-btn:hover {
-  text-decoration: underline;
-}
-
-tr.ask-claude-row {
-  border-left: 3px solid var(--accent);
+.ask-claude-save-btn:hover {
+  background: var(--accent);
+  color: var(--bg);
 }
 
 /* Reply nested inside Claude comment */

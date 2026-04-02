@@ -17,7 +17,6 @@ interface Props {
 
 export default function DiffLine(props: Props) {
   const [showNewComment, setShowNewComment] = createSignal(false);
-  const [showAskClaude, setShowAskClaude] = createSignal(false);
 
   const cls = () => {
     if (props.line.type === 'add') return 'diff-add';
@@ -102,7 +101,7 @@ export default function DiffLine(props: Props) {
       mode: 'direct',
     };
     addLocalComment(localComment);
-    setShowAskClaude(false);
+    setShowNewComment(false);
     try {
       const created = await apiCreateComment({
         author: 'user',
@@ -132,9 +131,6 @@ export default function DiffLine(props: Props) {
         <td class="line-content">
           <span class="diff-prefix">{prefix()}</span>
           <span innerHTML={codeHtml()} />
-          <span class="line-actions">
-            <a class="ask-claude-btn" onClick={(e) => { e.stopPropagation(); setShowAskClaude(true); }}>Ask Claude</a>
-          </span>
         </td>
       </tr>
 
@@ -153,19 +149,7 @@ export default function DiffLine(props: Props) {
       <Show when={showNewComment()}>
         <tr class="comment-row">
           <td colspan="3">
-            <CommentTextarea onSave={handleSaveNew} onCancel={() => setShowNewComment(false)} />
-          </td>
-        </tr>
-      </Show>
-
-      <Show when={showAskClaude()}>
-        <tr class="comment-row ask-claude-row">
-          <td colspan="3">
-            <CommentTextarea
-              placeholder="Ask Claude a question about this line..."
-              onSave={handleAskClaude}
-              onCancel={() => setShowAskClaude(false)}
-            />
+            <CommentTextarea onSave={handleSaveNew} onAskClaude={handleAskClaude} onCancel={() => setShowNewComment(false)} />
           </td>
         </tr>
       </Show>

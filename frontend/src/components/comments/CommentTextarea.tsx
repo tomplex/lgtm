@@ -7,6 +7,7 @@ interface Props {
   onCancel: () => void;
   showDelete?: boolean;
   onDelete?: () => void;
+  onAskClaude?: (text: string) => void;
 }
 
 export default function CommentTextarea(props: Props) {
@@ -63,6 +64,19 @@ export default function CommentTextarea(props: Props) {
             }}
           >
             Delete
+          </button>
+        )}
+        {props.onAskClaude && (
+          <button
+            class="ask-claude-save-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              const text = textareaRef.value.trim();
+              if (text) props.onAskClaude!(text);
+              else props.onCancel();
+            }}
+          >
+            Ask Claude
           </button>
         )}
         <button
