@@ -169,13 +169,14 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'set_analysis',
-    'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. The review UI uses this to show priority indicators, file groupings, and a review strategy. Called by the analyze skill after agents have written their output.',
+    'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. The review UI uses this to show priority indicators, file groupings, and a review strategy. Optionally adds a review guide document. Called by the analyze skill after agents have written their output.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
       fileAnalysisPath: z.string().describe('Absolute path to the file-analyzer markdown output'),
       synthesisPath: z.string().describe('Absolute path to the synthesis agent markdown output'),
+      reviewGuidePath: z.string().optional().describe('Absolute path to a markdown review guide (overview, strategy, opinion) to add as a reviewable document'),
     },
-    async ({ repoPath, fileAnalysisPath, synthesisPath }) => {
+    async ({ repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath }) => {
       const lookup = requireProject(manager, repoPath, server);
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
@@ -192,11 +193,19 @@ function createMcpServer(manager: SessionManager): McpServer {
         };
 
         found.session.setAnalysis(analysis);
+
+        // Add review guide as a reviewable document
+        if (reviewGuidePath) {
+          found.session.addItem('review-guide', 'Review Guide', reviewGuidePath);
+          found.session.broadcast('items_changed', { id: 'review-guide' });
+        }
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             ok: true,
             fileCount: Object.keys(files).length,
             groupCount: synthesis.groups.length,
+            reviewGuide: !!reviewGuidePath,
           }) }],
         };
       } catch (err) {

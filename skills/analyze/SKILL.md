@@ -43,7 +43,7 @@ The agent writes a markdown file with per-file classifications.
 ### Step 2: Synthesis
 
 Spawn the `synthesizer` agent. Pass the path to the file analysis output, the session
-description, and an output file path.
+description, and both output file paths.
 
 ```
 Prompt for the agent:
@@ -51,9 +51,11 @@ Prompt for the agent:
 Read the file analysis at /tmp/lgtm-analysis-files.md.
 Session description: <DESCRIPTION or "No description provided.">
 Write your synthesis to /tmp/lgtm-analysis-synthesis.md
+Write your review guide to /tmp/lgtm-analysis-review-guide.md
 ```
 
-The agent reads the file analysis, then writes a markdown file with overview, strategy, and groups.
+The agent reads the file analysis, then writes two files: a structured synthesis (groups)
+and a human-readable review guide (overview, strategy, opinion).
 
 ### Step 3: Submit
 
@@ -61,6 +63,7 @@ Call `set_analysis` with:
 - `repoPath`: the repo path
 - `fileAnalysisPath`: `/tmp/lgtm-analysis-files.md`
 - `synthesisPath`: `/tmp/lgtm-analysis-synthesis.md`
+- `reviewGuidePath`: `/tmp/lgtm-analysis-review-guide.md`
 
 The MCP tool parses both markdown files, merges them into the analysis JSON, validates
 the structure, and sets it on the session.

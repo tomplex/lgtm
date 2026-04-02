@@ -14,6 +14,7 @@ export interface AnalysisGroup {
 export interface Synthesis {
   overview: string;
   reviewStrategy: string;
+  opinion: string;
   groups: AnalysisGroup[];
 }
 
@@ -96,6 +97,7 @@ export function parseSynthesis(input: string): Synthesis {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
     const overview = (parsed.overview as string) ?? '';
     const reviewStrategy = (parsed.reviewStrategy as string) ?? '';
+    const opinion = (parsed.opinion as string) ?? '';
     const rawGroups = (parsed.groups as Array<Record<string, unknown>>) ?? [];
     if (!overview) throw new Error('Missing overview in JSON');
     if (!reviewStrategy) throw new Error('Missing reviewStrategy in JSON');
@@ -107,7 +109,7 @@ export function parseSynthesis(input: string): Synthesis {
       if (g.description) group.description = g.description as string;
       return group;
     });
-    return { overview, reviewStrategy, groups };
+    return { overview, reviewStrategy, opinion, groups };
   }
 
   const sections = new Map<string, string>();
@@ -122,6 +124,7 @@ export function parseSynthesis(input: string): Synthesis {
 
   const overview = sections.get('overview') ?? '';
   const reviewStrategy = sections.get('review strategy') ?? '';
+  const opinion = sections.get('opinion') ?? '';
   const groupsRaw = sections.get('groups') ?? '';
 
   if (!overview) throw new Error('Missing ## Overview section');
@@ -152,5 +155,5 @@ export function parseSynthesis(input: string): Synthesis {
     groups.push(group);
   }
 
-  return { overview, reviewStrategy, groups };
+  return { overview, reviewStrategy, opinion, groups };
 }

@@ -11,11 +11,12 @@ You are synthesizing per-file analysis results into a high-level review guide. Y
 
 1. **Path to the file analysis markdown** — read this file to get per-file classifications.
 2. **Session description** — context about what the branch is doing (may be empty).
-3. **Output file path** — write your synthesis to this file.
+3. **Synthesis output file path** — write your structured synthesis (groups) to this file.
+4. **Review guide output file path** — write the human-readable review guide (overview, strategy, opinion) to this file.
 
 ## Instructions
 
-Produce three things:
+Produce four things:
 
 ### 1. Overview
 
@@ -25,7 +26,17 @@ Produce three things:
 
 A concrete suggestion for how to approach the review. Which files or groups to start with, what to pay attention to, what can be safely batch-skimmed. Reference specific files or groups by name.
 
-### 3. Groups
+### 3. Opinion
+
+Your honest assessment of this change. Cover:
+- **Quality:** Is the code well-structured? Are there patterns you'd push back on?
+- **Risk:** What could break? Are there edge cases or failure modes that concern you?
+- **Completeness:** Is anything missing — tests, error handling, documentation?
+- **Suggestions:** If you were reviewing this, what would you ask the author to change?
+
+Be direct and specific. This is not a summary — it's your professional opinion as a reviewer. Reference specific files and line ranges where relevant.
+
+### 4. Groups
 
 Organize the files into thematic groups. Each group has:
 - `name`: A descriptive display name (e.g., "Auth middleware (new)", "Call-site updates")
@@ -39,9 +50,13 @@ Rules:
 - Don't force files into groups — a small "Other" group is better than a contrived grouping
 - Group by thematic coherence (files that serve the same purpose), not by directory structure
 
-## Output format
+## Output files
 
-Write your synthesis to the output file path provided in the task prompt. Use this exact markdown format:
+You write **two** files:
+
+### File 1: Synthesis (structured data)
+
+Write to the synthesis output file path. This is parsed by the server for structured data (groups). Use this exact markdown format:
 
 ```
 ## Overview
@@ -78,3 +93,53 @@ Rules:
 - The first non-list line after a group heading is the optional description.
 - File paths are listed with `- ` prefix.
 - Do not include any content before the first `## ` heading.
+
+### File 2: Review Guide (human-readable document)
+
+Write to the review guide output file path. This is displayed as a reviewable document tab in the UI — the reviewer can read it, comment on it, and discuss it with Claude. Write it as polished, readable markdown.
+
+```
+# Review Guide
+
+## Overview
+
+This PR replaces the sequential FULL OUTER JOIN carry-forward chain with a parallel
+LEFT JOIN strategy. Each date independently resolves its CF sources from the
+pre-computed plan rather than chaining off the previous date's CF output.
+
+## Review Strategy
+
+Start with `parallel_carry_forward.py` — this is the entire algorithmic replacement
+and where any logical bugs will live. Pay close attention to how `plan_carry_forward`
+resolves the most-recent-prev delivery date when a sub-field has gaps.
+
+Then read `build.py` to verify the async task wiring, particularly how `cf_tasks`
+handles a join returning `None`.
+
+The test files are worth reviewing carefully since the assertion changes (row count
+drops, NULL-observed semantic flip) are deliberate product decisions.
+
+## Opinion
+
+The overall design is solid — parallel carry-forward eliminates the sequential
+bottleneck and the code is cleaner for it.
+
+Two concerns:
+
+1. **`parallel_carry_forward.py:120-145`** — the `_resolve_prev_delivery` function
+   does a linear scan through sorted dates. For partitions with many dates this
+   could be slow. Consider a bisect lookup.
+
+2. **Test coverage** — `test_comprehensive_build.py` tests the happy path well but
+   doesn't test the case where *all* prior dates have NULL values for a sub-field.
+   The carry-forward should return NULL but this isn't explicitly verified.
+
+The migration from sequential to parallel is clean and the tests are thorough where
+they exist.
+```
+
+Rules:
+- Use proper markdown with headings, bold, lists, and code references.
+- The reviewer will read this in a rendered markdown view — make it scannable.
+- The Opinion section should be specific and reference files/lines, not generic praise.
+- Do not include the Groups data in this file — it's in the synthesis file.
