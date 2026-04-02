@@ -35,6 +35,7 @@ function createMcpServer(manager: SessionManager): McpServer {
     async ({ repoPath, description, baseBranch }) => {
       const result = manager.register(repoPath, { description, baseBranch });
       associateMcpSession(server, result.slug);
+      claimDiffReviews(server, result.slug);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
@@ -122,6 +123,21 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
+    'claim_reviews',
+    'Claim code review notifications for a project. When the reviewer submits feedback on the diff, only the Claude session that claimed reviews will receive the channel notification. Calling this transfers the claim from any previous holder.',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+    },
+    async ({ repoPath }) => {
+      const lookup = requireProject(manager, repoPath, server);
+      if ('error' in lookup) return lookup.error;
+      const { found } = lookup;
+      claimDiffReviews(server, found.slug);
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, slug: found.slug }) }] };
+    },
+  );
+
+  server.tool(
     'reply',
     'Reply to a user comment in the review UI. Use this to answer direct questions from the reviewer. The reply appears inline beneath the original comment.',
     {
@@ -196,7 +212,13 @@ function createMcpServer(manager: SessionManager): McpServer {
   return server;
 }
 
-const activeMcpSessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport; projectSlug?: string; itemIds: Set<string> }>();
+const activeMcpSessions = new Map<string, {
+  server: McpServer;
+  transport: StreamableHTTPServerTransport;
+  projectSlug?: string;
+  claimedDiff: boolean;
+  itemIds: Set<string>;
+}>();
 
 // Associate an MCP server instance with a project slug (called when tools use repoPath)
 export function associateMcpSession(server: McpServer, slug: string): void {
@@ -218,15 +240,32 @@ export function associateMcpItem(server: McpServer, itemId: string): void {
   }
 }
 
+// Claim diff review notifications for this MCP session (unclaims any previous holder)
+function claimDiffReviews(server: McpServer, slug: string): void {
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.projectSlug === slug) entry.claimedDiff = false;
+  }
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.server === server) {
+      entry.claimedDiff = true;
+      return;
+    }
+  }
+}
+
 export function notifyChannel(content: string, meta: Record<string, string>): void {
   const targetProject = meta.project;
   const targetItem = meta.item;
-  for (const { server, projectSlug, itemIds } of activeMcpSessions.values()) {
+  for (const { server, projectSlug, claimedDiff, itemIds } of activeMcpSessions.values()) {
     // Only notify sessions associated with the target project
     if (!projectSlug || projectSlug !== targetProject) continue;
-    // If an item is specified, only notify sessions that own that item
-    // (diff is owned by all sessions in the project via start)
-    if (targetItem && targetItem !== 'diff' && !itemIds.has(targetItem)) continue;
+    // Diff reviews go only to the session that claimed them
+    if (!targetItem || targetItem === 'diff') {
+      if (!claimedDiff) continue;
+    } else {
+      // Document reviews go only to the session that added that document
+      if (!itemIds.has(targetItem)) continue;
+    }
     server.server.notification({
       method: 'notifications/claude/channel',
       params: { content, meta },
@@ -257,7 +296,7 @@ export function mountMcp(app: express.Express, manager: SessionManager): void {
     await transport.handleRequest(req, res, req.body);
 
     if (transport.sessionId) {
-      activeMcpSessions.set(transport.sessionId, { server: mcpServer, transport, itemIds: new Set() });
+      activeMcpSessions.set(transport.sessionId, { server: mcpServer, transport, claimedDiff: false, itemIds: new Set() });
     }
   });
 
