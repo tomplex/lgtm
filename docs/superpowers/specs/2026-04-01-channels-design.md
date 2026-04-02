@@ -128,13 +128,16 @@ This tool works for replying to any comment, but in practice Claude will use it 
 - **MCP tools** — new `reply` tool
 - **Frontend** — "Ask Claude" button/textarea on lines, direct question rendering, reply-via-SSE handling
 
-## Open questions from research
+## Resolved questions
 
-These are from `docs/channels-research.md` and still need answers before or during implementation:
+- **Does `notifications/claude/channel` work with Streamable HTTP transport?** Yes — confirmed via spike. The MCP server declares `capabilities: { experimental: { 'claude/channel': {} } }`, and `server.notification()` pushes through the SSE stream to Claude Code. No stdio required.
+- **Claude Code flag required:** `--dangerously-load-development-channels server:lgtm` (research preview). Once allowlisted, `--channels` suffices.
+- **Review submitted event:** working end-to-end as of the spike commit. `notifyChannel()` exported from `mcp.ts`, called from `POST /submit` route.
 
-- Does `notifications/claude/channel` work with Streamable HTTP transport, or only stdio?
+## Remaining open questions
+
 - What happens if multiple Claude sessions connect to the same MCP server? Do all get the notification?
 - Is there a way to target a specific Claude session?
 - How does the `instructions` field work with HTTP transport?
 
-The first question is a blocker — if HTTP transport doesn't support channel notifications, we need a workaround (possibly a separate stdio MCP server just for channels). The others affect multi-session behavior but aren't blockers for a single-session MVP.
+These affect multi-session behavior but aren't blockers for a single-session MVP.

@@ -80,9 +80,12 @@ mcp.notification({
 });
 ```
 
+## Resolved questions
+
+- **Streamable HTTP transport works.** Confirmed 2026-04-02. The MCP server declares `experimental: { 'claude/channel': {} }` in capabilities, and `server.notification()` pushes through the SSE stream. Claude Code receives `<channel>` tags as expected. Requires `--dangerously-load-development-channels server:lgtm` flag during research preview.
+
 ## Open questions
 
-- Does `notifications/claude/channel` work with Streamable HTTP transport, or only stdio? Need to test.
 - What happens if multiple Claude sessions are connected to the same MCP server? Do all of them get the notification?
 - Is there a way to target a specific Claude session with a notification?
 - How does the `instructions` field on the channel server work with HTTP transport? (For stdio channels, the instructions tell Claude what the channel events mean.)
