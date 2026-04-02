@@ -8,6 +8,7 @@ import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 import { notifyChannel } from './mcp.js';
+import { findSymbol } from './symbol-lookup.js';
 
 declare global {
   namespace Express {
@@ -145,6 +146,17 @@ export function createApp(manager: SessionManager): express.Express {
 
   projectRouter.get('/analysis', (_req, res) => {
     res.json({ analysis: res.locals.session.analysis });
+  });
+
+  projectRouter.get('/symbol', (req, res) => {
+    const session = res.locals.session;
+    const name = (req.query.name as string) ?? '';
+    if (!name) {
+      res.json({ symbol: '', results: [] });
+      return;
+    }
+    const results = findSymbol(session.repoPath, name);
+    res.json({ symbol: name, results });
   });
 
   // --- User state routes ---
