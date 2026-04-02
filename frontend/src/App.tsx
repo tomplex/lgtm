@@ -196,9 +196,13 @@ export default function App() {
 
   function connectSSE() {
     const es = new EventSource(`${baseUrl()}/events`);
-    es.addEventListener('comments_changed', () => {
-      loadComments();
-      showToast('New comments from Claude', 2000);
+    es.addEventListener('comments_changed', async () => {
+      const prevClaudeCount = comments.list.filter((c) => c.author === 'claude' && !c.parentId).length;
+      await loadComments();
+      const newClaudeCount = comments.list.filter((c) => c.author === 'claude' && !c.parentId).length;
+      if (newClaudeCount > prevClaudeCount) {
+        showToast('New comments from Claude', 2000);
+      }
     });
     es.addEventListener('items_changed', () => {
       loadItems().then(() => showToast('Review items updated', 2000));

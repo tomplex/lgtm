@@ -92,7 +92,7 @@ export default function CommentRow(props: Props) {
   }
 
   return (
-    <div class="claude-comment" classList={{ resolved: isResolved() }} data-comment-id={props.comment.id}>
+    <div class={props.comment.author === 'claude' ? 'claude-comment' : 'user-comment'} classList={{ resolved: isResolved() }} data-comment-id={props.comment.id}>
       <div class="claude-header">
         <span class="claude-label">{props.comment.author === 'claude' ? 'Claude' : 'You'}</span>
 

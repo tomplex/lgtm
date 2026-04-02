@@ -39,6 +39,7 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -136,6 +137,7 @@ header .stats {
 .main {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -827,11 +829,10 @@ kbd {
   line-height: 1.5;
 }
 
-/* --- Claude comments --- */
-.claude-comment {
+/* --- Comments (shared layout) --- */
+.claude-comment,
+.user-comment {
   padding: 6px 10px;
-  background: #1a1528;
-  border: 1px solid #6e40c9;
   border-radius: 4px;
   font-size: 13px;
   line-height: 1.4;
@@ -839,7 +840,16 @@ kbd {
   flex-direction: column;
   gap: 4px;
 }
-.claude-comment .claude-header {
+.claude-comment {
+  background: #1a1528;
+  border: 1px solid #6e40c9;
+}
+.user-comment {
+  background: var(--comment-bg);
+  border: 1px solid var(--comment-border);
+}
+.claude-comment .claude-header,
+.user-comment .claude-header {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -852,15 +862,26 @@ kbd {
   letter-spacing: 0.5px;
   flex-shrink: 0;
 }
-.claude-comment .claude-text {
+.user-comment .claude-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--comment-border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.claude-comment .claude-text,
+.user-comment .claude-text {
   flex: 1;
 }
-.claude-comment .inline-actions {
+.claude-comment .inline-actions,
+.user-comment .inline-actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
 }
-.claude-comment .inline-actions a {
+.claude-comment .inline-actions a,
+.user-comment .inline-actions a {
   font-size: 11px;
   color: var(--text-muted);
   cursor: pointer;
@@ -872,6 +893,10 @@ kbd {
   background: var(--hover);
   color: #a371f7;
 }
+.user-comment .inline-actions a:hover {
+  background: var(--hover);
+  color: var(--comment-border);
+}
 tr.claude-comment-row td {
   padding: 4px 12px 4px 60px;
   background: #1a1528;
@@ -881,11 +906,13 @@ tr.claude-comment-row td {
 }
 
 /* Resolved state */
-.claude-comment.resolved {
+.claude-comment.resolved,
+.user-comment.resolved {
   opacity: 0.5;
   border-style: dashed;
 }
-.claude-comment .resolve-badge {
+.claude-comment .resolve-badge,
+.user-comment .resolve-badge {
   font-size: 10px;
   font-weight: 600;
   color: var(--add-text);
