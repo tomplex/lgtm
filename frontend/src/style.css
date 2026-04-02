@@ -1255,11 +1255,11 @@ tr.expand-row:hover td {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 16px 20px;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 .overview-banner.collapsed .overview-content {
   display: none;
@@ -1271,14 +1271,25 @@ tr.expand-row:hover td {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 14px;
+}
+.overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.overview-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
 }
 .overview-text {
   color: var(--text);
 }
 .overview-strategy {
   color: var(--text-muted);
-  font-style: italic;
 }
 .overview-toggle {
   background: none;
@@ -1371,8 +1382,10 @@ tr.expand-row:hover td {
 .file-header-summary {
   font-size: 12px;
   font-weight: 400;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: 4px;
+  line-height: 1.5;
 }
 
 /* --- Group headers --- */

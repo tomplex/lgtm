@@ -15,8 +15,14 @@ export default function OverviewBanner() {
       {(a) => (
         <div class="overview-banner" classList={{ collapsed: collapsed() }}>
           <div class="overview-content">
-            <div class="overview-text">{a().overview}</div>
-            <div class="overview-strategy">{a().reviewStrategy}</div>
+            <div class="overview-section">
+              <div class="overview-label">Overview</div>
+              <div class="overview-text">{a().overview}</div>
+            </div>
+            <div class="overview-section">
+              <div class="overview-label">Review Strategy</div>
+              <div class="overview-strategy">{a().reviewStrategy}</div>
+            </div>
           </div>
           <button class="overview-toggle" title="Toggle overview" onClick={toggle}>
             &#9650;
