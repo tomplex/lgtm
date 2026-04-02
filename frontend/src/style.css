@@ -411,6 +411,11 @@ tr.comment-row td {
   gap: 8px;
   width: 75%;
   max-width: 700px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .comment-box textarea {
