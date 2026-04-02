@@ -29,16 +29,34 @@ interface RgMatch {
   text: string;
 }
 
+// Directories to exclude from symbol search
+const EXCLUDED_DIRS = ['dist', 'build', 'node_modules', '.git', '__pycache__', '.next', 'coverage', '.superpowers'];
+
+// Source code extensions in priority order (higher = better)
+const SOURCE_PRIORITY: Record<string, number> = {
+  '.py': 10, '.ts': 10, '.tsx': 10, '.js': 9, '.jsx': 9,
+  '.go': 8, '.rs': 8, '.java': 8, '.rb': 8,
+};
+
+function fileTypePriority(file: string): number {
+  for (const [ext, priority] of Object.entries(SOURCE_PRIORITY)) {
+    if (file.endsWith(ext)) return priority;
+  }
+  return 0; // non-source files (md, json, etc.)
+}
+
 function runRipgrep(repoPath: string, symbol: string): RgMatch[] {
   const patterns = buildPatterns(symbol);
   const matches: RgMatch[] = [];
   const seen = new Set<string>();
 
+  const globArgs = EXCLUDED_DIRS.flatMap(d => ['--glob', `!${d}/`]);
+
   for (const pattern of patterns) {
     let output: string;
     try {
       output = execSync(
-        `rg --json -n -e ${JSON.stringify(pattern)} -- .`,
+        `rg --json -n ${globArgs.map(a => JSON.stringify(a)).join(' ')} -e ${JSON.stringify(pattern)} -- .`,
         { cwd: repoPath, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
       );
     } catch (err: unknown) {
@@ -254,9 +272,14 @@ function extractJsDocstring(lines: string[], startIndex: number): string | null 
 
 export function sortResults(results: SymbolResult[], diffFiles: Set<string>): SymbolResult[] {
   return results.slice().sort((a, b) => {
+    // Diff files first
     const aInDiff = diffFiles.has(a.file) ? 0 : 1;
     const bInDiff = diffFiles.has(b.file) ? 0 : 1;
     if (aInDiff !== bInDiff) return aInDiff - bInDiff;
+    // Source code files before non-source (md, json, etc.)
+    const aPri = fileTypePriority(a.file);
+    const bPri = fileTypePriority(b.file);
+    if (aPri !== bPri) return bPri - aPri;
     return a.file.localeCompare(b.file);
   });
 }
@@ -296,7 +319,7 @@ export function findSymbol(repoPath: string, symbol: string): SymbolResult[] {
     }
 
     results.push({
-      file: absoluteFile,
+      file: match.file.startsWith('./') ? match.file.slice(2) : match.file,
       line: match.line,
       kind,
       body,
