@@ -188,9 +188,11 @@ export default function DiffLine(props: Props) {
       </For>
 
       <Show when={showNewComment()}>
-        <tr class="comment-row">
+        <tr class="comment-overlay-row">
           <td colspan="3">
-            <CommentTextarea onSave={handleSaveNew} onAskClaude={handleAskClaude} onCancel={() => setShowNewComment(false)} />
+            <div class="comment-overlay">
+              <CommentTextarea onSave={handleSaveNew} onAskClaude={handleAskClaude} onCancel={() => setShowNewComment(false)} />
+            </div>
           </td>
         </tr>
       </Show>

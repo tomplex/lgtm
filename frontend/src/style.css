@@ -405,6 +405,26 @@ tr.comment-row td {
   max-width: 0;
 }
 
+tr.comment-overlay-row {
+  height: 0;
+  line-height: 0;
+}
+tr.comment-overlay-row td {
+  padding: 0;
+  border: none;
+  position: relative;
+  height: 0;
+  overflow: visible;
+}
+.comment-overlay {
+  position: absolute;
+  top: 4px;
+  left: 60px;
+  z-index: 100;
+  width: 75%;
+  max-width: 700px;
+}
+
 .comment-box {
   display: flex;
   flex-direction: column;
