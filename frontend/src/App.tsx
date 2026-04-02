@@ -97,6 +97,7 @@ export default function App() {
       }
     } else if (data.mode === 'file') {
       setAppMode('file');
+      setCommitPanelOpen(false);
       setMdMeta({
         content: data.content,
         filename: data.filename,
@@ -290,7 +291,7 @@ export default function App() {
         onRefresh={handleRefresh}
         onSubmit={handleSubmit}
         onToggleCommits={() => setCommitPanelOpen(!commitPanelOpen())}
-        showCommitToggle={allCommits().length > 0}
+        showCommitToggle={appMode() === 'diff' && allCommits().length > 0}
       />
       <TabBar onSwitchItem={switchToItem} onCloseTab={handleCloseTab} />
       <CommitPanel visible={commitPanelOpen()} onApply={handleApplyCommits} />
