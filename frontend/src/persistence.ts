@@ -1,9 +1,8 @@
-import { reviewedFiles, sidebarView } from './state';
+import { reviewedFiles, setReviewedFiles, sidebarView, setSidebarView } from './state';
 import type { SidebarView } from './state';
-import { setSidebarView } from './state';
 import { fetchUserState, putUserReviewed, putUserSidebarView } from './api';
 
-let lastReviewedFiles = new Set<string>();
+let lastReviewedSnapshot: Record<string, boolean> = {};
 let lastSidebarView = '';
 
 export async function loadState(): Promise<void> {
@@ -12,7 +11,7 @@ export async function loadState(): Promise<void> {
 
     if (state.reviewedFiles) {
       for (const path of state.reviewedFiles) {
-        reviewedFiles.add(path);
+        setReviewedFiles(path, true);
       }
     }
 
@@ -20,30 +19,35 @@ export async function loadState(): Promise<void> {
       setSidebarView(state.sidebarView as SidebarView);
     }
 
-    lastReviewedFiles = new Set(reviewedFiles);
-    lastSidebarView = sidebarView;
+    lastReviewedSnapshot = { ...reviewedFiles };
+    lastSidebarView = sidebarView();
   } catch {
     /* server unavailable — start fresh */
   }
 }
 
 export function saveState(): void {
-  for (const path of reviewedFiles) {
-    if (!lastReviewedFiles.has(path)) putUserReviewed(path);
+  // Sync reviewed files
+  for (const path of Object.keys(reviewedFiles)) {
+    if (reviewedFiles[path] && !lastReviewedSnapshot[path]) {
+      putUserReviewed(path);
+    }
   }
-  for (const path of lastReviewedFiles) {
-    if (!reviewedFiles.has(path)) putUserReviewed(path);
+  for (const path of Object.keys(lastReviewedSnapshot)) {
+    if (lastReviewedSnapshot[path] && !reviewedFiles[path]) {
+      putUserReviewed(path);
+    }
   }
-  lastReviewedFiles = new Set(reviewedFiles);
+  lastReviewedSnapshot = { ...reviewedFiles };
 
-  if (sidebarView !== lastSidebarView) {
-    putUserSidebarView(sidebarView);
-    lastSidebarView = sidebarView;
+  if (sidebarView() !== lastSidebarView) {
+    putUserSidebarView(sidebarView());
+    lastSidebarView = sidebarView();
   }
 }
 
 export async function clearPersistedState(): Promise<void> {
-  lastReviewedFiles = new Set();
+  lastReviewedSnapshot = {};
   const { baseUrl } = await import('./api');
   await fetch(`${baseUrl()}/user-state/clear`, { method: 'POST' });
 }
