@@ -234,6 +234,31 @@ export default function App() {
     }
 
     connectSSE();
+
+    // Resizable sidebar
+    const handle = document.getElementById('resize-handle');
+    const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
+    if (handle && sidebar) {
+      let dragging = false;
+      handle.addEventListener('mousedown', (e) => {
+        dragging = true;
+        handle.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        sidebar.style.width = Math.min(Math.max(e.clientX, 150), 600) + 'px';
+      });
+      document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      });
+    }
   });
 
   // --- Hash navigation ---
