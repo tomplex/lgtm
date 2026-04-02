@@ -435,8 +435,9 @@ tr.comment-overlay-row td {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Edit textarea inside a comment overlay shouldn't nest card styles */
-.comment-overlay .comment-box {
+/* Edit textarea inside a saved comment overlay shouldn't nest card styles */
+.comment-overlay .claude-comment .comment-box,
+.comment-overlay .user-comment .comment-box {
   width: 100%;
   max-width: none;
   background: none;
