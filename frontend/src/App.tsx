@@ -210,8 +210,13 @@ export default function App() {
     es.addEventListener('items_changed', () => {
       loadItems().then(() => showToast('Review items updated', 2000));
     });
-    es.addEventListener('git_changed', () => {
+    es.addEventListener('git_changed', async () => {
       handleRefresh();
+      // Also reload commits since they may have changed
+      try {
+        const commits = await fetchCommits();
+        setAllCommits(commits);
+      } catch { /* ignore */ }
     });
     es.onerror = () => {
       es.close();
