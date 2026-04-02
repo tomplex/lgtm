@@ -47,7 +47,8 @@ export default function DiffLine(props: Props) {
     );
 
   function handleLineClick(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest('.comment-box') || (e.target as HTMLElement).closest('.claude-comment')) return;
+    if ((e.target as HTMLElement).closest('.comment-box') || (e.target as HTMLElement).closest('.claude-comment'))
+      return;
     const existingUserComment = lineComments().find((c) => c.author === 'user' && c.mode === 'review');
     if (existingUserComment) return;
     setShowNewComment(true);
@@ -77,7 +78,9 @@ export default function DiffLine(props: Props) {
         mode: 'review',
       });
       updateLocalComment(tempId, { id: created.id });
-    } catch { /* optimistic update already applied */ }
+    } catch {
+      /* optimistic update already applied */
+    }
   }
 
   return (
@@ -112,10 +115,7 @@ export default function DiffLine(props: Props) {
       <Show when={showNewComment()}>
         <tr class="comment-row">
           <td colspan="3">
-            <CommentTextarea
-              onSave={handleSaveNew}
-              onCancel={() => setShowNewComment(false)}
-            />
+            <CommentTextarea onSave={handleSaveNew} onCancel={() => setShowNewComment(false)} />
           </td>
         </tr>
       </Show>

@@ -30,7 +30,7 @@ export function groupFiles(files: DiffFile[], analysis: Analysis): FileGroup[] {
 
   for (const group of analysis.groups) {
     const groupFiles = group.files
-      .map(path => files.find(f => f.path === path))
+      .map((path) => files.find((f) => f.path === path))
       .filter((f): f is DiffFile => f != null);
     if (groupFiles.length > 0) {
       result.push({ name: group.name, description: group.description, files: groupFiles });
@@ -38,7 +38,7 @@ export function groupFiles(files: DiffFile[], analysis: Analysis): FileGroup[] {
     }
   }
 
-  const ungrouped = files.filter(f => !grouped.has(f.path));
+  const ungrouped = files.filter((f) => !grouped.has(f.path));
   if (ungrouped.length > 0) {
     result.push({ name: 'Other', files: ungrouped });
   }

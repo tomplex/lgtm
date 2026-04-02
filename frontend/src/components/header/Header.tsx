@@ -38,17 +38,16 @@ export default function Header(props: Props) {
         </Show>
       </h1>
       <div class="stats" id="stats">
-        {files().length} file{files().length !== 1 ? 's' : ''} &middot;{' '}
-        <span class="add">+{totalAdd()}</span>{' '}
+        {files().length} file{files().length !== 1 ? 's' : ''} &middot; <span class="add">+{totalAdd()}</span>{' '}
         <span class="del">-{totalDel()}</span>
-        <Show when={reviewedCount() === files().length && files().length > 0}>
-          {' '}&middot; All files reviewed
-        </Show>
+        <Show when={reviewedCount() === files().length && files().length > 0}> &middot; All files reviewed</Show>
         <Show when={reviewedCount() < files().length && remainingLines() > 0}>
-          {' '}&middot; {remainingLines()} line{remainingLines() !== 1 ? 's' : ''} to review
+          {' '}
+          &middot; {remainingLines()} line{remainingLines() !== 1 ? 's' : ''} to review
         </Show>
         <Show when={userCommentCount() > 0}>
-          {' '}&middot; {userCommentCount()} comment{userCommentCount() !== 1 ? 's' : ''}
+          {' '}
+          &middot; {userCommentCount()} comment{userCommentCount() !== 1 ? 's' : ''}
         </Show>
       </div>
       <div class="header-actions">

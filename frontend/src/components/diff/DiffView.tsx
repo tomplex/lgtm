@@ -22,8 +22,8 @@ function precomputeWordDiffs(lines: DiffLineType[]): Record<number, string> {
 
 export default function DiffView() {
   const file = createMemo(() => files()[activeFileIdx()]);
-  const lang = createMemo(() => file() ? detectLang(file()!.path) : null);
-  const wordDiffs = createMemo(() => file() ? precomputeWordDiffs(file()!.lines) : {});
+  const lang = createMemo(() => (file() ? detectLang(file()!.path) : null));
+  const wordDiffs = createMemo(() => (file() ? precomputeWordDiffs(file()!.lines) : {}));
 
   const fileAnalysis = createMemo(() => {
     const f = file();
@@ -65,10 +65,7 @@ export default function DiffView() {
           <table class="diff-table">
             <For each={f().lines}>
               {(line, lineIdx) => (
-                <Show
-                  when={line.type !== 'hunk'}
-                  fallback={<HunkRow file={f()} line={line} lineIdx={lineIdx()} />}
-                >
+                <Show when={line.type !== 'hunk'} fallback={<HunkRow file={f()} line={line} lineIdx={lineIdx()} />}>
                   <DiffLine
                     line={line}
                     lineIdx={lineIdx()}
@@ -99,7 +96,7 @@ export default function DiffView() {
 
 function HunkRow(props: { file: DiffFile; line: DiffLineType; lineIdx: number }) {
   const hunkMatch = () => props.line.content.match(/@@ -(\d+)(?:,\d+)? \+(\d+)/);
-  const hunkNewStart = () => hunkMatch() ? parseInt(hunkMatch()![2]) : 0;
+  const hunkNewStart = () => (hunkMatch() ? parseInt(hunkMatch()![2]) : 0);
 
   const prevNewLine = () => {
     for (let i = props.lineIdx - 1; i >= 0; i--) {
@@ -114,7 +111,10 @@ function HunkRow(props: { file: DiffFile; line: DiffLineType; lineIdx: number })
   async function expandContext(lineNum: number, direction: string, rowEl: HTMLElement, count = 20) {
     try {
       const lines = await fetchContext(props.file.path, lineNum, count, direction);
-      if (lines.length === 0) { rowEl.remove(); return; }
+      if (lines.length === 0) {
+        rowEl.remove();
+        return;
+      }
       const fileLang = detectLang(props.file.path);
       let html = '';
       for (const l of lines) {
@@ -134,10 +134,15 @@ function HunkRow(props: { file: DiffFile; line: DiffLineType; lineIdx: number })
         for (const row of rows) rowEl.before(row);
       } else {
         let after: Element = rowEl;
-        for (const row of rows) { after.after(row); after = row; }
+        for (const row of rows) {
+          after.after(row);
+          after = row;
+        }
       }
       rowEl.remove();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   return (
@@ -150,10 +155,7 @@ function HunkRow(props: { file: DiffFile; line: DiffLineType; lineIdx: number })
         </tr>
       </Show>
       <Show when={!isSmallGap() && hunkNewStart() > 1}>
-        <tr
-          class="expand-row"
-          onClick={(e) => expandContext(hunkNewStart(), 'up', (e.currentTarget as HTMLElement), 20)}
-        >
+        <tr class="expand-row" onClick={(e) => expandContext(hunkNewStart(), 'up', e.currentTarget as HTMLElement, 20)}>
           <td colspan="3">&#8943; Show more context above</td>
         </tr>
       </Show>

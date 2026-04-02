@@ -123,6 +123,6 @@ export const commentsByFile = createMemo(() => {
   return result;
 });
 
-export const userCommentCount = createMemo(() =>
-  comments.list.filter((c) => c.author === 'user' && !c.parentId && c.status !== 'dismissed').length,
+export const userCommentCount = createMemo(
+  () => comments.list.filter((c) => c.author === 'user' && !c.parentId && c.status !== 'dismissed').length,
 );

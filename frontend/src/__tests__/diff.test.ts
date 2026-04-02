@@ -54,7 +54,9 @@ describe('parseDiff', () => {
   });
 
   it('handles multiple files', () => {
-    const multi = SAMPLE_DIFF + `diff --git a/src/bar.ts b/src/bar.ts
+    const multi =
+      SAMPLE_DIFF +
+      `diff --git a/src/bar.ts b/src/bar.ts
 --- a/src/bar.ts
 +++ b/src/bar.ts
 @@ -1,3 +1,3 @@

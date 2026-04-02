@@ -32,9 +32,7 @@ const FILES = [
 describe('sortFilesByPriority', () => {
   it('sorts files by priority order: critical > important > normal > low', () => {
     const sorted = sortFilesByPriority(FILES, ANALYSIS);
-    expect(sorted.map(f => f.path)).toEqual([
-      'core.ts', 'auth.ts', 'utils.ts', 'types.ts', 'unknown.ts',
-    ]);
+    expect(sorted.map((f) => f.path)).toEqual(['core.ts', 'auth.ts', 'utils.ts', 'types.ts', 'unknown.ts']);
   });
 
   it('preserves diff order within same priority', () => {
@@ -47,7 +45,7 @@ describe('sortFilesByPriority', () => {
     };
     const files = [makeFile('b.ts'), makeFile('a.ts')];
     const sorted = sortFilesByPriority(files, analysis);
-    expect(sorted.map(f => f.path)).toEqual(['b.ts', 'a.ts']);
+    expect(sorted.map((f) => f.path)).toEqual(['b.ts', 'a.ts']);
   });
 
   it('puts unanalyzed files at the end', () => {
@@ -59,38 +57,36 @@ describe('sortFilesByPriority', () => {
 describe('groupFiles', () => {
   it('groups files by analysis groups', () => {
     const groups = groupFiles(FILES, ANALYSIS);
-    expect(groups.map(g => g.name)).toEqual(['Core', 'Support', 'Other']);
+    expect(groups.map((g) => g.name)).toEqual(['Core', 'Support', 'Other']);
   });
 
   it('puts ungrouped files in Other', () => {
     const groups = groupFiles(FILES, ANALYSIS);
-    const other = groups.find(g => g.name === 'Other')!;
-    expect(other.files.map(f => f.path)).toContain('types.ts');
-    expect(other.files.map(f => f.path)).toContain('unknown.ts');
+    const other = groups.find((g) => g.name === 'Other')!;
+    expect(other.files.map((f) => f.path)).toContain('types.ts');
+    expect(other.files.map((f) => f.path)).toContain('unknown.ts');
   });
 
   it('omits Other group when all files are grouped', () => {
     const allGrouped: Analysis = {
       ...ANALYSIS,
-      groups: [
-        { name: 'All', files: ['core.ts', 'auth.ts', 'utils.ts', 'types.ts', 'unknown.ts'] },
-      ],
+      groups: [{ name: 'All', files: ['core.ts', 'auth.ts', 'utils.ts', 'types.ts', 'unknown.ts'] }],
     };
     const groups = groupFiles(FILES, allGrouped);
-    expect(groups.map(g => g.name)).toEqual(['All']);
+    expect(groups.map((g) => g.name)).toEqual(['All']);
   });
 });
 
 describe('phaseFiles', () => {
   it('partitions files into three phases', () => {
     const phases = phaseFiles(FILES, ANALYSIS);
-    expect(phases.review.map(f => f.path)).toEqual(['core.ts', 'auth.ts']);
-    expect(phases.skim.map(f => f.path)).toContain('utils.ts');
-    expect(phases['rubber-stamp'].map(f => f.path)).toEqual(['types.ts']);
+    expect(phases.review.map((f) => f.path)).toEqual(['core.ts', 'auth.ts']);
+    expect(phases.skim.map((f) => f.path)).toContain('utils.ts');
+    expect(phases['rubber-stamp'].map((f) => f.path)).toEqual(['types.ts']);
   });
 
   it('puts unanalyzed files in skim', () => {
     const phases = phaseFiles(FILES, ANALYSIS);
-    expect(phases.skim.map(f => f.path)).toContain('unknown.ts');
+    expect(phases.skim.map((f) => f.path)).toContain('unknown.ts');
   });
 });

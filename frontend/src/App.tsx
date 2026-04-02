@@ -22,7 +22,15 @@ import {
   repoMeta,
   allCommits,
 } from './state';
-import { fetchItems, fetchItemData, fetchCommits, fetchAnalysis, submitReview as apiSubmitReview, removeItem, baseUrl } from './api';
+import {
+  fetchItems,
+  fetchItemData,
+  fetchCommits,
+  fetchAnalysis,
+  submitReview as apiSubmitReview,
+  removeItem,
+  baseUrl,
+} from './api';
 import { fetchComments } from './comment-api';
 import { parseDiff } from './diff';
 import { formatAllComments } from './format-comments';
@@ -48,14 +56,18 @@ export default function App() {
     try {
       const items = await fetchItems();
       setSessionItems(items);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   async function loadComments() {
     try {
       const allComments = await fetchComments();
       setComments('list', allComments);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   async function switchToItem(itemId: string) {
@@ -79,7 +91,9 @@ export default function App() {
             for (const c of commits) setSelectedShas(c.sha, true);
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (data.mode === 'file') {
       setAppMode('file');
       setMdMeta({
@@ -137,7 +151,9 @@ export default function App() {
 
   async function handleApplyCommits() {
     setCommitPanelOpen(false);
-    const shas = allCommits().filter((c) => selectedShas[c.sha]).map((c) => c.sha);
+    const shas = allCommits()
+      .filter((c) => selectedShas[c.sha])
+      .map((c) => c.sha);
     const commits = shas.length > 0 && shas.length < allCommits().length ? shas.join(',') : undefined;
 
     try {
@@ -258,7 +274,9 @@ export default function App() {
       <Toast />
       <Show when={appMode() === 'diff'}>
         <div class="keyboard-hint">
-          Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment
+          Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>
+          ) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot;{' '}
+          <kbd>n</kbd>/<kbd>p</kbd> next/prev comment
         </div>
       </Show>
       <Show when={appMode() === 'file'}>

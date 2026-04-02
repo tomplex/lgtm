@@ -17,7 +17,9 @@ async function checkedJson<T>(resp: Response): Promise<T> {
     try {
       const body = await resp.json();
       if (body.error) message = body.error;
-    } catch { /* ignore parse failure */ }
+    } catch {
+      /* ignore parse failure */
+    }
     throw new Error(message);
   }
   return resp.json();
@@ -147,4 +149,3 @@ export async function putUserSidebarView(view: string): Promise<void> {
     body: JSON.stringify({ view }),
   });
 }
-

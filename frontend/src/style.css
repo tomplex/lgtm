@@ -67,7 +67,9 @@ header h1 {
   text-decoration: none;
   margin-left: 6px;
 }
-.header-pr:hover { text-decoration: underline; }
+.header-pr:hover {
+  text-decoration: underline;
+}
 
 header .stats {
   font-size: 13px;
@@ -699,7 +701,9 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 .tab-item:hover {
   color: var(--text);
@@ -1182,24 +1186,45 @@ tr.expand-row:hover td {
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
-.view-btn:first-child { border-radius: 4px 0 0 4px; }
-.view-btn:last-child { border-radius: 0 4px 4px 0; }
-.view-btn:not(:first-child) { border-left: none; }
+.view-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.view-btn:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.view-btn:not(:first-child) {
+  border-left: none;
+}
 .view-btn.active {
   background: var(--accent);
   color: var(--bg);
   border-color: var(--accent);
 }
-.view-btn:hover:not(.active) { background: var(--hover); color: var(--text); }
+.view-btn:hover:not(.active) {
+  background: var(--hover);
+  color: var(--text);
+}
 
 /* --- Priority indicators --- */
-.file-item.priority-critical { border-left: 3px solid #f85149; }
-.file-item.priority-important { border-left: 3px solid #d29922; }
-.file-item.priority-normal { border-left: 3px solid #58a6ff; }
-.file-item.priority-low { border-left: 3px solid #8b949e; }
-.file-item.priority-low:not(.active) { opacity: 0.5; }
+.file-item.priority-critical {
+  border-left: 3px solid #f85149;
+}
+.file-item.priority-important {
+  border-left: 3px solid #d29922;
+}
+.file-item.priority-normal {
+  border-left: 3px solid #58a6ff;
+}
+.file-item.priority-low {
+  border-left: 3px solid #8b949e;
+}
+.file-item.priority-low:not(.active) {
+  opacity: 0.5;
+}
 
 /* --- File summary in sidebar --- */
 .file-item .file-summary {
@@ -1232,7 +1257,9 @@ tr.expand-row:hover td {
   cursor: pointer;
   user-select: none;
 }
-.group-header:hover { background: var(--hover); }
+.group-header:hover {
+  background: var(--hover);
+}
 .group-header-left {
   display: flex;
   align-items: center;
@@ -1267,8 +1294,12 @@ tr.expand-row:hover td {
   font-size: 10px;
   flex-shrink: 0;
 }
-.group-stats .add { color: var(--add-text); }
-.group-stats .del { color: var(--del-text); }
+.group-stats .add {
+  color: var(--add-text);
+}
+.group-stats .del {
+  color: var(--del-text);
+}
 
 /* --- Phase headers --- */
 .phase-header {

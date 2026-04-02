@@ -7,7 +7,9 @@ async function checkedJson<T>(resp: Response): Promise<T> {
     try {
       const body = await resp.json();
       if (body.error) message = body.error;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     throw new Error(message);
   }
   return resp.json();

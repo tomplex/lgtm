@@ -3,10 +3,18 @@ import type { DiffFile } from './state';
 import type { SessionItem } from './state';
 
 export function formatDiffComments(comments: Comment[], files: DiffFile[]): string {
-  const byFile: Record<string, { lineNum: number | string; lineType: string; lineContent: string; comment: string }[]> = {};
+  const byFile: Record<string, { lineNum: number | string; lineType: string; lineContent: string; comment: string }[]> =
+    {};
 
   const diffUserComments = comments.filter(
-    (c) => c.author === 'user' && c.item === 'diff' && c.file && c.line != null && !c.parentId && c.mode === 'review' && c.status !== 'dismissed',
+    (c) =>
+      c.author === 'user' &&
+      c.item === 'diff' &&
+      c.file &&
+      c.line != null &&
+      !c.parentId &&
+      c.mode === 'review' &&
+      c.status !== 'dismissed',
   );
 
   for (const c of diffUserComments) {
@@ -74,7 +82,11 @@ export function formatClaudeInteractions(comments: Comment[]): string {
   return output;
 }
 
-export function formatDocComments(comments: Comment[], items: SessionItem[], blockPreviews: Record<string, string>): string {
+export function formatDocComments(
+  comments: Comment[],
+  items: SessionItem[],
+  blockPreviews: Record<string, string>,
+): string {
   let output = '';
   for (const item of items) {
     if (item.id === 'diff') continue;
@@ -101,9 +113,7 @@ export function formatDocClaudeInteractions(comments: Comment[], items: SessionI
   let output = '';
   for (const item of items) {
     if (item.id === 'diff') continue;
-    const itemClaudeComments = comments.filter(
-      (c) => c.author === 'claude' && c.item === item.id && !c.parentId,
-    );
+    const itemClaudeComments = comments.filter((c) => c.author === 'claude' && c.item === item.id && !c.parentId);
     const interactions: { block: number; comment: string; reply?: string; resolved: boolean }[] = [];
 
     for (const cc of itemClaudeComments) {

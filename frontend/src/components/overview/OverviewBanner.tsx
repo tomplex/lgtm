@@ -2,9 +2,7 @@ import { Show, createSignal } from 'solid-js';
 import { analysis } from '../../state';
 
 export default function OverviewBanner() {
-  const [collapsed, setCollapsed] = createSignal(
-    localStorage.getItem('lgtm-overview-collapsed') === 'true',
-  );
+  const [collapsed, setCollapsed] = createSignal(localStorage.getItem('lgtm-overview-collapsed') === 'true');
 
   function toggle() {
     const next = !collapsed();

@@ -44,14 +44,23 @@ export default function CommentTextarea(props: Props) {
         {props.initialText ?? ''}
       </textarea>
       <div class="comment-actions">
-        <button class="cancel-btn" onClick={(e) => { e.stopPropagation(); props.onCancel(); }}>
+        <button
+          class="cancel-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onCancel();
+          }}
+        >
           Cancel
         </button>
         {props.showDelete && (
           <button
             class="cancel-btn"
             style="color: var(--del-text)"
-            onClick={(e) => { e.stopPropagation(); props.onDelete?.(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onDelete?.();
+            }}
           >
             Delete
           </button>

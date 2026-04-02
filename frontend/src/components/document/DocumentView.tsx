@@ -19,10 +19,8 @@ export default function DocumentView() {
     }));
   });
 
-  const totalComments = createMemo(() =>
-    comments.list.filter(
-      (c) => c.item === activeItemId() && !c.parentId && c.status !== 'dismissed',
-    ).length,
+  const totalComments = createMemo(
+    () => comments.list.filter((c) => c.item === activeItemId() && !c.parentId && c.status !== 'dismissed').length,
   );
 
   return (
@@ -30,12 +28,11 @@ export default function DocumentView() {
       <div id="stats">
         {mdMeta().filename || 'Document'}
         <Show when={totalComments() > 0}>
-          {' '}&middot; {totalComments()} comment{totalComments() !== 1 ? 's' : ''}
+          {' '}
+          &middot; {totalComments()} comment{totalComments() !== 1 ? 's' : ''}
         </Show>
       </div>
-      <For each={blocks()}>
-        {(block) => <DocumentBlock html={block.html} blockIdx={block.idx} />}
-      </For>
+      <For each={blocks()}>{(block) => <DocumentBlock html={block.html} blockIdx={block.idx} />}</For>
     </div>
   );
 }
@@ -45,16 +42,13 @@ function DocumentBlock(props: { html: string; blockIdx: number }) {
 
   const blockComments = createMemo(() =>
     comments.list.filter(
-      (c) =>
-        c.item === activeItemId() &&
-        c.block === props.blockIdx &&
-        !c.parentId &&
-        c.status !== 'dismissed',
+      (c) => c.item === activeItemId() && c.block === props.blockIdx && !c.parentId && c.status !== 'dismissed',
     ),
   );
 
   function handleBlockClick(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest('.comment-box') || (e.target as HTMLElement).closest('.reply-textarea-wrap')) return;
+    if ((e.target as HTMLElement).closest('.comment-box') || (e.target as HTMLElement).closest('.reply-textarea-wrap'))
+      return;
 
     // If user already has a comment, don't open a new one
     const existingUser = blockComments().find((c) => c.author === 'user' && c.mode === 'review');
@@ -96,10 +90,7 @@ function DocumentBlock(props: { html: string; blockIdx: number }) {
       </For>
       <Show when={showNewComment()}>
         <div class="md-comment">
-          <CommentTextarea
-            onSave={handleSave}
-            onCancel={() => setShowNewComment(false)}
-          />
+          <CommentTextarea onSave={handleSave} onCancel={() => setShowNewComment(false)} />
         </div>
       </Show>
     </>

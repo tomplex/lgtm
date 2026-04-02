@@ -1,7 +1,11 @@
 import { createSignal, For, Show } from 'solid-js';
 import { renderMd } from '../../utils';
 import { comments, addLocalComment, updateLocalComment, removeLocalComment } from '../../state';
-import { createComment as apiCreateComment, updateComment as apiUpdateComment, deleteComment as apiDeleteComment } from '../../comment-api';
+import {
+  createComment as apiCreateComment,
+  updateComment as apiUpdateComment,
+  deleteComment as apiDeleteComment,
+} from '../../comment-api';
 import type { Comment } from '../../comment-types';
 import CommentTextarea from './CommentTextarea';
 import ReplyTextarea from './ReplyTextarea';
@@ -71,7 +75,9 @@ export default function CommentRow(props: Props) {
         block: props.comment.block,
       });
       updateLocalComment(tempId, { id: created.id });
-    } catch { /* optimistic update already applied */ }
+    } catch {
+      /* optimistic update already applied */
+    }
   }
 
   async function handleEditReply(replyId: string, text: string) {
@@ -86,15 +92,9 @@ export default function CommentRow(props: Props) {
   }
 
   return (
-    <div
-      class="claude-comment"
-      classList={{ resolved: isResolved() }}
-      data-comment-id={props.comment.id}
-    >
+    <div class="claude-comment" classList={{ resolved: isResolved() }} data-comment-id={props.comment.id}>
       <div class="claude-header">
-        <span class="claude-label">
-          {props.comment.author === 'claude' ? 'Claude' : 'You'}
-        </span>
+        <span class="claude-label">{props.comment.author === 'claude' ? 'Claude' : 'You'}</span>
 
         <Show when={isResolved()}>
           <span class="resolve-badge">Resolved</span>
@@ -118,36 +118,33 @@ export default function CommentRow(props: Props) {
         <Show when={!isResolved() && !isDismissed() && props.comment.author === 'user'}>
           <span class="inline-actions">
             <a onClick={() => setEditing(true)}>edit</a>
-            <a class="del-action" onClick={handleDelete}>delete</a>
+            <a class="del-action" onClick={handleDelete}>
+              delete
+            </a>
           </span>
         </Show>
       </div>
 
-      <Show when={editing()} fallback={
-        <div class="claude-text" innerHTML={renderMd(props.comment.text)} />
-      }>
-        <CommentTextarea
-          initialText={props.comment.text}
-          onSave={handleEdit}
-          onCancel={() => setEditing(false)}
-        />
+      <Show when={editing()} fallback={<div class="claude-text" innerHTML={renderMd(props.comment.text)} />}>
+        <CommentTextarea initialText={props.comment.text} onSave={handleEdit} onCancel={() => setEditing(false)} />
       </Show>
 
       <For each={replies()}>
         {(reply) => (
           <div class="claude-reply">
             <div class="claude-reply-header">
-              <span class="reply-label">
-                {reply.author === 'claude' ? 'Claude' : 'You'}
-              </span>
+              <span class="reply-label">{reply.author === 'claude' ? 'Claude' : 'You'}</span>
               <span class="inline-actions">
                 <a onClick={() => setEditingReplyId(reply.id)}>edit</a>
-                <a class="del-action" onClick={() => handleDeleteReply(reply.id)}>delete</a>
+                <a class="del-action" onClick={() => handleDeleteReply(reply.id)}>
+                  delete
+                </a>
               </span>
             </div>
-            <Show when={editingReplyId() === reply.id} fallback={
-              <div class="reply-text" innerHTML={renderMd(reply.text)} />
-            }>
+            <Show
+              when={editingReplyId() === reply.id}
+              fallback={<div class="reply-text" innerHTML={renderMd(reply.text)} />}
+            >
               <CommentTextarea
                 initialText={reply.text}
                 onSave={(text) => handleEditReply(reply.id, text)}
@@ -159,10 +156,7 @@ export default function CommentRow(props: Props) {
       </For>
 
       <Show when={replying()}>
-        <ReplyTextarea
-          onSave={handleReply}
-          onCancel={() => setReplying(false)}
-        />
+        <ReplyTextarea onSave={handleReply} onCancel={() => setReplying(false)} />
       </Show>
     </div>
   );

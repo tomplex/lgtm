@@ -20,14 +20,17 @@ export default function FilePicker(props: Props) {
     }
   });
 
-  const existingPaths = () => new Set(sessionItems().filter((i) => i.path).map((i) => i.path));
+  const existingPaths = () =>
+    new Set(
+      sessionItems()
+        .filter((i) => i.path)
+        .map((i) => i.path),
+    );
 
   const filtered = () => {
     const q = query().toLowerCase();
     const files = allFiles() || [];
-    return files
-      .filter((f) => !existingPaths().has(f) && (!q || f.toLowerCase().includes(q)))
-      .slice(0, 20);
+    return files.filter((f) => !existingPaths().has(f) && (!q || f.toLowerCase().includes(q))).slice(0, 20);
   };
 
   function handleClickOutside(e: Event) {

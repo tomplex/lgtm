@@ -18,7 +18,16 @@ const SAMPLE_FILE: DiffFile = {
 describe('formatDiffComments', () => {
   it('formats user review comments grouped by file', () => {
     const comments: Comment[] = [
-      { id: '1', author: 'user', text: 'Why this change?', status: 'active', item: 'diff', file: 'src/app.ts', line: 2, mode: 'review' },
+      {
+        id: '1',
+        author: 'user',
+        text: 'Why this change?',
+        status: 'active',
+        item: 'diff',
+        file: 'src/app.ts',
+        line: 2,
+        mode: 'review',
+      },
     ];
     const result = formatDiffComments(comments, [SAMPLE_FILE]);
     expect(result).toContain('## src/app.ts');
@@ -28,9 +37,36 @@ describe('formatDiffComments', () => {
 
   it('excludes replies and dismissed comments', () => {
     const comments: Comment[] = [
-      { id: '1', author: 'user', text: 'visible', status: 'active', item: 'diff', file: 'src/app.ts', line: 2, mode: 'review' },
-      { id: '2', author: 'user', text: 'reply', status: 'active', item: 'diff', file: 'src/app.ts', line: 2, parentId: '1' },
-      { id: '3', author: 'user', text: 'dismissed', status: 'dismissed', item: 'diff', file: 'src/app.ts', line: 3, mode: 'review' },
+      {
+        id: '1',
+        author: 'user',
+        text: 'visible',
+        status: 'active',
+        item: 'diff',
+        file: 'src/app.ts',
+        line: 2,
+        mode: 'review',
+      },
+      {
+        id: '2',
+        author: 'user',
+        text: 'reply',
+        status: 'active',
+        item: 'diff',
+        file: 'src/app.ts',
+        line: 2,
+        parentId: '1',
+      },
+      {
+        id: '3',
+        author: 'user',
+        text: 'dismissed',
+        status: 'dismissed',
+        item: 'diff',
+        file: 'src/app.ts',
+        line: 3,
+        mode: 'review',
+      },
     ];
     const result = formatDiffComments(comments, [SAMPLE_FILE]);
     expect(result).toContain('visible');
@@ -46,8 +82,25 @@ describe('formatDiffComments', () => {
 describe('formatClaudeInteractions', () => {
   it('formats claude comments with user replies', () => {
     const comments: Comment[] = [
-      { id: 'c1', author: 'claude', text: 'Consider renaming', status: 'active', item: 'diff', file: 'src/app.ts', line: 2 },
-      { id: 'r1', author: 'user', text: 'Good point', status: 'active', item: 'diff', file: 'src/app.ts', line: 2, parentId: 'c1' },
+      {
+        id: 'c1',
+        author: 'claude',
+        text: 'Consider renaming',
+        status: 'active',
+        item: 'diff',
+        file: 'src/app.ts',
+        line: 2,
+      },
+      {
+        id: 'r1',
+        author: 'user',
+        text: 'Good point',
+        status: 'active',
+        item: 'diff',
+        file: 'src/app.ts',
+        line: 2,
+        parentId: 'c1',
+      },
     ];
     const result = formatClaudeInteractions(comments);
     expect(result).toContain('**Claude:** Consider renaming');

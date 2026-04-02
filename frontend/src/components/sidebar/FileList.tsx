@@ -27,9 +27,7 @@ function FileItem(props: FileItemProps) {
   const isReviewed = () => reviewedFiles[props.file.path] ?? false;
 
   const fileComments = createMemo(() =>
-    comments.list.filter(
-      (c) => c.file === props.file.path && !c.parentId && c.status !== 'dismissed',
-    ),
+    comments.list.filter((c) => c.file === props.file.path && !c.parentId && c.status !== 'dismissed'),
   );
   const userCount = () => fileComments().filter((c) => c.author === 'user').length;
   const claudeCount = () => fileComments().filter((c) => c.author === 'claude').length;
@@ -37,8 +35,7 @@ function FileItem(props: FileItemProps) {
   const lastSlash = () => props.file.path.lastIndexOf('/');
   const dir = () => (lastSlash() >= 0 ? props.file.path.slice(0, lastSlash() + 1) : '');
   const base = () => (lastSlash() >= 0 ? props.file.path.slice(lastSlash() + 1) : props.file.path);
-  const fileSummary = () =>
-    props.showSummary ? analysis()?.files[props.file.path]?.summary : undefined;
+  const fileSummary = () => (props.showSummary ? analysis()?.files[props.file.path]?.summary : undefined);
 
   function handleSelect() {
     setActiveFileIdx(props.idx);
@@ -55,7 +52,10 @@ function FileItem(props: FileItemProps) {
       <span
         class="review-check"
         title="Mark as reviewed (e)"
-        onClick={(e) => { e.stopPropagation(); toggleReviewed(props.file.path); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleReviewed(props.file.path);
+        }}
       >
         {isReviewed() ? '\u2713' : '\u25CB'}
       </span>
@@ -69,10 +69,14 @@ function FileItem(props: FileItemProps) {
         </Show>
       </span>
       <Show when={claudeCount() > 0}>
-        <span class="badge claude-badge" title="Claude comments">{claudeCount()}</span>
+        <span class="badge claude-badge" title="Claude comments">
+          {claudeCount()}
+        </span>
       </Show>
       <Show when={userCount() > 0}>
-        <span class="badge comments-badge" title="Your comments">{userCount()}</span>
+        <span class="badge comments-badge" title="Your comments">
+          {userCount()}
+        </span>
       </Show>
       <span class="file-stats">
         <span class="add">+{props.file.additions}</span>
@@ -206,10 +210,7 @@ function PhasedFileList() {
                 </span>
               </div>
               <div class="phase-progress-bar">
-                <div
-                  class="phase-progress-fill"
-                  style={`width: ${pct()}%; background: ${config.color}`}
-                />
+                <div class="phase-progress-fill" style={`width: ${pct()}%; background: ${config.color}`} />
               </div>
             </div>
             <For each={phaseFiles_()}>

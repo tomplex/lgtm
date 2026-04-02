@@ -7,7 +7,7 @@ import type { DiffLine as DiffLineType } from '../../state';
 
 export default function WholeFileView() {
   const file = createMemo(() => files()[activeFileIdx()]);
-  const lang = createMemo(() => file() ? detectLang(file()!.path) : null);
+  const lang = createMemo(() => (file() ? detectLang(file()!.path) : null));
 
   const [wholeFileLines] = createResource(
     () => file()?.path,
@@ -32,7 +32,7 @@ export default function WholeFileView() {
     if (!lines) return [];
     return lines.map((l) => ({
       line: {
-        type: addLines().has(l.num) ? 'add' as const : 'context' as const,
+        type: addLines().has(l.num) ? ('add' as const) : ('context' as const),
         content: l.content,
         oldLine: l.num,
         newLine: l.num,
@@ -57,14 +57,7 @@ export default function WholeFileView() {
           <Show when={wholeFileLines()} fallback={<div class="empty-state">Loading...</div>}>
             <table class="diff-table">
               <For each={asDiffLines()}>
-                {(item) => (
-                  <DiffLine
-                    line={item.line}
-                    lineIdx={item.lineIdx}
-                    filePath={f().path}
-                    lang={lang()}
-                  />
-                )}
+                {(item) => <DiffLine line={item.line} lineIdx={item.lineIdx} filePath={f().path} lang={lang()} />}
               </For>
             </table>
           </Show>

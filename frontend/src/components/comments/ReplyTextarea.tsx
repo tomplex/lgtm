@@ -34,7 +34,13 @@ export default function ReplyTextarea(props: Props) {
         onClick={(e) => e.stopPropagation()}
       />
       <div class="comment-actions" style="margin-top:4px">
-        <button class="cancel-btn" onClick={(e) => { e.stopPropagation(); props.onCancel(); }}>
+        <button
+          class="cancel-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onCancel();
+          }}
+        >
           Cancel
         </button>
         <button
