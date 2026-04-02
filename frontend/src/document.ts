@@ -1,18 +1,14 @@
 import {
   comments,
-  claudeComments,
   activeItemId,
   mdMeta,
   setMdMeta,
   type MdMeta,
+  addLocalComment,
 } from './state';
-import { escapeHtml, renderMd } from './utils';
-import { saveState } from './persistence';
-import { renderClaudeCommentHtml, handleClaudeCommentAction } from './claude-comments';
-
-function mdKey(blockIdx: number): string {
-  return activeItemId === 'diff' ? `md::${blockIdx}` : `doc:${activeItemId}:${blockIdx}`;
-}
+import { renderMd } from './utils';
+import { renderCommentHtml, handleCommentAction } from './claude-comments';
+import { createComment as apiCreateComment } from './comment-api';
 
 function mdBlockId(blockIdx: number): string {
   return `md-block-${activeItemId}-${blockIdx}`;
@@ -34,35 +30,22 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
   let html = '';
   let blockIdx = 0;
   for (const child of Array.from(temp.children)) {
-    const key = mdKey(blockIdx);
-    const hasComment = !!comments[key];
+    const blockComments = comments.filter(c =>
+      c.item === activeItemId && c.block === blockIdx && !c.parentId && c.status !== 'dismissed'
+    );
+    const hasComment = blockComments.length > 0;
 
-    // Claude comments on this block
-    const claudeForBlock = claudeComments.filter((c) => c.block === blockIdx);
-    let claudeHtml = '';
-    for (const cc of claudeForBlock) {
-      claudeHtml += `<div class="md-comment" style="margin:4px 0">
+    let commentHtml = '';
+    for (const comment of blockComments) {
+      commentHtml += `<div class="md-comment" style="margin:4px 0">
         <div class="comment-box" style="max-width:100%">
-          ${renderClaudeCommentHtml(cc)}
+          ${renderCommentHtml(comment)}
         </div>
       </div>`;
     }
 
     html += `<div class="md-block ${hasComment ? 'has-comment' : ''}" id="${mdBlockId(blockIdx)}" data-block="${blockIdx}">${child.outerHTML}</div>`;
-    html += claudeHtml;
-    if (hasComment) {
-      html += `<div class="md-comment" id="${mdCommentId(blockIdx)}">
-        <div class="comment-box">
-          <div class="saved-comment" data-edit-md-comment="${blockIdx}">
-            <span class="comment-text">${renderMd(comments[key])}</span>
-            <span class="inline-actions">
-              <a>edit</a>
-              <a class="del-action" data-delete-md-comment="${blockIdx}">delete</a>
-            </span>
-          </div>
-        </div>
-      </div>`;
-    }
+    html += commentHtml;
     blockIdx++;
   }
 
@@ -77,25 +60,9 @@ export function renderMarkdown(data: MdMeta & { content: string; claudeComments?
 function handleMdContainerClick(e: Event): void {
   const target = e.target as HTMLElement;
 
-  // Claude comment actions (dismiss, resolve, unresolve, reply, edit-reply, delete-reply)
+  // Comment actions (dismiss, resolve, unresolve, reply, edit, delete)
   const rerenderMd = () => renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
-  if (handleClaudeCommentAction(target, rerenderMd)) return;
-
-  // Edit saved comment
-  const editEl = target.closest<HTMLElement>('[data-edit-md-comment]');
-  if (editEl) {
-    editMdComment(parseInt(editEl.dataset.editMdComment!));
-    return;
-  }
-
-  // Delete user comment
-  const deleteEl = target.closest<HTMLElement>('[data-delete-md-comment]');
-  if (deleteEl) {
-    const blockIdx = parseInt(deleteEl.dataset.deleteMdComment!);
-    delete comments[mdKey(blockIdx)];
-    renderMarkdownComments();
-    return;
-  }
+  if (handleCommentAction(target, rerenderMd)) return;
 
   // Block click -> toggle comment (skip if clicking inside a comment or textarea)
   if (target.closest('.md-comment') || target.closest('.reply-textarea-wrap')) return;
@@ -107,26 +74,22 @@ function handleMdContainerClick(e: Event): void {
 }
 
 export function renderMarkdownComments(): void {
-  saveState();
   document.querySelectorAll<HTMLElement>('.md-block').forEach((el) => {
     const idx = parseInt(el.dataset.block!);
-    const key = mdKey(idx);
-    el.classList.toggle('has-comment', !!comments[key]);
+    const blockComments = comments.filter(c =>
+      c.item === activeItemId && c.block === idx && !c.parentId && c.status !== 'dismissed'
+    );
+    const hasComment = blockComments.length > 0;
+    el.classList.toggle('has-comment', hasComment);
     const existing = document.getElementById(mdCommentId(idx));
     if (existing) existing.remove();
-    if (comments[key]) {
+    for (const comment of blockComments) {
       const div = document.createElement('div');
       div.className = 'md-comment';
       div.id = mdCommentId(idx);
       div.innerHTML = `
-        <div class="comment-box">
-          <div class="saved-comment" data-edit-md-comment="${idx}">
-            <span class="comment-text">${renderMd(comments[key])}</span>
-            <span class="inline-actions">
-              <a>edit</a>
-              <a class="del-action" data-delete-md-comment="${idx}">delete</a>
-            </span>
-          </div>
+        <div class="comment-box" style="max-width:100%">
+          ${renderCommentHtml(comment)}
         </div>
       `;
       el.after(div);
@@ -136,16 +99,22 @@ export function renderMarkdownComments(): void {
 }
 
 function updateMdStats(): void {
-  const prefix = activeItemId === 'diff' ? 'md::' : `doc:${activeItemId}:`;
-  const count = Object.keys(comments).filter(k => k.startsWith(prefix)).length;
+  const count = comments.filter(c => c.item === activeItemId && !c.parentId && c.status !== 'dismissed').length;
   document.getElementById('stats')!.innerHTML =
     `${mdMeta.filename || 'Document'}` + (count > 0 ? ` &middot; ${count} comment${count !== 1 ? 's' : ''}` : '');
 }
 
 function toggleMdComment(blockIdx: number): void {
-  const key = mdKey(blockIdx);
-  if (comments[key]) {
-    editMdComment(blockIdx);
+  const existingComment = comments.find(c =>
+    c.item === activeItemId && c.block === blockIdx && !c.parentId && c.author === 'user' && c.mode === 'review'
+  );
+  if (existingComment) {
+    // existing user comment — open edit flow via renderCommentHtml's data attributes
+    // handleCommentAction will handle edits; just focus the block's comment element
+    const commentEl = document.querySelector<HTMLElement>(`[data-comment-id="${existingComment.id}"]`);
+    if (commentEl) {
+      commentEl.scrollIntoView({ block: 'nearest' });
+    }
     return;
   }
 
@@ -171,6 +140,8 @@ function toggleMdComment(blockIdx: number): void {
     </div>
   `;
 
+  const rerenderMd = () => renderMarkdown({ ...mdMeta, content: mdMeta.content || '' });
+
   const textarea = div.querySelector('textarea')!;
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -178,7 +149,7 @@ function toggleMdComment(blockIdx: number): void {
       e.preventDefault();
       e.stopPropagation();
     } else if (e.key === 'Enter' && e.metaKey) {
-      saveMdComment(blockIdx);
+      saveMdComment(blockIdx, div, rerenderMd);
       e.preventDefault();
       e.stopPropagation();
     }
@@ -190,67 +161,23 @@ function toggleMdComment(blockIdx: number): void {
   });
   div.querySelector('[data-action="save"]')!.addEventListener('click', (e) => {
     e.stopPropagation();
-    saveMdComment(blockIdx);
+    saveMdComment(blockIdx, div, rerenderMd);
   });
 
   block.after(div);
   textarea.focus();
 }
 
-function editMdComment(blockIdx: number): void {
-  const key = mdKey(blockIdx);
-  const div = document.getElementById(mdCommentId(blockIdx));
-  if (!div) return;
-
-  div.innerHTML = `
-    <div class="comment-box">
-      <textarea>${escapeHtml(comments[key])}</textarea>
-      <div class="comment-actions">
-        <button class="cancel-btn" data-action="cancel-edit">Cancel</button>
-        <button class="cancel-btn" data-action="delete" style="color: var(--del-text)">Delete</button>
-        <button class="save-btn" data-action="save">Save</button>
-      </div>
-    </div>
-  `;
-
-  const textarea = div.querySelector('textarea')!;
-  textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      renderMarkdownComments();
-      e.preventDefault();
-      e.stopPropagation();
-    } else if (e.key === 'Enter' && e.metaKey) {
-      saveMdComment(blockIdx);
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
-  textarea.addEventListener('click', (e) => e.stopPropagation());
-  div.querySelector('[data-action="cancel-edit"]')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    renderMarkdownComments();
-  });
-  div.querySelector('[data-action="delete"]')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    delete comments[key];
-    renderMarkdownComments();
-  });
-  div.querySelector('[data-action="save"]')!.addEventListener('click', (e) => {
-    e.stopPropagation();
-    saveMdComment(blockIdx);
-  });
-
-  textarea.focus();
-  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-}
-
-function saveMdComment(blockIdx: number): void {
-  const key = mdKey(blockIdx);
-  const div = document.getElementById(mdCommentId(blockIdx));
-  if (!div) return;
+async function saveMdComment(blockIdx: number, div: HTMLElement, rerender: () => void): Promise<void> {
   const text = div.querySelector('textarea')?.value?.trim();
-  if (!text) delete comments[key];
-  else comments[key] = text;
-  renderMarkdownComments();
+  if (!text) {
+    div.remove();
+    return;
+  }
+  div.remove();
+  const comment = await apiCreateComment({
+    author: 'user', text, item: activeItemId, block: blockIdx, mode: 'review'
+  });
+  addLocalComment(comment);
+  rerender();
 }
-
