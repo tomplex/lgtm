@@ -21,9 +21,10 @@ export function formatDiffComments(comments: Comment[], files: DiffFile[]): stri
     const filePath = c.file!;
     if (!byFile[filePath]) byFile[filePath] = [];
     const file = files.find((f) => f.path === filePath);
-    const line = file?.lines[c.line!];
+    // c.line is an absolute line number — find the matching diff line
+    const line = file?.lines.find((l) => l.newLine === c.line || l.oldLine === c.line);
     byFile[filePath].push({
-      lineNum: line?.newLine ?? line?.oldLine ?? '?',
+      lineNum: c.line ?? '?',
       lineType: line?.type ?? 'context',
       lineContent: line?.content ?? '',
       comment: c.text,

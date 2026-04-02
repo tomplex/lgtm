@@ -36,12 +36,15 @@ export default function DiffLine(props: Props) {
     return `<span class="diff-text">${escapeHtml(props.line.content)}</span>`;
   };
 
+  // Use the absolute line number (newLine for adds/context, oldLine for deletes)
+  const absLine = () => props.line.newLine ?? props.line.oldLine;
+
   const lineComments = () =>
     comments.list.filter(
       (c) =>
         c.item === 'diff' &&
         c.file === props.filePath &&
-        c.line === props.lineIdx &&
+        c.line === absLine() &&
         !c.parentId &&
         c.status !== 'dismissed',
     );
@@ -56,6 +59,7 @@ export default function DiffLine(props: Props) {
 
   async function handleSaveNew(text: string) {
     const tempId = `temp-${Date.now()}`;
+    const lineNum = absLine();
     const localComment: Comment = {
       id: tempId,
       author: 'user',
@@ -63,7 +67,7 @@ export default function DiffLine(props: Props) {
       status: 'active',
       item: 'diff',
       file: props.filePath,
-      line: props.lineIdx,
+      line: lineNum ?? undefined,
       mode: 'review',
     };
     addLocalComment(localComment);
@@ -74,7 +78,7 @@ export default function DiffLine(props: Props) {
         text,
         item: 'diff',
         file: props.filePath,
-        line: props.lineIdx,
+        line: lineNum ?? undefined,
         mode: 'review',
       });
       updateLocalComment(tempId, { id: created.id });

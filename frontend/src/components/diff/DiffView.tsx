@@ -31,10 +31,15 @@ export default function DiffView() {
     return f && a ? a.files[f.path] : undefined;
   });
 
+  // Collect absolute line numbers visible in the diff
   const orphanedComments = createMemo(() => {
     const f = file();
     if (!f) return [];
-    const visibleIdxs = new Set(f.lines.map((_, idx) => idx));
+    const visibleLines = new Set<number>();
+    for (const line of f.lines) {
+      if (line.newLine != null) visibleLines.add(line.newLine);
+      if (line.oldLine != null) visibleLines.add(line.oldLine);
+    }
     return comments.list.filter(
       (c) =>
         c.item === 'diff' &&
@@ -42,7 +47,7 @@ export default function DiffView() {
         c.line != null &&
         !c.parentId &&
         c.status !== 'dismissed' &&
-        !visibleIdxs.has(c.line!),
+        !visibleLines.has(c.line!),
     );
   });
 
