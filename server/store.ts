@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
 export interface ProjectBlob {
@@ -16,24 +16,37 @@ export interface ProjectBlob {
   sidebarView: string;
 }
 
-const DB_DIR = join(homedir(), '.lgtm');
-const DB_PATH = join(DB_DIR, 'data.db');
+function defaultDbPath(): string {
+  return join(homedir(), '.lgtm', 'data.db');
+}
 
 let _db: Database.Database | null = null;
 
+export function initStore(dbPath?: string): void {
+  const resolvedPath = dbPath ?? process.env.LGTM_DB_PATH ?? defaultDbPath();
+  mkdirSync(dirname(resolvedPath), { recursive: true });
+  _db = new Database(resolvedPath);
+  _db.pragma('journal_mode = WAL');
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS projects (
+      slug TEXT PRIMARY KEY,
+      data TEXT NOT NULL
+    )
+  `);
+}
+
+export function closeStore(): void {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+}
+
 function db(): Database.Database {
   if (!_db) {
-    mkdirSync(DB_DIR, { recursive: true });
-    _db = new Database(DB_PATH);
-    _db.pragma('journal_mode = WAL');
-    _db.exec(`
-      CREATE TABLE IF NOT EXISTS projects (
-        slug TEXT PRIMARY KEY,
-        data TEXT NOT NULL
-      )
-    `);
+    initStore();
   }
-  return _db;
+  return _db!;
 }
 
 export function storeGet(slug: string): ProjectBlob | null {
