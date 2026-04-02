@@ -35,6 +35,13 @@ body {
   overflow: hidden;
 }
 
+#root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
 header {
   display: flex;
   align-items: center;
