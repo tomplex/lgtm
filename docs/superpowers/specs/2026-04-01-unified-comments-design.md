@@ -1,6 +1,6 @@
 # Unified Comment Model — Design Spec
 
-Replace LGTM's separate comment data structures (`_claudeComments`, `_userComments`, frontend `comments` map) with a single unified model. This is a prerequisite for the channels feature but independently valuable — it simplifies the data model and makes comment threads a first-class concept.
+Replace LGTM's separate comment data structures (`_claudeComments`, `_userComments`, frontend `comments` map) with a single unified model. This is a prerequisite for the channels feature but independently valuable — it simplifies the data model, makes comment threads a first-class concept, and enables comments in whole-file view.
 
 ## Current State
 
@@ -10,7 +10,7 @@ Three separate structures hold comment data:
 2. **`_userComments: Record<string, string>`** (server, Session) — user review comments, keyed by `filepath::lineIdx` or `doc:itemId:blockIdx`. Plain text values.
 3. **`comments: Record<string, string>`** (frontend, state.ts) — client-side mirror of user comments plus replies to Claude comments (keyed `claude:{id}`). Synced to server via `PUT /user-state/comment`.
 
-Replies to Claude comments are stored as user comments with a `claude:{id}` key convention. There's no formal thread structure — the relationship is implicit in the key format.
+Replies to Claude comments are stored as user comments with a `claude:{id}` key convention. There's no formal thread structure — the relationship is implicit in the key format. Resolved state lives in a separate `Set<string>` on both server and frontend.
 
 ## Unified Comment Type
 
@@ -19,6 +19,7 @@ interface Comment {
   id: string;
   author: 'user' | 'claude';
   text: string;
+  status: 'active' | 'resolved' | 'dismissed';
   parentId?: string;       // reply to another comment
   item: string;            // 'diff' or document ID
   // location (for root comments):
@@ -31,52 +32,90 @@ interface Comment {
 ```
 
 - `author` determines rendering: "Claude" label with reply/resolve/dismiss actions, or "You" label with edit/delete actions.
+- `status` replaces the separate `_resolvedComments` Set. `dismissed` hides the comment without deleting it (recoverable, unlike the current dismiss-by-delete behavior).
 - `mode: 'review'` — batched user comment, included in review submission, no immediate action.
 - `mode: 'direct'` — immediate "Ask Claude" question (used by the channels feature in stage 2).
 - `parentId` links replies to their parent. A thread is a root comment plus its replies.
 - Claude comments (`author: 'claude'`, no `mode`) behave as they do today — seeded via the `comment` MCP tool, user can reply/resolve/dismiss.
 
+## CommentStore
+
+Pull comment management out of Session into a dedicated `CommentStore` class. Session delegates to it.
+
+```typescript
+class CommentStore {
+  private _comments: Comment[] = [];
+
+  add(comment: Omit<Comment, 'id' | 'status'>): Comment;
+  get(id: string): Comment | undefined;
+  update(id: string, fields: Partial<Pick<Comment, 'text' | 'status'>>): void;
+  delete(id: string): boolean;
+  list(filter?: { item?: string; file?: string; author?: string; parentId?: string; mode?: string }): Comment[];
+  toJSON(): Comment[];
+  static fromJSON(data: Comment[]): CommentStore;
+}
+```
+
+Session keeps the orchestration: broadcasting SSE events after mutations, calling `persist()`, etc. CommentStore is pure data — no side effects, easy to test.
+
 ## Server Changes
 
-### Session data model
+### Session integration
 
-Replace `_claudeComments` and `_userComments` with a single `_comments: Comment[]` array on Session.
-
-Querying by item, file, author, parentId, or mode is done with array filters. The existing methods (`addComments`, `setUserComment`, `deleteUserComment`, etc.) are replaced with unified `addComment`, `getComments`, `updateComment`, `deleteComment` methods.
-
-### Resolved/dismissed state
-
-`_resolvedComments` stays as a `Set<string>` of comment IDs on the server. No change to this mechanism — it's already ID-based and works with the unified model.
+Session replaces `_claudeComments`, `_userComments`, and `_resolvedComments` with a single `_commentStore: CommentStore` field. The existing methods (`addComments`, `setUserComment`, `deleteUserComment`, `toggleUserResolvedComment`, etc.) are removed in favor of the CommentStore API, called through Session wrapper methods or directly from the route handlers.
 
 ### Persistence migration
 
 The `ProjectBlob` schema changes to include a `comments: Comment[]` field. On load, if the blob has the old shape (`claudeComments` + `userComments` fields), convert it:
 
-- Each `ClaudeComment` in `_claudeComments[itemId]` becomes `{ ...cc, author: 'claude', item: itemId, text: cc.comment }`.
-- Each entry in `_userComments` becomes `{ author: 'user', mode: 'review', item, file, line/block, text }`, with location parsed from the key format.
-- Replies (keys matching `claude:{id}`) become `{ author: 'user', parentId: id, text, item: 'diff' }`.
+- Each `ClaudeComment` in `_claudeComments[itemId]` becomes `{ ...cc, author: 'claude', status: 'active', item: itemId, text: cc.comment }`.
+- Each entry in `_userComments` becomes `{ author: 'user', mode: 'review', status: 'active', item, file, line/block, text }`, with location parsed from the key format.
+- Replies (keys matching `claude:{id}`) become `{ author: 'user', parentId: id, status: 'active', text, item: 'diff' }`.
+- Each entry in `_resolvedComments` sets `status: 'resolved'` on the matching comment.
 
 After migration, the blob is re-saved in the new format so the conversion only happens once.
 
-### API route changes
+### REST API
 
-- `POST /project/:slug/comments` — currently takes `{ item, comments[] }` for Claude to add comments. Stays the same interface but stores as unified `Comment` with `author: 'claude'`.
-- `PUT /user-state/comment` — currently takes `{ key, text }`. Adapts to create/update a `Comment` with `author: 'user', mode: 'review'`. The key format is parsed to extract item/file/line/block.
-- `GET /project/:slug/data` — currently returns `claudeComments` and `userComments` separately. Returns a single `comments` array, filtered by item. The frontend adapts to consume this.
-- `GET /project/:slug/user-state` — `comments` field changes from key-value map to filtered `Comment[]`.
+Replace the scattered comment-related routes with a clean CRUD resource:
+
+**`GET /project/:slug/comments`** — list with optional filters
+- Query params: `item`, `file`, `author`, `parentId`, `mode`, `status`
+- Returns `{ comments: Comment[] }`
+
+**`POST /project/:slug/comments`** — create a comment
+- Body: `{ author, text, item, file?, line?, block?, parentId?, mode? }`
+- Returns `{ ok: true, comment: Comment }`
+- Broadcasts `comments_changed` via SSE
+
+**`PATCH /project/:slug/comments/:id`** — update text or status
+- Body: `{ text?, status? }`
+- Returns `{ ok: true, comment: Comment }`
+- Broadcasts `comments_changed` via SSE
+
+**`DELETE /project/:slug/comments/:id`** — hard delete
+- Returns `{ ok: true }`
+- Broadcasts `comments_changed` via SSE
+
+The old routes (`POST /comments`, `PUT /user-state/comment`, `PUT /user-state/resolved`, `DELETE /comments`) are removed.
+
+### Data endpoint changes
+
+`GET /project/:slug/data` currently returns `claudeComments` and `userComments` separately. It drops both fields — clients use the new `GET /comments` endpoint instead.
+
+`GET /project/:slug/user-state` drops the `comments` and `resolvedComments` fields. Sidebar view and reviewed files stay.
 
 ### MCP tool changes
 
-The `comment` tool stores comments with `author: 'claude'` — no interface change for Claude.
+The `comment` MCP tool creates comments with `author: 'claude'` via the new `POST /comments` route (or directly via CommentStore). No interface change for Claude.
+
 The `read_feedback` tool reads from the output file — unchanged.
 
 ## Frontend Changes
 
 ### State
 
-Replace the `comments: Record<string, string>` map and `claudeComments` array in `state.ts` with a single `comments: Comment[]` array. The `resolvedComments` set stays as-is (already ID-based).
-
-Remove `lineIdToKey` — location is stored directly on the Comment object, so there's no need to derive keys from line IDs.
+Replace the `comments: Record<string, string>` map and `claudeComments` array in `state.ts` with a single `comments: Comment[]` array. Remove `resolvedComments` Set (now a field on Comment). Remove `lineIdToKey` — location is stored directly on the Comment object.
 
 ### Rendering
 
@@ -85,9 +124,14 @@ Remove `lineIdToKey` — location is stored directly on the Comment object, so t
 - When rendering a diff line or document block, filter `comments` by location to find root comments and their replies.
 - Root comments render with author-appropriate styling (Claude label vs. You label).
 - Replies render beneath their parent, threaded.
-- Actions (reply, resolve, dismiss, edit, delete) are determined by `author` field.
+- Actions (reply, resolve, dismiss, edit, delete) are determined by `author` and `status` fields.
+- Resolve/dismiss change `status` via `PATCH /comments/:id` instead of updating a local Set.
 
 The existing `renderClaudeCommentHtml` and `toggleComment`/`saveComment`/`editComment` functions are refactored to be author-agnostic where possible.
+
+### Whole-file view comments
+
+Comments are now addressable by `file` + `line` (not diff-line index), so they can render in whole-file view. When the user opens a file in whole-file mode, filter comments by `file` path and render them at the corresponding line numbers. Same rendering and interaction as diff view — reply, resolve, dismiss, edit, delete.
 
 ### Review submission
 
@@ -95,22 +139,24 @@ The existing `renderClaudeCommentHtml` and `toggleComment`/`saveComment`/`editCo
 
 ### Persistence (frontend)
 
-`saveState` currently syncs user comments to the server via `PUT /user-state/comment`. This adapts to work with the unified model — on save, send the comment object (or just text + ID for updates).
+Comment mutations go through the REST API (`POST`, `PATCH`, `DELETE /comments`). No more local-first save with background sync — the server is the source of truth. The frontend fetches comments on load and updates via SSE.
 
 ## What stays the same
 
 - Review submission flow and output format
-- Resolved/dismissed state mechanism
-- SSE broadcast infrastructure
+- SSE broadcast infrastructure (new event types use same mechanism)
 - Git watcher
 - Analysis pipeline
 - MCP tool interfaces (from Claude's perspective)
 
 ## What changes
 
-- Session: `_claudeComments` + `_userComments` → `_comments: Comment[]`
-- ProjectBlob: new schema with migration from old format
-- API: `/data` returns unified comments; `/user-state/comment` creates unified Comment objects
-- Frontend state: single `comments` array replaces two separate structures
-- Frontend rendering: `comments.ts` and `claude-comments.ts` refactored for unified type
-- Key-based comment addressing replaced with ID-based addressing
+- **Session** — `_claudeComments` + `_userComments` + `_resolvedComments` replaced by `CommentStore`
+- **New class** — `CommentStore` for pure comment CRUD
+- **ProjectBlob** — new schema with migration from old format
+- **API** — CRUD `/comments` resource replaces scattered routes
+- **Frontend state** — single `comments: Comment[]` replaces three structures
+- **Frontend rendering** — `comments.ts` and `claude-comments.ts` refactored for unified type
+- **Whole-file view** — now renders comments
+- **Key-based comment addressing** — replaced with ID-based addressing
+- **Dismiss behavior** — now sets `status: 'dismissed'` instead of hard-deleting
