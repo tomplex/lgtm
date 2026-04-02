@@ -1,5 +1,5 @@
 import { Show, createMemo } from 'solid-js';
-import { repoMeta, files, reviewedFiles, userCommentCount } from '../../state';
+import { repoMeta, files, reviewedFiles, userCommentCount, activeItemId, sessionItems } from '../../state';
 
 interface Props {
   onRefresh: () => void;
@@ -64,6 +64,11 @@ export default function Header(props: Props) {
         <button id="submit-btn" onClick={props.onSubmit}>
           Submit Review
         </button>
+        <Show when={activeItemId() !== 'diff'}>
+          <div style="font-size:10px;color:var(--text-muted);text-align:right;margin-top:2px">
+            {sessionItems().find((i) => i.id === activeItemId())?.title ?? activeItemId()}
+          </div>
+        </Show>
       </div>
     </header>
   );

@@ -142,20 +142,28 @@ export function formatAllComments(
   files: DiffFile[],
   items: SessionItem[],
   blockPreviews: Record<string, string>,
+  scopeToItem?: string,
 ): string {
+  // Filter comments to the scoped item if provided
+  const scoped = scopeToItem ? comments.filter((c) => c.item === scopeToItem) : comments;
+
   let output = '';
 
-  const diffOutput = formatDiffComments(comments, files);
-  if (diffOutput) output += diffOutput;
+  if (!scopeToItem || scopeToItem === 'diff') {
+    const diffOutput = formatDiffComments(scoped, files);
+    if (diffOutput) output += diffOutput;
 
-  const claudeDiffOutput = formatClaudeInteractions(comments);
-  if (claudeDiffOutput) output += claudeDiffOutput;
+    const claudeDiffOutput = formatClaudeInteractions(scoped);
+    if (claudeDiffOutput) output += claudeDiffOutput;
+  }
 
-  const docOutput = formatDocComments(comments, items, blockPreviews);
-  if (docOutput) output += docOutput;
+  if (!scopeToItem || scopeToItem !== 'diff') {
+    const docOutput = formatDocComments(scoped, items, blockPreviews);
+    if (docOutput) output += docOutput;
 
-  const claudeDocOutput = formatDocClaudeInteractions(comments, items);
-  if (claudeDocOutput) output += claudeDocOutput;
+    const claudeDocOutput = formatDocClaudeInteractions(scoped, items);
+    if (claudeDocOutput) output += claudeDocOutput;
+  }
 
   return output || 'No comments (LGTM).';
 }

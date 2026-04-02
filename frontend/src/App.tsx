@@ -119,20 +119,22 @@ export default function App() {
 
   async function handleSubmit() {
     try {
+      const currentItem = activeItemId();
       const blockPreviews: Record<string, string> = {};
       document.querySelectorAll<HTMLElement>('.md-block[data-block]').forEach((el) => {
-        const itemId = activeItemId();
         const blockIdx = el.dataset.block;
         if (blockIdx != null) {
-          const key = `${itemId}-${blockIdx}`;
+          const key = `${currentItem}-${blockIdx}`;
           blockPreviews[key] = el.textContent?.trim()?.slice(0, 80) || `Block ${blockIdx}`;
         }
       });
 
-      const formatted = formatAllComments(comments.list, files(), sessionItems(), blockPreviews);
+      const formatted = formatAllComments(comments.list, files(), sessionItems(), blockPreviews, currentItem);
       const result = await apiSubmitReview(formatted, {});
-      showToast(`Review round ${result.round} submitted!`, 3000);
-      setComments('list', []);
+      const label = currentItem === 'diff' ? 'Code Changes' : sessionItems().find((i) => i.id === currentItem)?.title ?? currentItem;
+      showToast(`Review round ${result.round} submitted for ${label}!`, 3000);
+      // Only clear comments for the submitted item
+      setComments('list', (prev) => prev.filter((c) => c.item !== currentItem));
       clearPersistedState();
     } catch (e: any) {
       showToast('Failed to submit: ' + e.message);
