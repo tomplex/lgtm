@@ -83,13 +83,24 @@ export default function PeekPanel() {
     }
   }
 
+  function onDocKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      handleClose();
+    }
+  }
+
   onMount(() => {
     setTimeout(() => {
       panelRef?.focus();
       document.addEventListener('click', onDocClick);
     }, 0);
+    document.addEventListener('keydown', onDocKeyDown);
   });
-  onCleanup(() => document.removeEventListener('click', onDocClick));
+  onCleanup(() => {
+    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('keydown', onDocKeyDown);
+  });
 
   return (
     <Show when={peekState() && data()?.results?.length}>
