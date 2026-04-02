@@ -269,16 +269,19 @@ export function createApp(manager: SessionManager): express.Express {
   projectRouter.post('/submit', async (req, res) => {
     const session = res.locals.session;
     const commentsText = req.body.comments ?? '';
+    const item = req.body.item as string | undefined;
     const currentRound = await session.submitReview(commentsText);
-    console.log(`REVIEW_ROUND=${currentRound}`);
+    console.log(`REVIEW_ROUND=${currentRound}${item ? ` item=${item}` : ''}`);
 
     // Push review feedback to Claude via channel notification
     const slug = (req.params as Record<string, string>).slug;
-    notifyChannel(commentsText, {
+    const meta: Record<string, string> = {
       event: 'review_submitted',
       project: slug,
       round: String(currentRound),
-    });
+    };
+    if (item) meta.item = item;
+    notifyChannel(commentsText, meta);
 
     res.json({ ok: true, round: currentRound });
   });

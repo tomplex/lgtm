@@ -57,6 +57,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       const itemId = slugify(itemTitle);
       const result = found.session.addItem(itemId, itemTitle, path);
       found.session.broadcast('items_changed', { id: itemId });
+      associateMcpItem(server, itemId);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
   );
@@ -195,7 +196,7 @@ function createMcpServer(manager: SessionManager): McpServer {
   return server;
 }
 
-const activeMcpSessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport; projectSlug?: string }>();
+const activeMcpSessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport; projectSlug?: string; itemIds: Set<string> }>();
 
 // Associate an MCP server instance with a project slug (called when tools use repoPath)
 export function associateMcpSession(server: McpServer, slug: string): void {
@@ -207,11 +208,25 @@ export function associateMcpSession(server: McpServer, slug: string): void {
   }
 }
 
+// Associate an MCP server instance with an item ID (called when add_document is used)
+export function associateMcpItem(server: McpServer, itemId: string): void {
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.server === server) {
+      entry.itemIds.add(itemId);
+      return;
+    }
+  }
+}
+
 export function notifyChannel(content: string, meta: Record<string, string>): void {
   const targetProject = meta.project;
-  for (const { server, projectSlug } of activeMcpSessions.values()) {
+  const targetItem = meta.item;
+  for (const { server, projectSlug, itemIds } of activeMcpSessions.values()) {
     // Only notify sessions associated with the target project
     if (!projectSlug || projectSlug !== targetProject) continue;
+    // If an item is specified, only notify sessions that own that item
+    // (diff is owned by all sessions in the project via start)
+    if (targetItem && targetItem !== 'diff' && !itemIds.has(targetItem)) continue;
     server.server.notification({
       method: 'notifications/claude/channel',
       params: { content, meta },
@@ -242,7 +257,7 @@ export function mountMcp(app: express.Express, manager: SessionManager): void {
     await transport.handleRequest(req, res, req.body);
 
     if (transport.sessionId) {
-      activeMcpSessions.set(transport.sessionId, { server: mcpServer, transport });
+      activeMcpSessions.set(transport.sessionId, { server: mcpServer, transport, itemIds: new Set() });
     }
   });
 

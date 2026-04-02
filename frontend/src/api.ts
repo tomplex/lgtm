@@ -114,11 +114,12 @@ export async function fetchFile(filepath: string): Promise<{ num: number; conten
 export async function submitReview(
   comments: string,
   raw: Record<string, string>,
+  item?: string,
 ): Promise<{ ok: boolean; round: number }> {
   const resp = await fetch(`${baseUrl()}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ comments, raw }),
+    body: JSON.stringify({ comments, raw, item }),
   });
   return checkedJson<{ ok: boolean; round: number }>(resp);
 }

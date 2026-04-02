@@ -130,7 +130,7 @@ export default function App() {
       });
 
       const formatted = formatAllComments(comments.list, files(), sessionItems(), blockPreviews, currentItem);
-      const result = await apiSubmitReview(formatted, {});
+      const result = await apiSubmitReview(formatted, {}, currentItem);
       const label = currentItem === 'diff' ? 'Code Changes' : sessionItems().find((i) => i.id === currentItem)?.title ?? currentItem;
       showToast(`Review round ${result.round} submitted for ${label}!`, 3000);
       // Only clear comments for the submitted item
