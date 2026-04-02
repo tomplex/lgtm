@@ -4,9 +4,9 @@ import * as fs from 'fs';
 export interface SymbolResult {
   file: string;
   line: number;
-  kind: string;
+  kind: 'function' | 'class' | 'interface' | 'type' | 'variable';
   body: string;
-  docstring?: string;
+  docstring: string | null;
 }
 
 const MAX_RESULTS = 10;
@@ -71,20 +71,31 @@ function runRipgrep(repoPath: string, symbol: string): RgMatch[] {
   return matches;
 }
 
-function detectKind(lineText: string): string {
+function detectKind(lineText: string): SymbolResult['kind'] {
   // Python
   const pyMatch = lineText.match(/^\s*(def|class)\s+/);
-  if (pyMatch) return pyMatch[1];
+  if (pyMatch) {
+    const raw = pyMatch[1];
+    if (raw === 'def') return 'function';
+    if (raw === 'class') return 'class';
+  }
 
   // TypeScript keywords
   const tsMatch = lineText.match(/^\s*(?:export\s+)?(function|class|interface|type|const|let)\s+/);
-  if (tsMatch) return tsMatch[1];
+  if (tsMatch) {
+    const raw = tsMatch[1];
+    if (raw === 'function') return 'function';
+    if (raw === 'class') return 'class';
+    if (raw === 'interface') return 'interface';
+    if (raw === 'type') return 'type';
+    if (raw === 'const' || raw === 'let') return 'variable';
+  }
 
   // arrow function fallback — try to figure out const/let/var
   const arrowMatch = lineText.match(/^\s*(?:export\s+)?(const|let|var)\s+/);
-  if (arrowMatch) return arrowMatch[1];
+  if (arrowMatch) return 'variable';
 
-  return 'unknown';
+  return 'variable';
 }
 
 function isPython(file: string): boolean {
@@ -162,12 +173,12 @@ function extractTypeScriptBody(lines: string[], startIndex: number): string {
   return bodyLines.join('\n');
 }
 
-function extractPythonDocstring(lines: string[], startIndex: number): string | undefined {
+function extractPythonDocstring(lines: string[], startIndex: number): string | null {
   // Look for a triple-quoted string on the line after the def/class
   let i = startIndex + 1;
   // Skip the def line continuation lines (with parens) if any
   while (i < lines.length && lines[i].trim() === '') i++;
-  if (i >= lines.length) return undefined;
+  if (i >= lines.length) return null;
 
   const firstLine = lines[i].trim();
 
@@ -179,7 +190,7 @@ function extractPythonDocstring(lines: string[], startIndex: number): string | u
 
   // Multi-line: starts with """ or '''
   const openMatch = firstLine.match(/^("""|''')/);
-  if (!openMatch) return undefined;
+  if (!openMatch) return null;
   const quote = openMatch[1];
   const rest = firstLine.slice(3);
   const closeIdx = rest.indexOf(quote);
@@ -204,21 +215,21 @@ function extractPythonDocstring(lines: string[], startIndex: number): string | u
   return docLines.join(' ').trim();
 }
 
-function extractJsDocstring(lines: string[], startIndex: number): string | undefined {
+function extractJsDocstring(lines: string[], startIndex: number): string | null {
   // Look backwards from startIndex for a /** ... */ block
-  if (startIndex === 0) return undefined;
+  if (startIndex === 0) return null;
 
   let i = startIndex - 1;
   // Skip blank lines
   while (i >= 0 && lines[i].trim() === '') i--;
-  if (i < 0) return undefined;
+  if (i < 0) return null;
 
-  if (!lines[i].trim().endsWith('*/')) return undefined;
+  if (!lines[i].trim().endsWith('*/')) return null;
 
   const endIdx = i;
   // Find opening /**
   while (i >= 0 && !lines[i].trim().startsWith('/**')) i--;
-  if (i < 0) return undefined;
+  if (i < 0) return null;
 
   const docLines: string[] = [];
   for (let j = i; j <= endIdx; j++) {
@@ -238,10 +249,10 @@ function extractJsDocstring(lines: string[], startIndex: number): string | undef
     .filter(l => l.length > 0)
     .join(' ');
 
-  return raw || undefined;
+  return raw || null;
 }
 
-export async function findSymbol(repoPath: string, symbol: string): Promise<SymbolResult[]> {
+export function findSymbol(repoPath: string, symbol: string): SymbolResult[] {
   const matches = runRipgrep(repoPath, symbol);
 
   // Deduplicate by file+line and cap at MAX_RESULTS
@@ -265,7 +276,7 @@ export async function findSymbol(repoPath: string, symbol: string): Promise<Symb
     const kind = detectKind(lines[lineIndex]);
 
     let body: string;
-    let docstring: string | undefined;
+    let docstring: string | null;
 
     if (isPython(match.file)) {
       body = extractPythonBody(lines, lineIndex);
