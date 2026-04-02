@@ -18,10 +18,10 @@ function requireProject(manager: SessionManager, repoPath: string): { found: Ret
 }
 
 function createMcpServer(manager: SessionManager): McpServer {
-  const server = new McpServer({
-    name: 'lgtm',
-    version: '0.1.0',
-  });
+  const server = new McpServer(
+    { name: 'lgtm', version: '0.1.0' },
+    { capabilities: { experimental: { 'claude/channel': {} } } },
+  );
 
   server.tool(
     'start',
@@ -163,13 +163,22 @@ function createMcpServer(manager: SessionManager): McpServer {
   return server;
 }
 
-export function mountMcp(app: express.Express, manager: SessionManager): void {
-  const transports = new Map<string, StreamableHTTPServerTransport>();
+const activeMcpSessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
 
+export function notifyChannel(content: string, meta: Record<string, string>): void {
+  for (const { server } of activeMcpSessions.values()) {
+    server.server.notification({
+      method: 'notifications/claude/channel',
+      params: { content, meta },
+    });
+  }
+}
+
+export function mountMcp(app: express.Express, manager: SessionManager): void {
   app.post('/mcp', async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (sessionId && transports.has(sessionId)) {
-      const transport = transports.get(sessionId)!;
+    if (sessionId && activeMcpSessions.has(sessionId)) {
+      const { transport } = activeMcpSessions.get(sessionId)!;
       await transport.handleRequest(req, res, req.body);
       return;
     }
@@ -181,33 +190,33 @@ export function mountMcp(app: express.Express, manager: SessionManager): void {
 
     transport.onclose = () => {
       const sid = transport.sessionId;
-      if (sid) transports.delete(sid);
+      if (sid) activeMcpSessions.delete(sid);
     };
 
     await mcpServer.connect(transport);
     await transport.handleRequest(req, res, req.body);
 
     if (transport.sessionId) {
-      transports.set(transport.sessionId, transport);
+      activeMcpSessions.set(transport.sessionId, { server: mcpServer, transport });
     }
   });
 
   app.get('/mcp', async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (!sessionId || !transports.has(sessionId)) {
+    if (!sessionId || !activeMcpSessions.has(sessionId)) {
       res.status(400).json({ error: 'Missing or invalid MCP-Session-Id header' });
       return;
     }
-    const transport = transports.get(sessionId)!;
+    const { transport } = activeMcpSessions.get(sessionId)!;
     await transport.handleRequest(req, res);
   });
 
   app.delete('/mcp', async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (sessionId && transports.has(sessionId)) {
-      const transport = transports.get(sessionId)!;
+    if (sessionId && activeMcpSessions.has(sessionId)) {
+      const { transport } = activeMcpSessions.get(sessionId)!;
       await transport.handleRequest(req, res);
-      transports.delete(sessionId);
+      activeMcpSessions.delete(sessionId);
     } else {
       res.status(400).json({ error: 'Missing or invalid MCP-Session-Id header' });
     }

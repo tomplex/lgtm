@@ -6,6 +6,7 @@ import { getFileLines, getBranchCommits, gitRun } from './git-ops.js';
 import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
+import { notifyChannel } from './mcp.js';
 
 declare global {
   namespace Express {
@@ -251,6 +252,15 @@ export function createApp(manager: SessionManager): express.Express {
     const commentsText = req.body.comments ?? '';
     const currentRound = await session.submitReview(commentsText);
     console.log(`REVIEW_ROUND=${currentRound}`);
+
+    // Push review feedback to Claude via channel notification
+    const slug = (req.params as Record<string, string>).slug;
+    notifyChannel(commentsText, {
+      event: 'review_submitted',
+      project: slug,
+      round: String(currentRound),
+    });
+
     res.json({ ok: true, round: currentRound });
   });
 
