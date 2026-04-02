@@ -7,7 +7,6 @@ import {
   wholeFileView,
   setWholeFileView,
   allCommits,
-  reviewedFiles,
   toggleReviewed,
 } from '../state';
 
