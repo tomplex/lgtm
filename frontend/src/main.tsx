@@ -1,7 +1,6 @@
+import 'highlight.js/styles/github-dark.css';
+import './style.css';
 import { render } from 'solid-js/web';
-
-function App() {
-  return <div>LGTM — Solid migration in progress</div>;
-}
+import App from './App';
 
 render(() => <App />, document.getElementById('root')!);
