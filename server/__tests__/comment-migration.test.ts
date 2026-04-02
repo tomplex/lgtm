@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { migrateBlob } from './comment-migration.js';
+import { migrateBlob } from '../comment-migration.js';
 
 describe('migrateBlob', () => {
   it('converts old-format blob to new format with comments array', () => {
