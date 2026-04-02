@@ -2,7 +2,6 @@ import {
   files,
   activeFileIdx,
   comments,
-  claudeComments,
   sessionItems,
   activeItemId,
   allCommits,
@@ -13,11 +12,11 @@ import {
   setWholeFileView,
   setFiles,
   setRepoMeta,
-  setClaudeComments,
   setSessionItems,
   setActiveItemId,
   setAppMode,
 } from './state';
+import type { Comment } from './comment-types';
 import { fetchItems, fetchItemData, submitReview as apiSubmitReview, fetchRepoFiles, addItem, removeItem } from './api';
 import { escapeHtml, showToast } from './utils';
 import { parseDiff, renderDiff, selectFile, showWholeFile } from './diff';
@@ -41,11 +40,9 @@ function renderTabs(): void {
     tab.className = 'tab-item' + (item.id === activeItemId ? ' active' : '');
     tab.dataset.id = item.id;
 
-    const effUserCount =
-      item.id === 'diff'
-        ? Object.keys(comments).filter((k) => !k.startsWith('doc:') && !k.startsWith('claude:')).length
-        : Object.keys(comments).filter((k) => k.startsWith(`doc:${item.id}:`)).length;
-    const claudeCount = claudeComments.filter((c) => c._item === item.id).length;
+    const itemComments = comments.filter((c: Comment) => c.item === item.id && !c.parentId && c.status !== 'dismissed');
+    const claudeCount = itemComments.filter((c: Comment) => c.author === 'claude').length;
+    const effUserCount = itemComments.filter((c: Comment) => c.author === 'user').length;
 
     let badges = '';
     if (claudeCount > 0) badges += `<span class="tab-badge claude">${claudeCount}</span>`;
@@ -206,7 +203,6 @@ function setupDiffView(data: { diff: string; description: string; meta: any; cla
     'Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment';
 
   setRepoMeta(data.meta || {});
-  setClaudeComments((data.claudeComments || []).map(c => ({ ...c, _item: 'diff' })));
   setAppMode('diff');
 
   if (data.description) {
@@ -236,7 +232,6 @@ function setupFileView(data: { content: string; claudeComments?: any[]; [key: st
   document.querySelector('.keyboard-hint')!.innerHTML =
     'Click any block to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Esc</kbd> cancel';
 
-  setClaudeComments((data.claudeComments || []).map(c => ({ ...c, _item: activeItemId })));
   setAppMode('file');
   renderMarkdown(data);
 }
@@ -297,9 +292,8 @@ export async function handleSubmitReview(): Promise<void> {
 
   try {
     const formatted = formatAllComments();
-    const result = await apiSubmitReview(formatted, { ...comments });
+    const result = await apiSubmitReview(formatted, {});
     showToast(`Review round ${result.round} submitted!`, 3000);
-    for (const key of Object.keys(comments)) delete comments[key];
     clearPersistedState();
     document.getElementById('description-banner')!.style.display = 'none';
     if (appMode === 'file') {

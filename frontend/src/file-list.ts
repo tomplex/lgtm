@@ -2,12 +2,12 @@ import {
   files,
   activeFileIdx,
   comments,
-  claudeComments,
   reviewedFiles,
   analysis,
   sidebarView,
   setSidebarView,
 } from './state';
+import type { Comment } from './comment-types';
 import type { SidebarView } from './state';
 import { escapeHtml } from './utils';
 import { selectFile } from './diff';
@@ -32,8 +32,9 @@ function renderFileItem(file: { path: string; additions: number; deletions: numb
   div.className = cls;
   div.dataset.idx = String(idx);
 
-  const commentCount = Object.keys(comments).filter((k) => k.startsWith(file.path + '::')).length;
-  const claudeCount = claudeComments.filter((c) => c.file === file.path).length;
+  const fileComments = comments.filter((c: Comment) => c.file === file.path && !c.parentId && c.status !== 'dismissed');
+  const commentCount = fileComments.filter((c: Comment) => c.author === 'user').length;
+  const claudeCount = fileComments.filter((c: Comment) => c.author === 'claude').length;
 
   const lastSlash = file.path.lastIndexOf('/');
   const dir = lastSlash >= 0 ? file.path.slice(0, lastSlash + 1) : '';
@@ -97,7 +98,7 @@ export function renderFileList(): void {
 
   const reviewedCount = displayFiles.filter(f => reviewedFiles.has(f.path)).length;
   const remainingLines = displayFiles.filter(f => !reviewedFiles.has(f.path)).reduce((sum, f) => sum + f.additions, 0);
-  const commentCount = Object.keys(comments).filter(k => !k.startsWith('claude:')).length;
+  const commentCount = comments.filter((c: Comment) => c.author === 'user' && !c.parentId && c.status !== 'dismissed').length;
 
   let statsHtml = `${files.length} file${files.length !== 1 ? 's' : ''} &middot; <span class="add">+${totalAdd}</span> <span class="del">-${totalDel}</span>`;
   if (reviewedCount === files.length && files.length > 0) {

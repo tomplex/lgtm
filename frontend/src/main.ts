@@ -2,9 +2,10 @@ import 'highlight.js/styles/github-dark.css';
 import './style.css';
 
 import { fetchItemData, fetchAnalysis, baseUrl } from './api';
+import { fetchComments } from './comment-api';
 import { applyHash } from './diff';
 import { escapeHtml } from './utils';
-import { activeItemId, setAnalysis } from './state';
+import { activeItemId, setAnalysis, setComments } from './state';
 import { showToast } from './utils';
 import { loadState } from './persistence';
 import {
@@ -32,6 +33,9 @@ async function init(): Promise<void> {
 
     const analysisData = await fetchAnalysis();
     if (analysisData) setAnalysis(analysisData);
+
+    const allComments = await fetchComments();
+    setComments(allComments);
 
     // Set page title from first load
     const data = await fetchItemData('diff');
@@ -74,9 +78,11 @@ setupViewToggle();
 function connectSSE(): void {
   const eventsUrl = `${baseUrl()}/events`;
   const es = new EventSource(eventsUrl);
-  es.addEventListener('comments_changed', () => {
+  es.addEventListener('comments_changed', async () => {
+    const allComments = await fetchComments();
+    setComments(allComments);
     switchToItem(activeItemId);
-    showToast('New comments from Claude', 2000);
+    showToast('Comments updated', 2000);
   });
   es.addEventListener('items_changed', () => {
     loadItems().then(() => showToast('Review items updated', 2000));

@@ -7,7 +7,6 @@ import {
   setFiles,
   setActiveFileIdx,
   setAllCommits,
-  resetLineIds,
 } from './state';
 import { fetchCommits, fetchItemData } from './api';
 import { escapeHtml, showToast } from './utils';
@@ -93,7 +92,6 @@ async function applyCommitSelection(): Promise<void> {
     const data = await fetchItemData('diff', commits);
     if (data.mode !== 'diff') return;
     setFiles(parseDiff(data.diff));
-    resetLineIds();
     if (activeFileIdx >= files.length) setActiveFileIdx(0);
     renderFileList();
     if (files.length > 0) renderDiff(activeFileIdx);

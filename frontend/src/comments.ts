@@ -1,4 +1,4 @@
-import { comments, files, activeFileIdx, activeItemId, sessionItems, addLocalComment, updateLocalComment, removeLocalComment } from './state';
+import { comments, files, activeFileIdx, sessionItems, addLocalComment, updateLocalComment, removeLocalComment } from './state';
 import { escapeHtml } from './utils';
 import { renderDiff } from './diff';
 import { renderFileList } from './ui';
