@@ -48,7 +48,7 @@ describe('migrateBlob', () => {
 
     // Resolved Claude comment
     const resolved = result.comments.find((c: any) => c.id === 'cc-2');
-    expect(resolved.status).toBe('resolved');
+    expect(resolved!.status).toBe('resolved');
 
     // User diff comment migrated
     const userDiffComments = result.comments.filter((c: any) => c.author === 'user' && c.file === 'src/foo.ts' && !c.parentId);
