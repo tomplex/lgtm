@@ -8,9 +8,18 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      // SolidJS uses `let ref!: Type` pattern assigned via JSX ref={ref} prop
+      'no-unassigned-vars': 'off',
     },
   },
   {
-    ignores: ['dist/**', 'frontend/**', 'node_modules/**'],
+    files: ['server/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-namespace': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    ignores: ['dist/**', 'frontend/dist/**', 'node_modules/**'],
   },
 );

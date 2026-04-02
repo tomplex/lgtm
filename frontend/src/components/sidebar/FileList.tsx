@@ -242,7 +242,14 @@ function PhasedFileList(props: { filterQuery: string }) {
             <For each={phaseFiles_()}>
               {(file) => {
                 const idx = () => files().indexOf(file);
-                return <FileItem file={file} idx={idx()} extraClass="phased" hidden={!fileMatchesFilter(file.path, props.filterQuery)} />;
+                return (
+                  <FileItem
+                    file={file}
+                    idx={idx()}
+                    extraClass="phased"
+                    hidden={!fileMatchesFilter(file.path, props.filterQuery)}
+                  />
+                );
               }}
             </For>
           </>
