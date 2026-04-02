@@ -1552,7 +1552,7 @@ tr.expand-row:hover td {
 }
 
 .peek-panel {
-  margin: 4px 12px 4px 60px;
+  margin: 4px 12px 4px 0;
   max-width: 75%;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1622,6 +1622,8 @@ tr.expand-row:hover td {
   font-size: 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .peek-body {
