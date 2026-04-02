@@ -421,16 +421,37 @@ tr.comment-overlay-row td {
   top: 4px;
   left: 60px;
   z-index: 100;
-  width: 75%;
-  max-width: 700px;
+  width: 85%;
+  max-width: 900px;
+}
+
+/* Saved comments inside overlays don't need the outer comment-box card */
+.comment-overlay > .claude-comment,
+.comment-overlay > .user-comment {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Edit textarea inside a comment overlay shouldn't nest card styles */
+.comment-overlay .comment-box {
+  width: 100%;
+  max-width: none;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
 .comment-box {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 75%;
-  max-width: 700px;
+  width: 100%;
+  max-width: none;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 10px;

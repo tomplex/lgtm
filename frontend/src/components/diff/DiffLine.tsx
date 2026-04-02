@@ -1,4 +1,4 @@
-import { createSignal, Show, For } from 'solid-js';
+import { createSignal, Show, For, onCleanup } from 'solid-js';
 import { escapeHtml, highlightLine } from '../../utils';
 import { comments, addLocalComment, updateLocalComment, peekState, setPeekState } from '../../state';
 import { createComment as apiCreateComment } from '../../comment-api';
@@ -177,9 +177,9 @@ export default function DiffLine(props: Props) {
 
       <For each={lineComments()}>
         {(comment) => (
-          <tr class={comment.author === 'claude' ? 'claude-comment-row' : 'comment-row'}>
+          <tr class="comment-overlay-row">
             <td colspan="3">
-              <div class="comment-box" style="max-width:calc(100vw - 360px)">
+              <div class="comment-overlay">
                 <CommentRow comment={comment} />
               </div>
             </td>
@@ -188,13 +188,26 @@ export default function DiffLine(props: Props) {
       </For>
 
       <Show when={showNewComment()}>
-        <tr class="comment-overlay-row">
-          <td colspan="3">
-            <div class="comment-overlay">
-              <CommentTextarea onSave={handleSaveNew} onAskClaude={handleAskClaude} onCancel={() => setShowNewComment(false)} />
-            </div>
-          </td>
-        </tr>
+        {(() => {
+          // Click-outside to dismiss empty comment
+          const handleClickOutside = (e: MouseEvent) => {
+            const overlay = document.querySelector(`#line-${CSS.escape(props.filePath)}-${props.lineIdx} ~ .comment-overlay-row .comment-overlay`);
+            if (overlay && !overlay.contains(e.target as Node)) {
+              setShowNewComment(false);
+            }
+          };
+          document.addEventListener('mousedown', handleClickOutside);
+          onCleanup(() => document.removeEventListener('mousedown', handleClickOutside));
+          return (
+            <tr class="comment-overlay-row">
+              <td colspan="3">
+                <div class="comment-overlay">
+                  <CommentTextarea onSave={handleSaveNew} onAskClaude={handleAskClaude} onCancel={() => setShowNewComment(false)} />
+                </div>
+              </td>
+            </tr>
+          );
+        })()}
       </Show>
     </>
   );
