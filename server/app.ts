@@ -8,7 +8,7 @@ import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 import { notifyChannel } from './mcp.js';
-import { findSymbol } from './symbol-lookup.js';
+import { findSymbol, sortResults } from './symbol-lookup.js';
 
 declare global {
   namespace Express {
@@ -156,7 +156,8 @@ export function createApp(manager: SessionManager): express.Express {
       return;
     }
     const results = findSymbol(session.repoPath, name);
-    res.json({ symbol: name, results });
+    const sorted = sortResults(results, new Set());
+    res.json({ symbol: name, results: sorted });
   });
 
   // --- User state routes ---

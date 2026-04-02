@@ -252,6 +252,15 @@ function extractJsDocstring(lines: string[], startIndex: number): string | null 
   return raw || null;
 }
 
+export function sortResults(results: SymbolResult[], diffFiles: Set<string>): SymbolResult[] {
+  return results.slice().sort((a, b) => {
+    const aInDiff = diffFiles.has(a.file) ? 0 : 1;
+    const bInDiff = diffFiles.has(b.file) ? 0 : 1;
+    if (aInDiff !== bInDiff) return aInDiff - bInDiff;
+    return a.file.localeCompare(b.file);
+  });
+}
+
 export function findSymbol(repoPath: string, symbol: string): SymbolResult[] {
   const matches = runRipgrep(repoPath, symbol);
 

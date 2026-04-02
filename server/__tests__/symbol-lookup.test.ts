@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { findSymbol } from '../symbol-lookup.js';
+import { findSymbol, sortResults } from '../symbol-lookup.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -22,6 +22,19 @@ afterEach(() => {
   if (repoDir && fs.existsSync(repoDir)) {
     fs.rmSync(repoDir, { recursive: true, force: true });
   }
+});
+
+describe('sortResults', () => {
+  it('sorts diff files first, then alphabetical', () => {
+    const results = [
+      { file: 'z/last.py', line: 1, kind: 'function' as const, body: '', docstring: null },
+      { file: 'a/first.py', line: 1, kind: 'function' as const, body: '', docstring: null },
+      { file: 'm/middle.py', line: 1, kind: 'function' as const, body: '', docstring: null },
+    ];
+    const diffFiles = new Set(['m/middle.py']);
+    const sorted = sortResults(results, diffFiles);
+    expect(sorted.map(r => r.file)).toEqual(['m/middle.py', 'a/first.py', 'z/last.py']);
+  });
 });
 
 describe('findSymbol', () => {
