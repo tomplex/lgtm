@@ -72,6 +72,7 @@ export default function App() {
 
   async function switchToItem(itemId: string) {
     setActiveItemId(itemId);
+    localStorage.setItem('lgtm-active-item', itemId);
     const data = await fetchItemData(itemId);
 
     if (data.mode === 'diff') {
@@ -227,7 +228,9 @@ export default function App() {
     const analysisData = await fetchAnalysis();
     if (analysisData) setAnalysis(analysisData);
 
-    await switchToItem('diff');
+    const savedItem = localStorage.getItem('lgtm-active-item');
+    const validItem = savedItem && sessionItems().some((i) => i.id === savedItem);
+    await switchToItem(validItem ? savedItem! : 'diff');
 
     // Set page title
     const meta = repoMeta();

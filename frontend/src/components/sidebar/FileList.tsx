@@ -114,8 +114,21 @@ function FileItem(props: FileItemProps) {
 
 function FlatFileList(props: { filterQuery: string }) {
   const displayFiles = createMemo(() => {
+    let sorted = files();
     const a = analysis();
-    return a && sidebarView() === 'flat' ? sortFilesByPriority(files(), a) : files();
+    if (a && sidebarView() === 'flat') sorted = sortFilesByPriority(sorted, a);
+    // Files with Claude comments float to the top
+    const withComments = new Set(
+      comments.list.filter((c) => c.author === 'claude' && c.file && !c.parentId && c.status !== 'dismissed').map((c) => c.file!),
+    );
+    if (withComments.size > 0) {
+      sorted = [...sorted].sort((a, b) => {
+        const ac = withComments.has(a.path) ? 0 : 1;
+        const bc = withComments.has(b.path) ? 0 : 1;
+        return ac - bc;
+      });
+    }
+    return sorted;
   });
 
   return (
