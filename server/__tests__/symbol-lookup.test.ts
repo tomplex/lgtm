@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { findSymbol, sortResults } from '../symbol-lookup.js';
 import * as fs from 'fs';
 import * as path from 'path';
