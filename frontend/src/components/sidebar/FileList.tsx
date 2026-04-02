@@ -13,6 +13,29 @@ import {
 import type { DiffFile } from '../../state';
 import { sortFilesByPriority, groupFiles, phaseFiles } from '../../analysis';
 
+// --- Filter logic ---
+
+function matchesGlob(path: string, pattern: string): boolean {
+  const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*') + '$');
+  const basename = path.split('/').pop() || path;
+  return regex.test(path) || regex.test(basename);
+}
+
+function fileMatchesFilter(path: string, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const terms = q.split(/\s+/);
+  const lowerPath = path.toLowerCase();
+  return terms.every((term) => {
+    if (term.startsWith('!')) {
+      const neg = term.slice(1);
+      if (!neg) return true;
+      return neg.includes('*') ? !matchesGlob(lowerPath, neg) : !lowerPath.includes(neg);
+    }
+    return term.includes('*') ? matchesGlob(lowerPath, term) : lowerPath.includes(term);
+  });
+}
+
 interface FileItemProps {
   file: DiffFile;
   idx: number;
@@ -20,6 +43,7 @@ interface FileItemProps {
   showSummary?: boolean;
   priorityClass?: string;
   extraClass?: string;
+  hidden?: boolean;
 }
 
 function FileItem(props: FileItemProps) {
@@ -45,7 +69,7 @@ function FileItem(props: FileItemProps) {
 
   return (
     <div
-      class={`file-item${isActive() ? ' active' : ''}${isReviewed() ? ' reviewed' : ''}${props.extraClass ? ' ' + props.extraClass : ''}${props.priorityClass ? ' ' + props.priorityClass : ''}`}
+      class={`file-item${isActive() ? ' active' : ''}${isReviewed() ? ' reviewed' : ''}${props.extraClass ? ' ' + props.extraClass : ''}${props.priorityClass ? ' ' + props.priorityClass : ''}${props.hidden ? ' hidden' : ''}`}
       data-idx={props.idx}
       onClick={handleSelect}
     >
@@ -88,7 +112,7 @@ function FileItem(props: FileItemProps) {
 
 // --- Flat view ---
 
-function FlatFileList() {
+function FlatFileList(props: { filterQuery: string }) {
   const displayFiles = createMemo(() => {
     const a = analysis();
     return a && sidebarView() === 'flat' ? sortFilesByPriority(files(), a) : files();
@@ -106,6 +130,7 @@ function FlatFileList() {
             showDir
             showSummary
             priorityClass={priority() ? `priority-${priority()}` : undefined}
+            hidden={!fileMatchesFilter(file.path, props.filterQuery)}
           />
         );
       }}
@@ -115,7 +140,7 @@ function FlatFileList() {
 
 // --- Grouped view ---
 
-function GroupedFileList() {
+function GroupedFileList(props: { filterQuery: string }) {
   const groups = createMemo(() => {
     const a = analysis();
     return a ? groupFiles(files(), a) : [];
@@ -163,6 +188,7 @@ function GroupedFileList() {
                         idx={idx()}
                         extraClass="grouped"
                         priorityClass={priority() ? `priority-${priority()}` : undefined}
+                        hidden={!fileMatchesFilter(file.path, props.filterQuery)}
                       />
                     );
                   }}
@@ -184,7 +210,7 @@ const PHASE_CONFIG = {
   'rubber-stamp': { label: 'Rubber stamp', color: '#8b949e', icon: '\u25CB' },
 } as const;
 
-function PhasedFileList() {
+function PhasedFileList(props: { filterQuery: string }) {
   const phases = createMemo(() => {
     const a = analysis();
     return a ? phaseFiles(files(), a) : { review: [], skim: [], 'rubber-stamp': [] };
@@ -216,7 +242,7 @@ function PhasedFileList() {
             <For each={phaseFiles_()}>
               {(file) => {
                 const idx = () => files().indexOf(file);
-                return <FileItem file={file} idx={idx()} extraClass="phased" />;
+                return <FileItem file={file} idx={idx()} extraClass="phased" hidden={!fileMatchesFilter(file.path, props.filterQuery)} />;
               }}
             </For>
           </>
@@ -228,17 +254,17 @@ function PhasedFileList() {
 
 // --- Main FileList ---
 
-export default function FileList() {
+export default function FileList(props: { filterQuery: string }) {
   return (
     <div class="file-list" id="file-list">
       <Show when={analysis() && sidebarView() === 'grouped'}>
-        <GroupedFileList />
+        <GroupedFileList filterQuery={props.filterQuery} />
       </Show>
       <Show when={analysis() && sidebarView() === 'phased'}>
-        <PhasedFileList />
+        <PhasedFileList filterQuery={props.filterQuery} />
       </Show>
       <Show when={!analysis() || sidebarView() === 'flat'}>
-        <FlatFileList />
+        <FlatFileList filterQuery={props.filterQuery} />
       </Show>
     </div>
   );

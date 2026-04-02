@@ -1,16 +1,18 @@
+import { createSignal } from 'solid-js';
 import FileSearch from './FileSearch';
 import ViewToggle from './ViewToggle';
 import FileList from './FileList';
 
 export default function Sidebar() {
-  // TODO: integrate filter query into FileList's rendering (currently no-op)
+  const [filterQuery, setFilterQuery] = createSignal('');
+
   return (
     <div class="sidebar">
       <div class="sidebar-controls">
         <ViewToggle />
-        <FileSearch onFilter={() => {}} />
+        <FileSearch onFilter={setFilterQuery} />
       </div>
-      <FileList />
+      <FileList filterQuery={filterQuery()} />
     </div>
   );
 }
