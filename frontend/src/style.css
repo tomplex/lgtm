@@ -409,7 +409,8 @@ tr.comment-row td {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: calc(100vw - 360px);
+  width: 75%;
+  max-width: 700px;
 }
 
 .comment-box textarea {
