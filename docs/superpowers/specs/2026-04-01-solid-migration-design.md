@@ -120,7 +120,7 @@ Full rewrite, not incremental. At ~2,700 lines the app is small enough that adap
 - Feature set - this is a rewrite for maintainability, not a feature addition
 - CSS approach - still plain CSS, no CSS-in-JS
 
-## Open questions
+## Decisions
 
-- **Component file organization:** One component per file, or group related small components (e.g., `DiffLine` + `CommentRow` in the same file)? I'm leaning toward grouping tightly coupled components but splitting at natural boundaries (sidebar vs content area vs header).
-- **Testing strategy:** Solid has `solid-testing-library` for component tests. Worth adding for key interactive components (comment creation, file selection) or stick with pure function tests only?
+- **Component file organization:** One component per file, grouped by directory. Something like `src/components/diff/DiffLine.tsx`, `src/components/diff/CommentRow.tsx`, `src/components/sidebar/FileList.tsx`, etc. Directories map to natural UI boundaries.
+- **Testing strategy:** Pure function tests only for now. No `solid-testing-library`. The existing vitest tests for `parseDiff`, format helpers, etc. carry over. Component testing can be added later if needed.
