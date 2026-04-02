@@ -1327,6 +1327,57 @@ tr.expand-row:hover td {
 }
 
 /* --- Sidebar controls --- */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sidebar-tabs button {
+  flex: 1;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sidebar-tabs button:hover {
+  color: var(--text);
+}
+.sidebar-tabs button.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.sidebar-analysis {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.sidebar-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidebar-analysis-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+}
+.sidebar-analysis-text {
+  color: var(--text);
+}
+
 .sidebar-controls {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;

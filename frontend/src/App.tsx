@@ -41,7 +41,6 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import Header from './components/header/Header';
 import TabBar from './components/tabs/TabBar';
 import CommitPanel from './components/commits/CommitPanel';
-import OverviewBanner from './components/overview/OverviewBanner';
 import Sidebar from './components/sidebar/Sidebar';
 import DiffView from './components/diff/DiffView';
 import DocumentView from './components/document/DocumentView';
@@ -295,9 +294,6 @@ export default function App() {
       />
       <TabBar onSwitchItem={switchToItem} onCloseTab={handleCloseTab} />
       <CommitPanel visible={commitPanelOpen()} onApply={handleApplyCommits} />
-      <Show when={appMode() === 'diff'}>
-        <OverviewBanner />
-      </Show>
       <div class="main">
         <Show when={appMode() === 'diff'}>
           <Sidebar />
