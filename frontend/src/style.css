@@ -1541,3 +1541,15 @@ tr.expand-row:hover td {
 .line-content:hover {
   cursor: default;
 }
+
+/* Body gets this class when Cmd is held */
+body.cmd-held .line-content .hljs-title,
+body.cmd-held .line-content .hljs-title.function_,
+body.cmd-held .line-content .hljs-attr,
+body.cmd-held .line-content .hljs-built_in,
+body.cmd-held .line-content .hljs-type {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--text-muted);
+  cursor: pointer;
+}
