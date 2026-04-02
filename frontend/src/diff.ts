@@ -2,18 +2,16 @@ import {
   files,
   activeFileIdx,
   comments,
-  claudeComments,
   analysis,
-  getLineId,
-  lineIdToKey,
   setActiveFileIdx,
   setWholeFileView,
   type DiffFile,
 } from './state';
+import type { Comment } from './comment-types';
 import { fetchContext, fetchFile } from './api';
-import { renderClaudeCommentHtml, handleClaudeCommentAction } from './claude-comments';
-import { escapeHtml, detectLang, highlightLine, showToast, renderMd } from './utils';
-import { toggleComment, editComment } from './comments';
+import { renderCommentHtml, handleCommentAction } from './claude-comments';
+import { escapeHtml, detectLang, highlightLine, showToast } from './utils';
+import { toggleComment } from './comments';
 import { renderFileList } from './ui';
 
 export function parseDiff(raw: string): DiffFile[] {
@@ -120,7 +118,6 @@ function renderDiffLineHtml(
   file: DiffFile,
   line: DiffFile['lines'][number],
   lineIdx: number,
-  lineId: string,
   lang: string | null,
   wordDiffs: Record<number, { text: string; changed: boolean }[]>,
 ): string {
@@ -167,41 +164,23 @@ function renderDiffLineHtml(
       codeHtml = `<span class="diff-text">${escapeHtml(line.content)}</span>`;
     }
 
-    html += `<tr class="${cls}" id="line-${lineId}">
-      <td class="line-num" data-line-id="${lineId}">${line.oldLine ?? ''}</td>
-      <td class="line-num" data-line-id="${lineId}">${line.newLine ?? ''}</td>
+    html += `<tr class="${cls}" data-file="${escapeHtml(file.path)}" data-line-idx="${lineIdx}" id="line-${escapeHtml(file.path)}-${lineIdx}">
+      <td class="line-num">${line.oldLine ?? ''}</td>
+      <td class="line-num">${line.newLine ?? ''}</td>
       <td class="line-content"><span class="diff-prefix">${prefix}</span>${codeHtml}</td>
     </tr>`;
   }
 
-  // Claude's comments on this line
-  const claudeForLine = claudeComments.filter((c) => {
-    if (c.file !== file.path) return false;
-    const side = c.side || 'new';
-    return side === 'new' ? c.line === line.newLine : c.line === line.oldLine;
-  });
-  for (const cc of claudeForLine) {
-    html += `<tr class="claude-comment-row">
+  // Root comments at this location (not replies, not dismissed)
+  const lineComments = comments.filter(c =>
+    c.item === 'diff' && c.file === file.path && !c.parentId && c.status !== 'dismissed' &&
+    c.line === lineIdx
+  );
+  for (const comment of lineComments) {
+    html += `<tr class="${comment.author === 'claude' ? 'claude-comment-row' : 'comment-row'}">
       <td colspan="3">
         <div class="comment-box" style="max-width:calc(100vw - 360px)">
-          ${renderClaudeCommentHtml(cc)}
-        </div>
-      </td>
-    </tr>`;
-  }
-
-  const lineKey = `${file.path}::${lineIdx}`;
-  if (comments[lineKey]) {
-    html += `<tr class="comment-row" id="cr-${lineId}">
-      <td colspan="3">
-        <div class="comment-box">
-          <div class="saved-comment" data-edit-comment="${lineId}">
-            <span class="comment-text">${renderMd(comments[lineKey])}</span>
-            <span class="inline-actions">
-              <a>edit</a>
-              <a class="del-action" data-delete-comment="${lineId}">delete</a>
-            </span>
-          </div>
+          ${renderCommentHtml(comment)}
         </div>
       </td>
     </tr>`;
@@ -211,35 +190,33 @@ function renderDiffLineHtml(
 }
 
 function insertOrphanedComments(file: DiffFile, container: HTMLElement): void {
-  const fileComments = claudeComments.filter((c) => c.file === file.path && c.line != null);
-  const visibleNewLines = new Set(file.lines.map((l) => l.newLine).filter((n): n is number => n != null));
-  const visibleOldLines = new Set(file.lines.map((l) => l.oldLine).filter((n): n is number => n != null));
-  const orphaned = fileComments.filter((cc) => {
-    const side = cc.side || 'new';
-    return side === 'new' ? !visibleNewLines.has(cc.line!) : !visibleOldLines.has(cc.line!);
-  });
+  const fileComments = comments.filter(c =>
+    c.item === 'diff' && c.file === file.path && c.line != null && !c.parentId && c.status !== 'dismissed'
+  );
+  // Comments whose line index doesn't match any visible diff line index
+  const visibleLineIdxs = new Set(file.lines.map((_, idx) => idx));
+  const orphaned = fileComments.filter(c => !visibleLineIdxs.has(c.line!));
 
   orphaned.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
-  for (const cc of orphaned) {
-    const side = cc.side || 'new';
-    const targetLine = cc.line!;
+  for (const comment of orphaned) {
+    const targetLine = comment.line!;
 
+    // Find the closest preceding visible line index
     let anchorLineIdx = -1;
     for (let i = file.lines.length - 1; i >= 0; i--) {
-      const num = side === 'new' ? file.lines[i].newLine : file.lines[i].oldLine;
-      if (num != null && num <= targetLine) {
+      if (i <= targetLine) {
         anchorLineIdx = i;
         break;
       }
     }
 
-    const ccWithLabel = { ...cc, comment: `[line ${targetLine}${side === 'old' ? ' (old)' : ''}] ${cc.comment}` };
+    const labeledComment = { ...comment, text: `[line ${targetLine}] ${comment.text}` };
     const tr = document.createElement('tr');
-    tr.className = 'claude-comment-row';
+    tr.className = comment.author === 'claude' ? 'claude-comment-row' : 'comment-row';
     tr.innerHTML = `
       <td colspan="3">
         <div class="comment-box" style="max-width:calc(100vw - 360px)">
-          ${renderClaudeCommentHtml(ccWithLabel)}
+          ${renderCommentHtml(labeledComment)}
         </div>
       </td>
     `;
@@ -248,9 +225,7 @@ function insertOrphanedComments(file: DiffFile, container: HTMLElement): void {
     if (!table) continue;
 
     if (anchorLineIdx >= 0) {
-      const anchorKey = `${file.path}::${anchorLineIdx}`;
-      const anchorId = getLineId(anchorKey);
-      let anchor = document.getElementById('line-' + anchorId);
+      let anchor = document.getElementById(`line-${escapeHtml(file.path)}-${anchorLineIdx}`);
       if (anchor) {
         while (
           anchor!.nextElementSibling?.classList.contains('comment-row') ||
@@ -287,9 +262,7 @@ export function renderDiff(fileIdx: number): void {
   const wordDiffs = precomputeWordDiffs(file.lines);
 
   file.lines.forEach((line, lineIdx) => {
-    const lineKey = `${file.path}::${lineIdx}`;
-    const lineId = getLineId(lineKey);
-    html += renderDiffLineHtml(file, line, lineIdx, lineId, lang, wordDiffs);
+    html += renderDiffLineHtml(file, line, lineIdx, lang, wordDiffs);
   });
 
   // Expand context at end of file
@@ -326,47 +299,20 @@ export function renderDiff(fileIdx: number): void {
 function handleDiffContainerClick(e: Event): void {
   const target = e.target as HTMLElement;
 
-  // Claude comment actions (dismiss, resolve, unresolve, reply, edit-reply, delete-reply)
+  // Comment actions (all comment types)
   const rerenderDiff = () => { renderDiff(activeFileIdx); renderFileList(); };
-  if (handleClaudeCommentAction(target, rerenderDiff)) return;
+  if (handleCommentAction(target, rerenderDiff)) return;
 
-  // Delete comment via inline action
-  const deleteCommentEl = target.closest<HTMLElement>('[data-delete-comment]');
-  if (deleteCommentEl) {
-    const lineId = deleteCommentEl.dataset.deleteComment!;
-    const lineKey = lineIdToKey(lineId);
-    if (lineKey) delete comments[lineKey];
-    renderDiff(activeFileIdx);
-    renderFileList();
+  // Line click -> toggle comment
+  const lineRow = target.closest<HTMLElement>('tr[data-file][data-line-idx]');
+  if (lineRow && !target.closest('.comment-box') && !target.closest('.claude-comment')) {
+    const file = lineRow.dataset.file!;
+    const lineIdx = parseInt(lineRow.dataset.lineIdx!);
+    toggleComment(file, lineIdx);
     return;
   }
 
-  // Line number click -> toggle comment
-  const lineNumEl = target.closest<HTMLElement>('.line-num[data-line-id]');
-  if (lineNumEl) {
-    toggleComment(lineNumEl.dataset.lineId!);
-    return;
-  }
-
-  // Line content click -> toggle comment (larger click target)
-  const lineContentEl = target.closest<HTMLElement>('.line-content');
-  if (lineContentEl) {
-    const row = lineContentEl.closest<HTMLElement>('tr[id^="line-"]');
-    if (row) {
-      const lineId = row.id.replace('line-', '');
-      toggleComment(lineId);
-      return;
-    }
-  }
-
-  // Saved comment click -> edit
-  const editEl = target.closest<HTMLElement>('[data-edit-comment]');
-  if (editEl) {
-    editComment(editEl.dataset.editComment!);
-    return;
-  }
-
-  // Show whole file
+  // Show whole file link
   const wholeFileEl = target.closest<HTMLElement>('[data-action="show-whole-file"]');
   if (wholeFileEl) {
     showWholeFile(parseInt(wholeFileEl.dataset.fileIdx!));
@@ -447,12 +393,12 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
       if (l.type === 'add' && l.newLine) addLines.add(l.newLine);
     });
 
-    // Index Claude comments by new-file line number for this file
-    const commentsByLine: Record<number, typeof claudeComments> = {};
-    for (const cc of claudeComments) {
-      if (cc.file === file.path && cc.line != null && (cc.side || 'new') === 'new') {
-        if (!commentsByLine[cc.line]) commentsByLine[cc.line] = [];
-        commentsByLine[cc.line].push(cc);
+    // Build comment index by line number for this file
+    const commentsByLine: Record<number, Comment[]> = {};
+    for (const c of comments) {
+      if (c.item === 'diff' && c.file === file.path && c.line != null && !c.parentId && c.status !== 'dismissed') {
+        if (!commentsByLine[c.line]) commentsByLine[c.line] = [];
+        commentsByLine[c.line].push(c);
       }
     }
 
@@ -469,12 +415,12 @@ export async function showWholeFile(fileIdx: number): Promise<void> {
         <td class="line-content"><span class="diff-prefix"> </span>${codeHtml}</td>
       </tr>`;
 
-      // Claude comments on this line
-      for (const cc of commentsByLine[l.num] || []) {
-        html += `<tr class="claude-comment-row">
+      // Comments on this line
+      for (const comment of commentsByLine[l.num] || []) {
+        html += `<tr class="${comment.author === 'claude' ? 'claude-comment-row' : 'comment-row'}">
           <td colspan="3">
             <div class="comment-box" style="max-width:calc(100vw - 360px)">
-              ${renderClaudeCommentHtml(cc)}
+              ${renderCommentHtml(comment)}
             </div>
           </td>
         </tr>`;
