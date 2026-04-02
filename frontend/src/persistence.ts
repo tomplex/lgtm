@@ -1,7 +1,7 @@
 import { reviewedFiles, sidebarView } from './state';
 import type { SidebarView } from './state';
 import { setSidebarView } from './state';
-import { baseUrl, fetchUserState, putUserReviewed, putUserSidebarView } from './api';
+import { fetchUserState, putUserReviewed, putUserSidebarView } from './api';
 
 let lastReviewedFiles = new Set<string>();
 let lastSidebarView = '';
@@ -44,5 +44,6 @@ export function saveState(): void {
 
 export async function clearPersistedState(): Promise<void> {
   lastReviewedFiles = new Set();
+  const { baseUrl } = await import('./api');
   await fetch(`${baseUrl()}/user-state/clear`, { method: 'POST' });
 }
