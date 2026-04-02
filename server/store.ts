@@ -9,12 +9,10 @@ export interface ProjectBlob {
   baseBranch: string;
   description: string;
   items: { id: string; type: 'diff' | 'document'; title: string; path?: string }[];
-  claudeComments: Record<string, { id: string; file?: string; line?: number; side?: string; block?: number; comment: string }[]>;
+  comments: import('./comment-types.js').Comment[];
   analysis: Record<string, unknown> | null;
   round: number;
-  userComments: Record<string, string>;
   reviewedFiles: string[];
-  resolvedComments: string[];
   sidebarView: string;
 }
 

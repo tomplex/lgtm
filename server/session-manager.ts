@@ -23,7 +23,7 @@ export class SessionManager {
     // Restore persisted sessions
     for (const blob of storeList()) {
       const outputPath = `${REVIEW_DIR}/${blob.slug}.md`;
-      const session = Session.fromBlob(blob, outputPath);
+      const session = Session.fromBlob(blob as unknown as Record<string, unknown>, outputPath);
       session.watchRepo();
       this._sessions.set(blob.slug, session);
       console.log(`SESSION_RESTORED=${blob.slug} path=${blob.repoPath}`);

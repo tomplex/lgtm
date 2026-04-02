@@ -5,6 +5,9 @@ import {
   getBranchDiff, getSelectedCommitsDiff, getRepoMeta,
 } from './git-ops.js';
 import { storePut, type ProjectBlob } from './store.js';
+import { CommentStore } from './comment-store.js';
+import { migrateBlob } from './comment-migration.js';
+import type { Comment, CreateComment, CommentFilter } from './comment-types.js';
 
 // --- Types ---
 
@@ -13,15 +16,6 @@ interface SessionItem {
   type: 'diff' | 'document';
   title: string;
   path?: string;
-}
-
-interface ClaudeComment {
-  id: string;
-  file?: string;
-  line?: number;
-  side?: 'new' | 'old';
-  block?: number;
-  comment: string;
 }
 
 export interface SSEClient {
@@ -41,12 +35,10 @@ export class Session {
   private _items: SessionItem[] = [
     { id: 'diff', type: 'diff', title: 'Code Changes' },
   ];
-  private _claudeComments: Record<string, ClaudeComment[]> = {};
+  private _commentStore = new CommentStore();
   private _sseClients: SSEClient[] = [];
   private _analysis: Record<string, unknown> | null = null;
-  private _userComments: Record<string, string> = {};
   private _reviewedFiles = new Set<string>();
-  private _resolvedComments = new Set<string>();
   private _sidebarView = 'flat';
 
   constructor(opts: {
@@ -72,12 +64,10 @@ export class Session {
       baseBranch: this.baseBranch,
       description: this.description,
       items: this._items,
-      claudeComments: this._claudeComments,
+      comments: this._commentStore.toJSON(),
       analysis: this._analysis,
       round: this._round,
-      userComments: this._userComments,
       reviewedFiles: Array.from(this._reviewedFiles),
-      resolvedComments: Array.from(this._resolvedComments),
       sidebarView: this._sidebarView,
     };
   }
@@ -87,22 +77,21 @@ export class Session {
     storePut(this._slug, this.toBlob());
   }
 
-  static fromBlob(blob: ProjectBlob, outputPath: string): Session {
+  static fromBlob(blob: Record<string, unknown>, outputPath: string): Session {
+    const migrated = migrateBlob(blob);
     const session = new Session({
-      repoPath: blob.repoPath,
-      baseBranch: blob.baseBranch,
-      description: blob.description,
+      repoPath: migrated.repoPath as string,
+      baseBranch: migrated.baseBranch as string,
+      description: migrated.description as string,
       outputPath,
-      slug: blob.slug,
+      slug: migrated.slug as string,
     });
-    session._items = blob.items;
-    session._claudeComments = blob.claudeComments as Record<string, ClaudeComment[]>;
-    session._analysis = blob.analysis;
-    session._round = blob.round;
-    session._userComments = blob.userComments ?? {};
-    session._reviewedFiles = new Set(blob.reviewedFiles ?? []);
-    session._resolvedComments = new Set(blob.resolvedComments ?? []);
-    session._sidebarView = blob.sidebarView ?? 'flat';
+    session._items = migrated.items as SessionItem[];
+    session._commentStore = CommentStore.fromJSON(migrated.comments);
+    session._analysis = migrated.analysis as Record<string, unknown> | null;
+    session._round = migrated.round as number;
+    session._reviewedFiles = new Set(migrated.reviewedFiles as string[]);
+    session._sidebarView = (migrated.sidebarView as string) ?? 'flat';
     return session;
   }
 
@@ -117,7 +106,7 @@ export class Session {
   }
 
   getItemData(itemId: string, commits?: string): Record<string, unknown> {
-    const claudeComments = this._claudeComments[itemId] ?? [];
+    const comments = this._commentStore.list({ item: itemId });
 
     if (itemId === 'diff') {
       let diff: string;
@@ -132,8 +121,7 @@ export class Session {
         diff,
         description: this.description,
         meta: getRepoMeta(this.repoPath, this.baseBranch),
-        claudeComments,
-        userComments: this._userComments,
+        comments,
       };
     }
 
@@ -154,8 +142,7 @@ export class Session {
       filepath: p,
       markdown: isMarkdown,
       title: item.title ?? filename,
-      claudeComments,
-      userComments: this._userComments,
+      comments,
     };
   }
 
@@ -184,38 +171,9 @@ export class Session {
     const idx = this._items.findIndex(i => i.id === itemId);
     if (idx === -1) return false;
     this._items.splice(idx, 1);
-    delete this._claudeComments[itemId];
+    this.clearComments(itemId);
     this.persist();
     return true;
-  }
-
-  addComments(itemId: string, comments: Omit<ClaudeComment, 'id'>[]): number {
-    if (!this._claudeComments[itemId]) {
-      this._claudeComments[itemId] = [];
-    }
-    for (const c of comments) {
-      this._claudeComments[itemId].push({ ...c, id: crypto.randomUUID() });
-    }
-    this.persist();
-    return this._claudeComments[itemId].length;
-  }
-
-  deleteComment(itemId: string, commentId: string): void {
-    const items = this._claudeComments[itemId];
-    if (items) {
-      const idx = items.findIndex(c => c.id === commentId);
-      if (idx !== -1) items.splice(idx, 1);
-    }
-    this.persist();
-  }
-
-  clearComments(itemId?: string): void {
-    if (itemId) {
-      delete this._claudeComments[itemId];
-    } else {
-      this._claudeComments = {};
-    }
-    this.persist();
   }
 
   async submitReview(commentsText: string): Promise<number> {
@@ -229,32 +187,69 @@ export class Session {
     return currentRound;
   }
 
-  // --- User State ---
+  // --- Comments ---
 
-  get userComments(): Record<string, string> {
-    return this._userComments;
+  addComment(input: CreateComment): Comment {
+    const comment = this._commentStore.add(input);
+    this.persist();
+    return comment;
   }
+
+  addComments(itemId: string, comments: { file?: string; line?: number; block?: number; comment: string }[]): number {
+    for (const c of comments) {
+      this._commentStore.add({
+        author: 'claude',
+        text: c.comment,
+        item: itemId,
+        file: c.file,
+        line: c.line,
+        block: c.block,
+      });
+    }
+    this.persist();
+    return this._commentStore.list({ item: itemId, author: 'claude' }).length;
+  }
+
+  getComment(id: string): Comment | undefined {
+    return this._commentStore.get(id);
+  }
+
+  listComments(filter?: CommentFilter): Comment[] {
+    return this._commentStore.list(filter);
+  }
+
+  updateComment(id: string, fields: Partial<Pick<Comment, 'text' | 'status'>>): Comment | undefined {
+    const result = this._commentStore.update(id, fields);
+    if (result) this.persist();
+    return result;
+  }
+
+  deleteComment(itemId: string, commentId: string): boolean {
+    const result = this._commentStore.delete(commentId);
+    if (result) this.persist();
+    return result;
+  }
+
+  clearComments(itemId?: string): void {
+    if (itemId) {
+      for (const c of this._commentStore.list({ item: itemId })) {
+        this._commentStore.delete(c.id);
+      }
+    } else {
+      const all = this._commentStore.list();
+      for (const c of all) this._commentStore.delete(c.id);
+    }
+    this.persist();
+  }
+
+  // --- User State ---
 
   get userReviewedFiles(): string[] {
     return Array.from(this._reviewedFiles);
   }
 
-  get userResolvedComments(): string[] {
-    return Array.from(this._resolvedComments);
-  }
-
   get userSidebarView(): string {
     return this._sidebarView;
-  }
-
-  setUserComment(key: string, text: string): void {
-    this._userComments[key] = text;
-    this.persist();
-  }
-
-  deleteUserComment(key: string): void {
-    delete this._userComments[key];
-    this.persist();
   }
 
   setUserReviewedFiles(files: string[]): void {
@@ -268,19 +263,6 @@ export class Session {
     else this._reviewedFiles.delete(path);
     this.persist();
     return nowReviewed;
-  }
-
-  setUserResolvedComments(keys: string[]): void {
-    this._resolvedComments = new Set(keys);
-    this.persist();
-  }
-
-  toggleUserResolvedComment(key: string): boolean {
-    const nowResolved = !this._resolvedComments.has(key);
-    if (nowResolved) this._resolvedComments.add(key);
-    else this._resolvedComments.delete(key);
-    this.persist();
-    return nowResolved;
   }
 
   setUserSidebarView(view: string): void {
