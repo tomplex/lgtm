@@ -19,15 +19,7 @@ export interface SessionItem {
   path?: string;
 }
 
-export interface ClaudeComment {
-  id: string;
-  file?: string;
-  line?: number;
-  side?: 'new' | 'old';
-  block?: number;
-  comment: string;
-  _item: string;
-}
+import type { Comment } from './comment-types';
 
 export interface RepoMeta {
   branch?: string;
@@ -76,50 +68,19 @@ export type SidebarView = 'flat' | 'grouped' | 'phased';
 
 // --- Mutable state ---
 export let files: DiffFile[] = [];
-// Key format conventions for the comments record:
-//   "filepath::lineIdx"          — diff line comment (user note on a specific line)
-//   "doc:itemId:blockIdx"        — document block comment
-//   "claude:commentId"           — Claude reply text for a review comment
-//   "md::blockIdx"               — markdown block comment
-export const comments: Record<string, string> = {};
+export let comments: Comment[] = [];
 export let activeFileIdx = 0;
 export let appMode: 'diff' | 'file' = 'diff';
 export let mdMeta: MdMeta = {};
 export let repoMeta: RepoMeta = {};
-export let claudeComments: ClaudeComment[] = [];
 export let sessionItems: SessionItem[] = [];
 export let activeItemId = 'diff';
 export let allCommits: Commit[] = [];
 export const selectedShas = new Set<string>();
 export const reviewedFiles = new Set<string>();
-export const resolvedComments = new Set<string>();
 export let wholeFileView = false;
 export let analysis: Analysis | null = null;
 export let sidebarView: SidebarView = 'flat';
-
-// Line ID tracking
-let lineIdCounter = 0;
-const lineKeyToId: Record<string, string> = {};
-const idToLineKey: Record<string, string> = {};
-
-export function getLineId(lineKey: string): string {
-  if (!lineKeyToId[lineKey]) {
-    const id = 'lc-' + lineIdCounter++;
-    lineKeyToId[lineKey] = id;
-    idToLineKey[id] = lineKey;
-  }
-  return lineKeyToId[lineKey];
-}
-
-export function lineIdToKey(lineId: string): string | null {
-  return idToLineKey[lineId] ?? null;
-}
-
-export function resetLineIds(): void {
-  lineIdCounter = 0;
-  for (const key of Object.keys(lineKeyToId)) delete lineKeyToId[key];
-  for (const key of Object.keys(idToLineKey)) delete idToLineKey[key];
-}
 
 // Setters for reassignable state (since `export let` can't be reassigned from outside)
 export function setFiles(f: DiffFile[]) {
@@ -137,8 +98,21 @@ export function setMdMeta(m: MdMeta) {
 export function setRepoMeta(m: RepoMeta) {
   repoMeta = m;
 }
-export function setClaudeComments(c: ClaudeComment[]) {
-  claudeComments = c;
+export function setComments(c: Comment[]) {
+  comments = c;
+}
+
+export function addLocalComment(c: Comment) {
+  comments.push(c);
+}
+
+export function updateLocalComment(id: string, fields: Partial<Comment>) {
+  const idx = comments.findIndex(c => c.id === id);
+  if (idx >= 0) comments[idx] = { ...comments[idx], ...fields };
+}
+
+export function removeLocalComment(id: string) {
+  comments = comments.filter(c => c.id !== id);
 }
 export function setSessionItems(items: SessionItem[]) {
   sessionItems = items;

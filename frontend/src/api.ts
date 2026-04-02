@@ -1,4 +1,5 @@
-import type { SessionItem, Commit, RepoMeta, ClaudeComment, Analysis } from './state';
+import type { SessionItem, Commit, RepoMeta, Analysis } from './state';
+import type { Comment } from './comment-types';
 
 function getProjectSlug(): string {
   const match = window.location.pathname.match(/^\/project\/([^/]+)/);
@@ -23,9 +24,7 @@ async function checkedJson<T>(resp: Response): Promise<T> {
 }
 
 interface UserState {
-  comments: Record<string, string>;
   reviewedFiles: string[];
-  resolvedComments: string[];
   sidebarView: string;
 }
 
@@ -34,7 +33,7 @@ interface DiffData {
   diff: string;
   description: string;
   meta: RepoMeta;
-  claudeComments: ClaudeComment[];
+  comments: Comment[];
 }
 
 interface FileData {
@@ -44,7 +43,7 @@ interface FileData {
   filepath: string;
   markdown: boolean;
   title: string;
-  claudeComments: ClaudeComment[];
+  comments: Comment[];
 }
 
 interface ErrorData {
@@ -122,11 +121,6 @@ export async function submitReview(
   return checkedJson<{ ok: boolean; round: number }>(resp);
 }
 
-export async function deleteClaudeComment(itemId: string, commentId: string): Promise<void> {
-  const resp = await fetch(`${baseUrl()}/comments?item=${encodeURIComponent(itemId)}&id=${encodeURIComponent(commentId)}`, { method: 'DELETE' });
-  await checkedJson<{ ok: boolean }>(resp);
-}
-
 export async function fetchAnalysis(): Promise<Analysis | null> {
   const resp = await fetch(`${baseUrl()}/analysis`);
   const data = await checkedJson<{ analysis?: Analysis | null }>(resp);
@@ -138,27 +132,11 @@ export async function fetchUserState(): Promise<UserState> {
   return checkedJson<UserState>(resp);
 }
 
-export async function putUserComment(key: string, text: string | null): Promise<void> {
-  await fetch(`${baseUrl()}/user-state/comment`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, text }),
-  });
-}
-
 export async function putUserReviewed(path: string): Promise<void> {
   await fetch(`${baseUrl()}/user-state/reviewed`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path }),
-  });
-}
-
-export async function putUserResolved(key: string): Promise<void> {
-  await fetch(`${baseUrl()}/user-state/resolved`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key }),
   });
 }
 
@@ -170,6 +148,3 @@ export async function putUserSidebarView(view: string): Promise<void> {
   });
 }
 
-export async function clearUserState(): Promise<void> {
-  await fetch(`${baseUrl()}/user-state/clear`, { method: 'POST' });
-}
