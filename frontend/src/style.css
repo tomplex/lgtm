@@ -1552,7 +1552,7 @@ tr.expand-row:hover td {
 }
 
 .peek-panel {
-  margin: 4px 12px 4px 0;
+  margin: 4px 12px 4px 5px;
   max-width: 75%;
   border: 1px solid var(--border);
   border-radius: 6px;
