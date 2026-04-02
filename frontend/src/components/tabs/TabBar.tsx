@@ -1,4 +1,5 @@
 import { For, Show, createSignal } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { sessionItems, activeItemId, comments } from '../../state';
 import type { Comment } from '../../comment-types';
 import FilePicker from './FilePicker';
@@ -10,6 +11,7 @@ interface Props {
 
 export default function TabBar(props: Props) {
   const [showPicker, setShowPicker] = createSignal(false);
+  const [pickerPos, setPickerPos] = createSignal({ top: 0, left: 0 });
 
   function badgeCounts(itemId: string) {
     const itemComments = comments.list.filter((c: Comment) => c.item === itemId);
@@ -55,14 +57,22 @@ export default function TabBar(props: Props) {
         class="tab-item tab-add"
         onClick={(e) => {
           e.stopPropagation();
+          if (!showPicker()) {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setPickerPos({ top: rect.bottom + 4, left: rect.left });
+          }
           setShowPicker(!showPicker());
         }}
       >
         +
-        <Show when={showPicker()}>
-          <FilePicker onClose={() => setShowPicker(false)} onSelect={() => setShowPicker(false)} />
-        </Show>
       </div>
+      <Show when={showPicker()}>
+        <Portal>
+          <div style={{ position: 'fixed', top: `${pickerPos().top}px`, left: `${pickerPos().left}px`, 'z-index': '10000' }}>
+            <FilePicker onClose={() => setShowPicker(false)} onSelect={() => setShowPicker(false)} />
+          </div>
+        </Portal>
+      </Show>
     </div>
   );
 }
