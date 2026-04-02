@@ -1,11 +1,12 @@
 import { createSignal, Show, For } from 'solid-js';
 import { escapeHtml, highlightLine } from '../../utils';
-import { comments, addLocalComment, updateLocalComment } from '../../state';
+import { comments, addLocalComment, updateLocalComment, peekState, setPeekState } from '../../state';
 import { createComment as apiCreateComment } from '../../comment-api';
 import type { Comment } from '../../comment-types';
 import type { DiffLine as DiffLineType } from '../../state';
 import CommentRow from '../comments/CommentRow';
 import CommentTextarea from '../comments/CommentTextarea';
+import PeekPanel from './PeekPanel';
 
 interface Props {
   line: DiffLineType;
@@ -49,13 +50,49 @@ export default function DiffLine(props: Props) {
         c.status !== 'dismissed',
     );
 
+  function getWordAtClick(e: MouseEvent): string | null {
+    const sel = document.caretPositionFromPoint?.(e.clientX, e.clientY)
+      ?? (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (!sel) return null;
+
+    const node = 'offsetNode' in sel ? sel.offsetNode : sel.startContainer;
+    const offset = 'offset' in sel ? sel.offset : sel.startOffset;
+    if (node.nodeType !== Node.TEXT_NODE) return null;
+
+    const text = node.textContent ?? '';
+    let start = offset;
+    let end = offset;
+    while (start > 0 && /[\w]/.test(text[start - 1])) start--;
+    while (end < text.length && /[\w]/.test(text[end])) end++;
+
+    const word = text.slice(start, end);
+    if (word.length < 2 || !/^[a-zA-Z_]/.test(word)) return null;
+    return word;
+  }
+
   function handleLineClick(e: MouseEvent) {
     if ((e.target as HTMLElement).closest('.comment-box') || (e.target as HTMLElement).closest('.claude-comment'))
       return;
+    if ((e.target as HTMLElement).closest('.peek-panel')) return;
+
+    // Cmd+click: symbol lookup
+    if (e.metaKey || e.ctrlKey) {
+      const word = getWordAtClick(e);
+      if (word) {
+        setPeekState({ filePath: props.filePath, lineIdx: props.lineIdx, symbol: word });
+      }
+      return;
+    }
+
     const existingUserComment = lineComments().find((c) => c.author === 'user' && c.mode === 'review');
     if (existingUserComment) return;
     setShowNewComment(true);
   }
+
+  const showPeek = () => {
+    const p = peekState();
+    return p && p.filePath === props.filePath && p.lineIdx === props.lineIdx;
+  };
 
   async function handleSaveNew(text: string) {
     const tempId = `temp-${Date.now()}`;
@@ -133,6 +170,10 @@ export default function DiffLine(props: Props) {
           <span innerHTML={codeHtml()} />
         </td>
       </tr>
+
+      <Show when={showPeek()}>
+        <PeekPanel />
+      </Show>
 
       <For each={lineComments()}>
         {(comment) => (

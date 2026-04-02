@@ -1429,3 +1429,115 @@ tr.expand-row:hover td {
   border-radius: 2px;
   transition: width 0.3s;
 }
+
+/* --- Peek Definition Panel --- */
+
+.peek-row td {
+  padding: 0 !important;
+}
+
+.peek-panel {
+  margin: 4px 12px 4px 60px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+  outline: none;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.peek-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.peek-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.peek-close:hover {
+  color: var(--del-text);
+}
+
+.peek-symbol {
+  color: var(--text);
+}
+
+.peek-location {
+  color: var(--accent);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+}
+
+.peek-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.peek-tab {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.peek-tab:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.peek-tab.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.peek-docstring {
+  padding: 8px 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.peek-body {
+  margin: 0;
+  padding: 8px 12px;
+  overflow: auto;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 20px;
+  flex: 1;
+  min-height: 0;
+}
+.peek-body code {
+  background: none;
+}
+
+.peek-footer {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.line-content:hover {
+  cursor: default;
+}
