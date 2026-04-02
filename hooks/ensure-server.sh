@@ -3,3 +3,5 @@
 # During development, npm run dev:all occupies the port — this is a no-op.
 lsof -ti:9900 >/dev/null 2>&1 && exit 0
 nohup node "${CLAUDE_PLUGIN_ROOT}/dist/server/server.js" --port 9900 >/dev/null 2>&1 &
+sleep 1
+lsof -ti:9900 >/dev/null 2>&1 || echo "Warning: LGTM server failed to start on port 9900" >&2

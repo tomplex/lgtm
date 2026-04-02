@@ -3,18 +3,21 @@
 ## Bugs
 - [x] j/k shortcuts use flat file order, not current view order (phased/grouped)
 - [x] Description banner persists over docs and after review submission
+- [x] Replying to or deleting a comment resets the diff viewer to the first file (fixed by Solid migration — reactive state, no full re-renders)
+- [x] Claude comment line matching wrong (diff array indices vs file line numbers) — fixed: all comments now use absolute line numbers
 
 ## UI polish
 - [x] Page title and top bar should show repo/project name prominently, plus branch vs base
 - [ ] Too many horizontal bands at top (header, tabs, meta, commits, description) - consolidate; meta bar could fold into header or be on-demand
 - [ ] Grouped view group headers are too dense
 - [ ] Phased review groups should be collapsible, auto-collapse when all items reviewed
+- [ ] Flat file view: sort files with Claude comments to the top
 - [ ] Button to dismiss/hide files in the sidebar
 
 ## Commenting
 - [x] Markdown rendering in comments (both user and Claude)
 - [ ] Line range commenting (select multiple lines, one comment)
-- [ ] Whole-file comments (not tied to a specific line)
+- [x] Comments in whole-file view (shared DiffLine component via Solid migration)
 - [x] Multi-round reply/resolve stability — reply keys use `claude:<item>:<serverIndex>` which shifts when Claude adds new comments between rounds. Needs stable IDs (UUID per comment, server-side).
 
 ## Diff & commits

@@ -4,53 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Code Review</title>
-  <script type="module" crossorigin src="/assets/index-BZxMwUoJ.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-Bw35aRZX.css">
+  <script type="module" crossorigin src="/assets/index-Cz8SnYjL.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-5pBbElj9.css">
 </head>
 <body>
-<header>
-  <h1>Code Review</h1>
-  <div class="stats" id="stats"></div>
-  <div class="header-actions">
-    <div class="commit-toggle" id="commit-toggle-wrap" style="display:none">
-      <button class="header-btn" id="commit-toggle-btn">Commits</button>
-    </div>
-    <button class="header-btn" id="refresh-btn">Refresh</button>
-    <button id="submit-btn">Submit Review</button>
-  </div>
-</header>
-<div class="tab-bar" id="tab-bar"></div>
-<div class="commit-panel" id="commit-panel"></div>
-<div class="description-banner" id="description-banner" style="display:none"></div>
-<div class="overview-banner" id="overview-banner" style="display:none">
-  <div class="overview-content">
-    <div class="overview-text" id="overview-text"></div>
-    <div class="overview-strategy" id="overview-strategy"></div>
-  </div>
-  <button class="overview-toggle" id="overview-toggle" title="Toggle overview">&#9650;</button>
-</div>
-<div class="main">
-  <div class="sidebar">
-    <div class="sidebar-controls">
-      <div class="view-toggle" id="view-toggle" style="display:none">
-        <button class="view-btn active" data-view="flat">Flat</button>
-        <button class="view-btn" data-view="grouped">Grouped</button>
-        <button class="view-btn" data-view="phased">Phased</button>
-      </div>
-      <div class="sidebar-search">
-        <input type="text" id="file-search" placeholder="Filter files... (f)" autocomplete="off">
-      </div>
-    </div>
-    <div class="file-list" id="file-list"></div>
-  </div>
-  <div class="resize-handle" id="resize-handle"></div>
-  <div class="diff-container" id="diff-container">
-    <div class="empty-state">Loading diff...</div>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
-<div class="keyboard-hint">
-  Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot; <kbd>n</kbd>/<kbd>p</kbd> next/prev comment
-</div>
+  <div id="root"></div>
 </body>
 </html>
