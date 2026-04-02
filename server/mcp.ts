@@ -9,11 +9,12 @@ import { parseFileAnalysis, parseSynthesis } from './parse-analysis.js';
 
 type McpTextResult = { content: [{ type: 'text'; text: string }] };
 
-function requireProject(manager: SessionManager, repoPath: string): { found: ReturnType<SessionManager['findByRepoPath']> & object } | { error: McpTextResult } {
+function requireProject(manager: SessionManager, repoPath: string, mcpServer?: McpServer): { found: ReturnType<SessionManager['findByRepoPath']> & object } | { error: McpTextResult } {
   const found = manager.findByRepoPath(repoPath);
   if (!found) {
     return { error: { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call start first.' }) }] } };
   }
+  if (mcpServer) associateMcpSession(mcpServer, found.slug);
   return { found };
 }
 
@@ -33,6 +34,7 @@ function createMcpServer(manager: SessionManager): McpServer {
     },
     async ({ repoPath, description, baseBranch }) => {
       const result = manager.register(repoPath, { description, baseBranch });
+      associateMcpSession(server, result.slug);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
@@ -48,7 +50,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       title: z.string().optional().describe('Tab title (defaults to filename)'),
     },
     async ({ repoPath, path, title }) => {
-      const lookup = requireProject(manager, repoPath);
+      const lookup = requireProject(manager, repoPath, server);
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
       const itemTitle = title || path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Untitled';
@@ -73,7 +75,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       })).describe('Array of comments to add'),
     },
     async ({ repoPath, item, comments }) => {
-      const lookup = requireProject(manager, repoPath);
+      const lookup = requireProject(manager, repoPath, server);
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
       const itemId = item ?? 'diff';
@@ -90,7 +92,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const lookup = requireProject(manager, repoPath);
+      const lookup = requireProject(manager, repoPath, server);
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
       let feedback = '';
@@ -110,7 +112,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const lookup = requireProject(manager, repoPath);
+      const lookup = requireProject(manager, repoPath, server);
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
       manager.deregister(found.slug);
@@ -127,7 +129,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       text: z.string().describe('The reply text'),
     },
     async ({ repoPath, commentId, text }) => {
-      const lookup = requireProject(manager, repoPath);
+      const lookup = requireProject(manager, repoPath, server);
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
       const parent = found.session.getComment(commentId);
@@ -157,7 +159,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       synthesisPath: z.string().describe('Absolute path to the synthesis agent markdown output'),
     },
     async ({ repoPath, fileAnalysisPath, synthesisPath }) => {
-      const lookup = requireProject(manager, repoPath);
+      const lookup = requireProject(manager, repoPath, server);
       if ('error' in lookup) return lookup.error;
       const { found } = lookup;
 
@@ -193,10 +195,23 @@ function createMcpServer(manager: SessionManager): McpServer {
   return server;
 }
 
-const activeMcpSessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
+const activeMcpSessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport; projectSlug?: string }>();
+
+// Associate an MCP server instance with a project slug (called when tools use repoPath)
+export function associateMcpSession(server: McpServer, slug: string): void {
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.server === server) {
+      entry.projectSlug = slug;
+      return;
+    }
+  }
+}
 
 export function notifyChannel(content: string, meta: Record<string, string>): void {
-  for (const { server } of activeMcpSessions.values()) {
+  const targetProject = meta.project;
+  for (const { server, projectSlug } of activeMcpSessions.values()) {
+    // If we know which project this session is working on, only notify matching ones
+    if (targetProject && projectSlug && projectSlug !== targetProject) continue;
     server.server.notification({
       method: 'notifications/claude/channel',
       params: { content, meta },
