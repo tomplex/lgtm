@@ -210,8 +210,8 @@ export function associateMcpSession(server: McpServer, slug: string): void {
 export function notifyChannel(content: string, meta: Record<string, string>): void {
   const targetProject = meta.project;
   for (const { server, projectSlug } of activeMcpSessions.values()) {
-    // If we know which project this session is working on, only notify matching ones
-    if (targetProject && projectSlug && projectSlug !== targetProject) continue;
+    // Only notify sessions associated with the target project
+    if (!projectSlug || projectSlug !== targetProject) continue;
     server.server.notification({
       method: 'notifications/claude/channel',
       params: { content, meta },
