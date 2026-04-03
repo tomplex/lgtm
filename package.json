@@ -9,7 +9,7 @@
     "build:frontend": "tsc -p frontend/tsconfig.json && vite build",
     "build": "npm run build:server && npm run build:frontend",
     "dev": "tsx watch server/server.ts",
-    "dev:frontend": "vite",
+    "dev:frontend": "vite --force",
     "dev:all": "concurrently -n server,frontend -c blue,green \"npm run dev -- --repo . --port 9900\" \"REVIEW_PORT=9900 npm run dev:frontend\"",
     "start": "node dist/server/server.js",
     "test": "npm run test:frontend && npm run test:server",
