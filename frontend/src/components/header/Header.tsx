@@ -16,6 +16,7 @@ export default function Header(props: Props) {
   const meta = repoMeta;
   const [dropdownOpen, setDropdownOpen] = createSignal(false);
   const [submitTarget, setSubmitTarget] = createSignal<SubmitTarget>('claude');
+  const [githubEvent, setGithubEvent] = createSignal<GithubEvent>('COMMENT');
 
   const canSubmitGithub = createMemo(() => !!meta().pr && activeItemId() === 'diff');
 
@@ -30,17 +31,20 @@ export default function Header(props: Props) {
 
   function handleSubmitClick() {
     if (submitTarget() === 'github') {
-      setDropdownOpen(false);
-      props.onSubmitGithub('COMMENT');
+      props.onSubmitGithub(githubEvent());
     } else {
       props.onSubmit();
     }
   }
 
-  function handleGithubEvent(event: GithubEvent) {
-    setDropdownOpen(false);
-    props.onSubmitGithub(event);
-  }
+  const githubLabel = () => {
+    const labels: Record<GithubEvent, string> = {
+      'COMMENT': 'Comment on GitHub',
+      'APPROVE': 'Approve on GitHub',
+      'REQUEST_CHANGES': 'Request Changes on GitHub',
+    };
+    return labels[githubEvent()];
+  };
 
   return (
     <header>
@@ -85,7 +89,7 @@ export default function Header(props: Props) {
         </button>
         <div class="submit-group">
           <button id="submit-btn" onClick={handleSubmitClick}>
-            {submitTarget() === 'github' ? 'Submit to GitHub' : 'Submit Review'}
+            {submitTarget() === 'github' ? githubLabel() : 'Submit Review'}
           </button>
           <button
             class="submit-dropdown-toggle"
@@ -113,10 +117,25 @@ export default function Header(props: Props) {
                 </button>
                 <Show when={submitTarget() === 'github'}>
                   <div class="submit-dropdown-divider" />
-                  <button class="submit-dropdown-item" onClick={() => handleGithubEvent('APPROVE')}>
+                  <button
+                    class="submit-dropdown-item"
+                    classList={{ active: githubEvent() === 'COMMENT' }}
+                    onClick={() => { setGithubEvent('COMMENT'); setDropdownOpen(false); }}
+                  >
+                    Comment
+                  </button>
+                  <button
+                    class="submit-dropdown-item"
+                    classList={{ active: githubEvent() === 'APPROVE' }}
+                    onClick={() => { setGithubEvent('APPROVE'); setDropdownOpen(false); }}
+                  >
                     Approve
                   </button>
-                  <button class="submit-dropdown-item" onClick={() => handleGithubEvent('REQUEST_CHANGES')}>
+                  <button
+                    class="submit-dropdown-item"
+                    classList={{ active: githubEvent() === 'REQUEST_CHANGES' }}
+                    onClick={() => { setGithubEvent('REQUEST_CHANGES'); setDropdownOpen(false); }}
+                  >
                     Request Changes
                   </button>
                 </Show>
