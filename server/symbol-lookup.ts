@@ -11,15 +11,20 @@ export interface SymbolResult {
 
 const MAX_RESULTS = 10;
 
-function buildPatterns(symbol: string): string[] {
+interface PatternGroup {
+  pattern: string;
+  globs: string[];
+}
+
+function buildPatterns(symbol: string): PatternGroup[] {
   const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return [
     // Python: def or class
-    `^\\s*(def|class)\\s+${escaped}\\b`,
-    // TypeScript: export? function/class/interface/type/const/let
-    `^\\s*(export\\s+)?(function|class|interface|type|const|let)\\s+${escaped}\\b`,
-    // Arrow functions: symbol = ( or symbol = (
-    `^\\s*(export\\s+const\\s+)?${escaped}\\s*[=(]`,
+    { pattern: `^\\s*(def|class)\\s+${escaped}\\b`, globs: ['*.py'] },
+    // TypeScript/JS: export? function/class/interface/type/const/let
+    { pattern: `^\\s*(export\\s+)?(function|class|interface|type|const|let)\\s+${escaped}\\b`, globs: ['*.ts', '*.tsx', '*.js', '*.jsx'] },
+    // Arrow functions (TS/JS only): const foo = (...) => or foo = function
+    { pattern: `^\\s*(export\\s+)?(const|let|var)\\s+${escaped}\\s*=`, globs: ['*.ts', '*.tsx', '*.js', '*.jsx'] },
   ];
 }
 
@@ -46,17 +51,18 @@ function fileTypePriority(file: string): number {
 }
 
 function runRipgrep(repoPath: string, symbol: string): RgMatch[] {
-  const patterns = buildPatterns(symbol);
+  const patternGroups = buildPatterns(symbol);
   const matches: RgMatch[] = [];
   const seen = new Set<string>();
 
-  const globArgs = EXCLUDED_DIRS.flatMap(d => ['--glob', `!${d}/`]);
+  const excludeArgs = EXCLUDED_DIRS.flatMap(d => ['--glob', `!${d}/`]);
 
-  for (const pattern of patterns) {
+  for (const { pattern, globs } of patternGroups) {
+    const includeArgs = globs.flatMap(g => ['--glob', g]);
     let output: string;
     try {
       output = execSync(
-        `rg --json -n ${globArgs.map(a => JSON.stringify(a)).join(' ')} -e ${JSON.stringify(pattern)} -- .`,
+        `rg --json -n ${[...excludeArgs, ...includeArgs].map(a => JSON.stringify(a)).join(' ')} -e ${JSON.stringify(pattern)} -- .`,
         { cwd: repoPath, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
       );
     } catch (err: unknown) {
