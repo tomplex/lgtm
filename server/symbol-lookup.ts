@@ -19,10 +19,10 @@ interface PatternGroup {
 function buildPatterns(symbol: string): PatternGroup[] {
   const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return [
-    // Python: def or class
-    { pattern: `^\\s*(def|class)\\s+${escaped}\\b`, globs: ['*.py'] },
-    // TypeScript/JS: export? function/class/interface/type/const/let
-    { pattern: `^\\s*(export\\s+)?(function|class|interface|type|const|let)\\s+${escaped}\\b`, globs: ['*.ts', '*.tsx', '*.js', '*.jsx'] },
+    // Python: async? def or class
+    { pattern: `^\\s*(async\\s+)?(def|class)\\s+${escaped}\\b`, globs: ['*.py'] },
+    // TypeScript/JS: export? async? function/class/interface/type/const/let
+    { pattern: `^\\s*(export\\s+)?(async\\s+)?(function|class|interface|type|const|let)\\s+${escaped}\\b`, globs: ['*.ts', '*.tsx', '*.js', '*.jsx'] },
     // Arrow functions (TS/JS only): const foo = (...) => or foo = function
     { pattern: `^\\s*(export\\s+)?(const|let|var)\\s+${escaped}\\s*=`, globs: ['*.ts', '*.tsx', '*.js', '*.jsx'] },
   ];
