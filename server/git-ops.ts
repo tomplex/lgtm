@@ -11,7 +11,25 @@ export function gitRun(repoPath: string, ...args: string[]): string {
 }
 
 export function detectBaseBranch(repoPath: string): string {
-  for (const candidate of ['master', 'main']) {
+  // Try the PR's actual base branch first (handles stacked PRs correctly)
+  try {
+    const base = execFileSync('gh', ['pr', 'view', '--json', 'baseRefName', '-q', '.baseRefName'], {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    if (base) {
+      // Fetch the base branch so we have origin/<base> available
+      try { gitRun(repoPath, 'fetch', 'origin', base); } catch { /* best effort */ }
+      return `origin/${base}`;
+    }
+  } catch {
+    // gh not installed or no open PR — fall back
+  }
+
+  // Fall back to main/master if they exist locally
+  for (const candidate of ['main', 'master']) {
     try {
       gitRun(repoPath, 'rev-parse', '--verify', candidate);
       return candidate;
@@ -19,7 +37,9 @@ export function detectBaseBranch(repoPath: string): string {
       continue;
     }
   }
-  return 'main';
+
+  // Last resort: use HEAD (e.g. detached head, no main/master)
+  return 'HEAD';
 }
 
 // Intentionally includes working-tree and staged changes alongside committed
@@ -100,12 +120,18 @@ export function getBranchCommits(repoPath: string, baseBranch: string): Commit[]
   return commits;
 }
 
+export function parseOwnerRepo(url: string): { owner: string; repo: string } | undefined {
+  const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+  if (!match) return undefined;
+  return { owner: match[1], repo: match[2] };
+}
+
 export interface RepoMeta {
   branch: string;
   baseBranch: string;
   repoPath: string;
   repoName: string;
-  pr?: { url: string; number: number; title: string };
+  pr?: { url: string; number: number; title: string; owner: string; repo: string };
 }
 
 export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
@@ -124,7 +150,11 @@ export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    meta.pr = JSON.parse(result);
+    const pr = JSON.parse(result);
+    const ownerRepo = parseOwnerRepo(pr.url);
+    if (ownerRepo) {
+      meta.pr = { ...pr, ...ownerRepo };
+    }
   } catch {
     // gh not installed or no PR
   }

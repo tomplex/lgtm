@@ -8,6 +8,7 @@ import {
   getBranchCommits,
   getRepoMeta,
   getFileLines,
+  parseOwnerRepo,
 } from '../git-ops.js';
 
 describe('git-ops', () => {
@@ -112,5 +113,20 @@ describe('git-ops', () => {
       const lines = getFileLines(fixture.repoPath, 'nonexistent.ts', 0, 5);
       expect(lines).toEqual([]);
     });
+  });
+});
+
+describe('parseOwnerRepo', () => {
+  it('parses owner and repo from GitHub PR URL', () => {
+    const result = parseOwnerRepo('https://github.com/tomplex/lgtm/pull/42');
+    expect(result).toEqual({ owner: 'tomplex', repo: 'lgtm' });
+  });
+
+  it('returns undefined for non-GitHub URLs', () => {
+    expect(parseOwnerRepo('https://gitlab.com/foo/bar/merge_requests/1')).toBeUndefined();
+  });
+
+  it('returns undefined for malformed URLs', () => {
+    expect(parseOwnerRepo('not-a-url')).toBeUndefined();
   });
 });

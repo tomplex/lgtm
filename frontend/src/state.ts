@@ -30,7 +30,7 @@ export interface RepoMeta {
   baseBranch?: string;
   repoPath?: string;
   repoName?: string;
-  pr?: { url: string; number: number; title: string };
+  pr?: { url: string; number: number; title: string; owner: string; repo: string };
 }
 
 export interface MdMeta {
