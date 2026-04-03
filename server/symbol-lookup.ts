@@ -127,17 +127,26 @@ function isPython(file: string): boolean {
 }
 
 function extractPythonBody(lines: string[], startIndex: number): string {
-  // startIndex is 0-based index into lines array
   const defLine = lines[startIndex];
-  // Determine the indentation of the def/class line itself
   const defIndentMatch = defLine.match(/^(\s*)/);
   const defIndent = defIndentMatch ? defIndentMatch[1].length : 0;
 
   const bodyLines = [defLine];
   let i = startIndex + 1;
+
+  // Phase 1: if the def line doesn't end with ':', it's a multi-line signature.
+  // Consume lines until we find the closing '):' or just ':'
+  if (!defLine.trimEnd().endsWith(':')) {
+    while (i < lines.length) {
+      bodyLines.push(lines[i]);
+      if (lines[i].trimEnd().endsWith(':')) { i++; break; }
+      i++;
+    }
+  }
+
+  // Phase 2: collect the body — everything indented deeper than the def line
   while (i < lines.length) {
     const line = lines[i];
-    // Skip blank lines — they're part of the body
     if (line.trim() === '') {
       bodyLines.push(line);
       i++;
@@ -145,18 +154,11 @@ function extractPythonBody(lines: string[], startIndex: number): string {
     }
     const lineIndentMatch = line.match(/^(\s*)/);
     const lineIndent = lineIndentMatch ? lineIndentMatch[1].length : 0;
-    if (lineIndent <= defIndent) {
-      // Back to same or lesser indentation — body ends
-      // Trim trailing blank lines
-      while (bodyLines.length > 1 && bodyLines[bodyLines.length - 1].trim() === '') {
-        bodyLines.pop();
-      }
-      break;
-    }
+    if (lineIndent <= defIndent) break;
     bodyLines.push(line);
     i++;
   }
-  // Trim trailing blank lines at end of file
+  // Trim trailing blank lines
   while (bodyLines.length > 1 && bodyLines[bodyLines.length - 1].trim() === '') {
     bodyLines.pop();
   }
