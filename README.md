@@ -9,7 +9,7 @@ A browser-based code review UI for collaborating with Claude Code. Claude regist
 The simplest way to use LGTM is as a Claude Code plugin. This gives you the `/lgtm` command, auto-starts the server, and connects MCP tools automatically.
 
 ```bash
-claude plugin add /path/to/claude-review
+claude plugin add tomplex/lgtm
 ```
 
 Once installed, the server starts automatically when you open a Claude Code session (via a SessionStart hook). No manual MCP configuration needed - the plugin bundles its own `.mcp.json`. Just type `/lgtm` or ask Claude to review your changes.
@@ -19,7 +19,7 @@ Once installed, the server starts automatically when you open a Claude Code sess
 For submitted reviews and direct questions to push back to Claude immediately (rather than requiring Claude to poll with `read_feedback`), start Claude Code with the development channels flag:
 
 ```bash
-claude --dangerously-load-development-channels plugin:lgtm@local
+claude --dangerously-load-development-channels plugin:lgtm@tomplex-lgtm
 ```
 
 Without this flag, everything still works - Claude just needs to call `read_feedback` to see your review comments.
@@ -37,13 +37,7 @@ Without this flag, everything still works - Claude just needs to call `read_feed
 - [Node.js](https://nodejs.org/) 20+
 - Claude Code CLI
 
-The plugin needs to be built before first use:
-
-```bash
-cd /path/to/claude-review
-npm install
-npm run build
-```
+Dependencies are installed automatically on first session start. No manual build step needed.
 
 ## How it works
 
