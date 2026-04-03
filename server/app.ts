@@ -1,8 +1,9 @@
 import express, { type Request, type Response, type NextFunction, Router } from 'express';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getFileLines, getBranchCommits, gitRun } from './git-ops.js';
+import { getFileLines, getBranchCommits, gitRun, getRepoMeta } from './git-ops.js';
 import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
@@ -296,6 +297,73 @@ export function createApp(manager: SessionManager): express.Express {
     notifyChannel(commentsText, meta);
 
     res.json({ ok: true, round: currentRound });
+  });
+
+  projectRouter.post('/submit-github', (req, res) => {
+    const session = res.locals.session;
+    const meta = getRepoMeta(session.repoPath, session.baseBranch);
+
+    if (!meta.pr) {
+      res.status(400).json({ error: 'No PR detected for this project' });
+      return;
+    }
+
+    const { event = 'COMMENT', body = '' } = req.body;
+    if (!['COMMENT', 'APPROVE', 'REQUEST_CHANGES'].includes(event)) {
+      res.status(400).json({ error: 'event must be COMMENT, APPROVE, or REQUEST_CHANGES' });
+      return;
+    }
+
+    // Collect active diff review comments (top-level only)
+    const topComments = session.listComments({
+      item: 'diff',
+      author: 'user',
+      mode: 'review',
+      status: 'active',
+    }).filter(c => !c.parentId && c.file && c.line != null);
+
+    // Flatten reply threads into parent comment body
+    const allComments = session.listComments({ item: 'diff' });
+    const ghComments = topComments.map(c => {
+      const replies = allComments
+        .filter(r => r.parentId === c.id)
+        .map(r => r.text);
+      const fullText = replies.length > 0
+        ? c.text + '\n\n' + replies.join('\n\n')
+        : c.text;
+      return {
+        path: c.file!,
+        line: c.line!,
+        side: c.side ?? 'RIGHT',
+        body: fullText,
+      };
+    });
+
+    const payload = JSON.stringify({
+      event,
+      body: body || 'Review submitted via LGTM',
+      comments: ghComments,
+    });
+
+    try {
+      const result = execFileSync('gh', [
+        'api',
+        `repos/${meta.pr.owner}/${meta.pr.repo}/pulls/${meta.pr.number}/reviews`,
+        '--method', 'POST',
+        '--input', '-',
+      ], {
+        cwd: session.repoPath,
+        encoding: 'utf-8',
+        input: payload,
+        timeout: 15000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const review = JSON.parse(result);
+      res.json({ ok: true, reviewUrl: review.html_url });
+    } catch (e: any) {
+      const msg = e.stderr?.trim() || e.message || 'GitHub API call failed';
+      res.status(502).json({ error: msg });
+    }
   });
 
   projectRouter.post('/analysis', (req, res) => {

@@ -201,6 +201,16 @@ describe('routes', () => {
     });
   });
 
+  describe('submit to GitHub', () => {
+    it('POST /project/:slug/submit-github returns 400 when no PR detected', async () => {
+      const res = await request(app)
+        .post(`/project/${slug}/submit-github`)
+        .send({ event: 'COMMENT' })
+        .expect(400);
+      expect(res.body.error).toContain('No PR detected');
+    });
+  });
+
   describe('error handling', () => {
     it('returns 404 for unknown project slug', async () => {
       await request(app)
