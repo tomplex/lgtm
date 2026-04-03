@@ -39,6 +39,7 @@ export default function DiffLine(props: Props) {
 
   // Use the absolute line number (newLine for adds/context, oldLine for deletes)
   const absLine = () => props.line.newLine ?? props.line.oldLine;
+  const absSide = (): 'RIGHT' | 'LEFT' => props.line.newLine != null ? 'RIGHT' : 'LEFT';
 
   const lineComments = () =>
     comments.list.filter(
@@ -105,6 +106,7 @@ export default function DiffLine(props: Props) {
       item: 'diff',
       file: props.filePath,
       line: lineNum ?? undefined,
+      side: absSide(),
       mode: 'review',
     };
     addLocalComment(localComment);
@@ -116,6 +118,7 @@ export default function DiffLine(props: Props) {
         item: 'diff',
         file: props.filePath,
         line: lineNum ?? undefined,
+        side: absSide(),
         mode: 'review',
       });
       updateLocalComment(tempId, { id: created.id });
@@ -135,6 +138,7 @@ export default function DiffLine(props: Props) {
       item: 'diff',
       file: props.filePath,
       line: lineNum ?? undefined,
+      side: absSide(),
       mode: 'direct',
     };
     addLocalComment(localComment);
@@ -146,6 +150,7 @@ export default function DiffLine(props: Props) {
         item: 'diff',
         file: props.filePath,
         line: lineNum ?? undefined,
+        side: absSide(),
         mode: 'direct',
       });
       updateLocalComment(tempId, { id: created.id });

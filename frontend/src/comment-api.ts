@@ -28,6 +28,7 @@ export async function createComment(input: {
   item: string;
   file?: string;
   line?: number;
+  side?: 'RIGHT' | 'LEFT';
   block?: number;
   parentId?: string;
   mode?: 'review' | 'direct';

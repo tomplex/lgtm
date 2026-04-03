@@ -226,12 +226,12 @@ export function createApp(manager: SessionManager): express.Express {
 
   projectRouter.post('/comments', (req, res) => {
     const session = res.locals.session;
-    const { author, text, item, file, line, block, parentId, mode } = req.body;
+    const { author, text, item, file, line, side, block, parentId, mode } = req.body;
     if (!author || !text || !item) {
       res.status(400).json({ error: 'author, text, and item are required' });
       return;
     }
-    const comment = session.addComment({ author, text, item, file, line, block, parentId, mode });
+    const comment = session.addComment({ author, text, item, file, line, side, block, parentId, mode });
     session.broadcast('comments_changed', { item, comment });
 
     // Push direct questions to Claude via channel notification
