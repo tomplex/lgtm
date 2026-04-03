@@ -7,6 +7,7 @@ export interface Comment {
   item: string;
   file?: string;
   line?: number;
+  side?: 'RIGHT' | 'LEFT';
   block?: number;
   mode?: 'review' | 'direct';
 }
