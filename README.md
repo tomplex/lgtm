@@ -122,6 +122,18 @@ hooks/                 -- SessionStart hook to auto-start server
 
 **Persistence** - sessions stored in SQLite. Comment history, file review state, and analysis data survive restarts.
 
+## How it compares
+
+There are a lot of AI code review tools. Most of them solve a different problem than LGTM does.
+
+**PR comment bots** (CodeRabbit, Qodo/PR-Agent, GitHub Copilot Code Review, Cursor BugBot, Greptile, Sourcery, etc.) auto-review pull requests and post comments. The feedback flows one direction - AI comments on your code, you accept or dismiss. Some support replying to the bot in PR comments, but none feed structured feedback back to an agent in a live coding session. They're useful, but they're reviewing *after* the work is done, not *during* it.
+
+**AI coding agents** (Cursor, Cline, Aider, Windsurf) have approval workflows, but they're pre-execution gates - "should I make this change?" - not post-execution review. You approve or reject individual diffs in the IDE. There's no way to look at everything the agent did, leave inline comments across files, prioritize what matters, and send it all back as structured feedback.
+
+**[Diffity](https://github.com/kamranahmedse/diffity)** is the closest thing to LGTM. It's an open-source browser-based diff viewer for reviewing AI agent work locally. You leave inline comments with severity tags, then run a command to have your agent resolve them. The main differences: Diffity is agent-agnostic (no MCP integration with the agent session), the human initiates review (vs LGTM where Claude seeds comments first), and there's no file prioritization or analysis layer.
+
+LGTM's specific niche is the iterative loop: Claude posts inline comments on the diff before you even start reading, you review and respond in the browser, Claude reads your structured feedback and acts on it in the same session, you refresh and go again. The file analysis layer (priority ranking, review phases, thematic groupings) helps you focus on what matters in large diffs. As far as I can tell, nothing else combines a browser review UI, bidirectional feedback with a live agent session, and file prioritization.
+
 ## Development
 
 ```bash
