@@ -132,7 +132,13 @@ There are a lot of AI code review tools. Most of them solve a different problem 
 
 **[Diffity](https://github.com/kamranahmedse/diffity)** is the closest thing to LGTM. It's an open-source browser-based diff viewer for reviewing AI agent work locally. You leave inline comments with severity tags, then run a command to have your agent resolve them. The main differences: Diffity is agent-agnostic (no MCP integration with the agent session), the human initiates review (vs LGTM where Claude seeds comments first), and there's no file prioritization or analysis layer.
 
-LGTM's specific niche is the iterative loop: Claude posts inline comments on the diff before you even start reading, you review and respond in the browser, Claude reads your structured feedback and acts on it in the same session, you refresh and go again. The file analysis layer (priority ranking, review phases, thematic groupings) helps you focus on what matters in large diffs. As far as I can tell, nothing else combines a browser review UI, bidirectional feedback with a live agent session, and file prioritization.
+LGTM's specific niche is the iterative loop: Claude posts inline comments on the diff before you even start reading, you review and respond in the browser, Claude reads your structured feedback and acts on it in the same session, you refresh and go again.
+
+The review UI itself is more full-featured than most diff viewers in this space. Syntax-highlighted diffs with word-level change detection, context expansion, whole-file view, commit picker for multi-commit branches, Cmd+click peek-definition (resolves identifiers to their definitions via ripgrep heuristics), threaded inline comments with replies, and rendered markdown document tabs for specs or design docs that Claude can attach alongside the diff. SSE keeps everything live - comments and items update in real time as Claude works.
+
+The analysis layer is where it gets opinionated. Claude classifies every file in the diff by priority (critical / important / normal / low) and review phase (review / skim / rubber-stamp), groups files thematically, and writes a review strategy overview. The sidebar switches between flat, grouped and phased views based on this analysis, so you can work through a large diff in order of importance rather than alphabetically. For a 40-file branch, the difference between "here are 40 files" and "here are the 6 files that matter, skim these 12, rubber-stamp the rest" is significant.
+
+As far as I can tell, nothing else combines a browser review UI, bidirectional feedback with a live agent session, and guided review prioritization.
 
 ## Development
 
