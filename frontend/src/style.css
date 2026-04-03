@@ -115,12 +115,16 @@ header .stats {
   border-color: var(--accent);
 }
 
+.submit-group {
+  display: flex;
+  position: relative;
+}
 #submit-btn {
   padding: 8px 20px;
   background: #238636;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 6px 0 0 6px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -132,6 +136,56 @@ header .stats {
 #submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.submit-dropdown-toggle {
+  padding: 8px 10px;
+  background: #238636;
+  color: white;
+  border: none;
+  border-left: 1px solid rgba(255,255,255,0.2);
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.submit-dropdown-toggle:hover {
+  background: #2ea043;
+}
+.submit-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 100;
+  min-width: 180px;
+  overflow: hidden;
+}
+.submit-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  color: var(--text);
+  border: none;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.submit-dropdown-item:hover {
+  background: var(--hover);
+}
+.submit-dropdown-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+.submit-dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }
 
 .main {
