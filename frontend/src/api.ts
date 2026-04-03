@@ -124,6 +124,18 @@ export async function submitReview(
   return checkedJson<{ ok: boolean; round: number }>(resp);
 }
 
+export async function submitGithub(
+  event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES',
+  body?: string,
+): Promise<{ ok: boolean; reviewUrl: string }> {
+  const resp = await fetch(`${baseUrl()}/submit-github`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, body }),
+  });
+  return checkedJson<{ ok: boolean; reviewUrl: string }>(resp);
+}
+
 export async function fetchAnalysis(): Promise<Analysis | null> {
   const resp = await fetch(`${baseUrl()}/analysis`);
   const data = await checkedJson<{ analysis?: Analysis | null }>(resp);
