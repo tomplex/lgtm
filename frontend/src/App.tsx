@@ -28,6 +28,7 @@ import {
   fetchCommits,
   fetchAnalysis,
   submitReview as apiSubmitReview,
+  submitGithub as apiSubmitGithub,
   removeItem,
   baseUrl,
 } from './api';
@@ -39,6 +40,7 @@ import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 import Header from './components/header/Header';
+import type { GithubEvent } from './components/header/Header';
 import TabBar from './components/tabs/TabBar';
 import CommitPanel from './components/commits/CommitPanel';
 import Sidebar from './components/sidebar/Sidebar';
@@ -169,6 +171,20 @@ export default function App() {
       clearPersistedState();
     } catch (e: any) {
       showToast('Failed to submit: ' + e.message);
+    }
+  }
+
+  async function handleSubmitGithub(event: GithubEvent) {
+    try {
+      const result = await apiSubmitGithub(event);
+      showToast('Review submitted to GitHub!', 3000);
+      if (result.reviewUrl) {
+        window.open(result.reviewUrl, '_blank');
+      }
+      setComments('list', (prev) => prev.filter((c) => c.item !== 'diff'));
+      clearPersistedState();
+    } catch (e: any) {
+      showToast('GitHub submit failed: ' + e.message);
     }
   }
 
@@ -319,6 +335,7 @@ export default function App() {
       <Header
         onRefresh={handleRefresh}
         onSubmit={handleSubmit}
+        onSubmitGithub={handleSubmitGithub}
         onToggleCommits={() => setCommitPanelOpen(!commitPanelOpen())}
         showCommitToggle={appMode() === 'diff' && allCommits().length > 0}
       />
