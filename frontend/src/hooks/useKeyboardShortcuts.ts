@@ -14,6 +14,7 @@ interface Options {
   onRefresh: () => void;
   onToggleCommits: () => void;
   onJumpComment: (direction: 'next' | 'prev') => void;
+  onSymbolSearch: () => void;
 }
 
 export function useKeyboardShortcuts(options: Options) {
@@ -23,6 +24,31 @@ export function useKeyboardShortcuts(options: Options) {
     const targetPos = direction === 'next' ? currentPos + 1 : currentPos - 1;
     if (targetPos < 0 || targetPos >= items.length) return null;
     return parseInt(items[targetPos].dataset.idx!);
+  }
+
+  let lastShiftUp = 0;
+  let shiftDownClean = false;
+
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Shift') {
+      shiftDownClean = true;
+    } else {
+      shiftDownClean = false;
+    }
+  }
+
+  function onShiftUp(e: KeyboardEvent) {
+    if (e.key !== 'Shift') return;
+    if (!shiftDownClean) return;
+    if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+
+    const now = Date.now();
+    if (now - lastShiftUp < 300) {
+      lastShiftUp = 0;
+      options.onSymbolSearch();
+    } else {
+      lastShiftUp = now;
+    }
   }
 
   function handler(e: KeyboardEvent) {
@@ -63,6 +89,14 @@ export function useKeyboardShortcuts(options: Options) {
     }
   }
 
-  onMount(() => document.addEventListener('keydown', handler));
-  onCleanup(() => document.removeEventListener('keydown', handler));
+  onMount(() => {
+    document.addEventListener('keydown', handler);
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onShiftUp);
+  });
+  onCleanup(() => {
+    document.removeEventListener('keydown', handler);
+    document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('keyup', onShiftUp);
+  });
 }
