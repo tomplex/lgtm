@@ -1,5 +1,5 @@
 import { createSignal, createMemo } from 'solid-js';
-import { createStore } from 'solid-js/store';
+import { createStore, reconcile } from 'solid-js/store';
 import type { Comment } from './comment-types';
 
 // --- Types (re-exported for consumers) ---
@@ -126,12 +126,19 @@ export interface PeekState {
 
 export const [peekState, setPeekState] = createSignal<PeekState | null>(null);
 
+export const [symbolSearchOpen, setSymbolSearchOpen] = createSignal(false);
+
 // --- Stores (partial updates) ---
 
 export const [comments, setComments] = createStore<{ list: Comment[] }>({ list: [] });
 
 export function addLocalComment(c: Comment) {
+  if (!c) return;
   setComments('list', (prev) => [...prev, c]);
+}
+
+export function replaceComments(list: Comment[]) {
+  setComments('list', reconcile(list));
 }
 
 export function updateLocalComment(id: string, fields: Partial<Comment>) {
@@ -157,6 +164,7 @@ export const activeFile = createMemo(() => files()[activeFileIdx()]);
 export const commentsByFile = createMemo(() => {
   const result: Record<string, Comment[]> = {};
   for (const c of comments.list) {
+    if (!c) continue;
     if (c.file && !c.parentId && c.status !== 'dismissed') {
       if (!result[c.file]) result[c.file] = [];
       result[c.file].push(c);
@@ -166,5 +174,5 @@ export const commentsByFile = createMemo(() => {
 });
 
 export const userCommentCount = createMemo(
-  () => comments.list.filter((c) => c.author === 'user' && !c.parentId && c.status !== 'dismissed').length,
+  () => comments.list.filter((c) => c?.author === 'user' && !c.parentId && c.status !== 'dismissed').length,
 );
