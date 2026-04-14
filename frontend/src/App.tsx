@@ -11,6 +11,7 @@ import {
   setMdMeta,
   setAllCommits,
   setComments,
+  replaceComments,
   setAnalysis,
   setWholeFileView,
   setActiveFileIdx,
@@ -38,6 +39,8 @@ import { formatAllComments } from './format-comments';
 import { loadState, clearPersistedState } from './persistence';
 import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { symbolSearchOpen, setSymbolSearchOpen } from './state';
+import SymbolSearch from './components/diff/SymbolSearch';
 
 import Header from './components/header/Header';
 import type { GithubEvent } from './components/header/Header';
@@ -87,7 +90,7 @@ export default function App() {
   async function loadComments() {
     try {
       const allComments = await fetchComments();
-      setComments('list', allComments);
+      replaceComments(allComments);
     } catch {
       /* ignore */
     }
@@ -239,6 +242,7 @@ export default function App() {
     onRefresh: handleRefresh,
     onToggleCommits: () => setCommitPanelOpen(!commitPanelOpen()),
     onJumpComment: jumpToComment,
+    onSymbolSearch: () => setSymbolSearchOpen(!symbolSearchOpen()),
   });
 
   // --- SSE ---
@@ -246,9 +250,9 @@ export default function App() {
   function connectSSE() {
     const es = new EventSource(`${baseUrl()}/events`);
     es.addEventListener('comments_changed', async () => {
-      const prevClaudeCount = comments.list.filter((c) => c.author === 'claude' && !c.parentId).length;
+      const prevClaudeCount = comments.list.filter((c) => c?.author === 'claude' && !c.parentId).length;
       await loadComments();
-      const newClaudeCount = comments.list.filter((c) => c.author === 'claude' && !c.parentId).length;
+      const newClaudeCount = comments.list.filter((c) => c?.author === 'claude' && !c.parentId).length;
       if (newClaudeCount > prevClaudeCount) {
         showToast('New comments from Claude', 2000);
       }
@@ -359,7 +363,7 @@ export default function App() {
         <div class="keyboard-hint">
           Click line to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>f</kbd> search (<code>!test *.py</code>
           ) &middot; <kbd>w</kbd> whole file &middot; <kbd>e</kbd> reviewed &middot; <kbd>c</kbd> commits &middot;{' '}
-          <kbd>n</kbd>/<kbd>p</kbd> next/prev comment
+          <kbd>n</kbd>/<kbd>p</kbd> next/prev comment &middot; <kbd>Shift Shift</kbd> symbol search
         </div>
       </Show>
       <Show when={appMode() === 'file'}>
@@ -367,6 +371,7 @@ export default function App() {
           Click any block to comment &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Esc</kbd> cancel
         </div>
       </Show>
+      <SymbolSearch />
     </>
   );
 }
