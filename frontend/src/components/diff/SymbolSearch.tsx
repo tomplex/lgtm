@@ -1,4 +1,4 @@
-import { createSignal, createResource, Show, For, onMount, onCleanup } from 'solid-js';
+import { createSignal, createResource, Show, For, onMount } from 'solid-js';
 import { symbolSearchOpen, setSymbolSearchOpen } from '../../state';
 import { fetchSymbol, type SymbolResult } from '../../api';
 import { highlightLine, detectLang, escapeHtml } from '../../utils';
