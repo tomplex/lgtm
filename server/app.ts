@@ -35,8 +35,8 @@ export function createApp(manager: SessionManager): express.Express {
     res.json({ ok: true, ...result });
   });
 
-  app.get('/projects', (_req, res) => {
-    const projects = manager.list().map((p) => {
+  app.get('/projects', async (_req, res) => {
+    const projects = await Promise.all(manager.list().map(async (p) => {
       const session = manager.get(p.slug)!;
 
       let branch: string | null = null;
@@ -44,7 +44,7 @@ export function createApp(manager: SessionManager): express.Express {
       let pr: { number: number; url: string } | null = null;
       let repoName = basename(p.repoPath);
       try {
-        const meta = getRepoMeta(session.repoPath, session.baseBranch);
+        const meta = await session.getCachedMeta();
         branch = meta.branch;
         baseBranch = meta.baseBranch;
         repoName = meta.repoName;
@@ -60,7 +60,7 @@ export function createApp(manager: SessionManager): express.Express {
       const userCommentCount = topLevel.filter((c) => c.author === 'user').length;
 
       return { ...p, repoName, branch, baseBranch, pr, claudeCommentCount, userCommentCount };
-    });
+    }));
     res.json({ projects });
   });
 

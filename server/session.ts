@@ -2,7 +2,8 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
-  getBranchDiff, getSelectedCommitsDiff, getRepoMeta,
+  getBranchDiff, getSelectedCommitsDiff, getRepoMeta, getRepoMetaAsync,
+  type RepoMeta,
 } from './git-ops.js';
 import { storePut, type ProjectBlob } from './store.js';
 import { CommentStore } from './comment-store.js';
@@ -26,7 +27,7 @@ export interface SSEClient {
 
 export class Session {
   readonly repoPath: string;
-  readonly baseBranch: string;
+  baseBranch: string;
   readonly description: string;
   readonly outputPath: string;
 
@@ -40,6 +41,7 @@ export class Session {
   private _analysis: Record<string, unknown> | null = null;
   private _reviewedFiles = new Set<string>();
   private _sidebarView = 'flat';
+  private _metaCache: { meta: RepoMeta; at: number } | null = null;
 
   constructor(opts: {
     repoPath: string;
@@ -104,6 +106,16 @@ export class Session {
 
   get items(): SessionItem[] {
     return this._items;
+  }
+
+  async getCachedMeta(ttlMs = 30_000): Promise<RepoMeta> {
+    const now = Date.now();
+    if (this._metaCache && now - this._metaCache.at < ttlMs) {
+      return this._metaCache.meta;
+    }
+    const meta = await getRepoMetaAsync(this.repoPath, this.baseBranch);
+    this._metaCache = { meta, at: now };
+    return meta;
   }
 
   get analysis(): Record<string, unknown> | null {

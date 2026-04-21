@@ -1,6 +1,9 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 export function gitRun(repoPath: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -151,6 +154,32 @@ export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const pr = JSON.parse(result);
+    const ownerRepo = parseOwnerRepo(pr.url);
+    if (ownerRepo) {
+      meta.pr = { ...pr, ...ownerRepo };
+    }
+  } catch {
+    // gh not installed or no PR
+  }
+  return meta;
+}
+
+export async function getRepoMetaAsync(repoPath: string, baseBranch: string): Promise<RepoMeta> {
+  const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+    cwd: repoPath,
+  });
+  const meta: RepoMeta = {
+    branch: stdout.trim(),
+    baseBranch,
+    repoPath,
+    repoName: basename(repoPath),
+  };
+  try {
+    const { stdout: ghOut } = await execFileAsync('gh', ['pr', 'view', '--json', 'url,number,title'], {
+      cwd: repoPath,
+      timeout: 5000,
+    });
+    const pr = JSON.parse(ghOut);
     const ownerRepo = parseOwnerRepo(pr.url);
     if (ownerRepo) {
       meta.pr = { ...pr, ...ownerRepo };
