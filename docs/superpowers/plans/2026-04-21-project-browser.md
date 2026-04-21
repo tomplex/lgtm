@@ -43,7 +43,16 @@ Run `npm run build` from repo root (never from `frontend/`). Run tests with `npm
 
 - [ ] **Step 1: Write the failing test**
 
-In `server/__tests__/routes.test.ts`, extend the existing `describe('project management', ...)` block — add this test after the existing `GET /projects` test (around line 65):
+In `server/__tests__/routes.test.ts`, extend the existing `describe('project management', ...)` block — add this test after the existing `GET /projects` test (around line 65).
+
+First, update the existing `node:path` import at the top of the file to include `basename`:
+
+```ts
+// was: import { join } from 'node:path';
+import { basename, join } from 'node:path';
+```
+
+Then add the test:
 
 ```ts
 it('GET /projects returns enriched fields for a fresh project', async () => {
@@ -52,7 +61,7 @@ it('GET /projects returns enriched fields for a fresh project', async () => {
     .expect(200);
   const project = res.body.projects.find((p: { slug: string }) => p.slug === slug);
   expect(project).toBeDefined();
-  expect(project.repoName).toBe(require('node:path').basename(fixture.repoPath));
+  expect(project.repoName).toBe(basename(fixture.repoPath));
   expect(project.branch).toBe('feature');
   expect(project.baseBranch).toBe('main');
   expect(project.pr).toBeNull();
