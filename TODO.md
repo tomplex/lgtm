@@ -15,6 +15,8 @@
 - [x] Flat file view: sort files with Claude comments to the top
 - [x] Button to dismiss/hide files in the sidebar
 - [x] Move comment save / delete buttons for inline interactions to the left hand side for easier access
+- [ ] using j to move down the file list should scroll the list 
+- [ ] direct to claude comments and pending review comments should appear differently
 
 ## Commenting
 - [x] Markdown rendering in comments (both user and Claude)
@@ -33,12 +35,16 @@
 - [x] "+" button in tab bar to add document items from the UI (path input, POSTs to `/items`)
 - [x] `GET /files?glob=**/*.md` endpoint to list repo files for a document picker
 
+## Navigation
+- [x] Browse between registered projects from one window — landing page at `/`, Cmd-K palette, header switcher
+
 ## MCP / integration
 - [x] Channel notification on submit — push feedback to Claude immediately (requires `--dangerously-load-development-channels server:lgtm`)
 - [x] "Ask Claude" button on comments — send a single comment to the Claude session via channel notification, Claude responds inline via `reply` MCP tool
 - [x] Plugin packaging (bundle MCP config, skills, hooks for `claude plugin add`)
 - [ ] Persistent review storage so review preferences can be learned from across sessions
 - [x] document review submissions should be connected to a specific claude instance rather than the project as a whole
+- [ ] Analysis skill should take a "focus area" - e.g. "I only care about the model_train" changes
 
 ## Tech debt
 - [x] Comprehensive server tests (103 tests: store, git-ops, session, session manager, routes)
