@@ -34,6 +34,8 @@
     "marked": "^12.0.1",
     "open": "^10.1.0",
     "solid-js": "^1.9.12",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver-protocol": "^3.17.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
