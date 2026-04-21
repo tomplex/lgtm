@@ -42,6 +42,7 @@ import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { symbolSearchOpen, setSymbolSearchOpen } from './state';
 import SymbolSearch from './components/diff/SymbolSearch';
+import ProjectPalette from './components/palette/ProjectPalette';
 
 import Header from './components/header/Header';
 import type { GithubEvent } from './components/header/Header';
@@ -374,6 +375,7 @@ export default function ProjectView() {
         </div>
       </Show>
       <SymbolSearch />
+      <ProjectPalette />
     </>
   );
 }

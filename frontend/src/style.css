@@ -2009,3 +2009,127 @@ body.cmd-held .line-content .hljs-type {
   border-color: var(--text);
   color: var(--text);
 }
+.project-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+}
+.project-palette-dialog {
+  width: 90vw;
+  max-width: 600px;
+  max-height: 70vh;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.project-palette-input {
+  background: var(--bg);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  padding: 12px 16px;
+  outline: none;
+}
+.project-palette-input::placeholder {
+  color: var(--text-muted);
+}
+.project-palette-results {
+  overflow-y: auto;
+  flex: 1;
+}
+.project-palette-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.project-palette-row.selected {
+  background: var(--hover);
+  border-left-color: var(--accent);
+}
+.project-palette-row.current {
+  color: var(--text-muted);
+}
+.project-palette-row.missing {
+  opacity: 0.6;
+  cursor: default;
+}
+.project-palette-row-name {
+  font-weight: 600;
+}
+.project-palette-row-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.project-palette-row-current {
+  color: var(--text-muted);
+}
+.project-palette-row-counts {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.project-palette-row-actions {
+  display: flex;
+  gap: 4px;
+}
+.project-palette-row-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+  padding: 0 4px;
+  line-height: 1;
+}
+.project-palette-row:hover .project-palette-row-remove,
+.project-palette-row.selected .project-palette-row-remove {
+  opacity: 1;
+}
+.project-palette-row-remove:hover {
+  color: var(--text);
+}
+.project-palette-row-yes,
+.project-palette-row-no {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.project-palette-row-yes:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.project-palette-row-no:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+.project-palette-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.project-palette-empty {
+  padding: 16px;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 13px;
+}
