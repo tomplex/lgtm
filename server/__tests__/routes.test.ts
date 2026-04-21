@@ -3,6 +3,7 @@ import request from 'supertest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { createGitFixture, type GitFixture } from './helpers/git-fixture.js';
 import { initStore, closeStore } from '../store.js';
 import { SessionManager } from '../session-manager.js';
@@ -102,6 +103,35 @@ describe('routes', () => {
       // Delete reply first so its parent still exists when it's removed.
       for (const id of [r1, a1, a2, a3, a4]) {
         await request(app).delete(`/project/${slug}/comments/${id}`).expect(200);
+      }
+    });
+
+    it('GET /projects returns branch:null when the repo directory is missing', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'lgtm-gone-'));
+      try {
+        execFileSync('git', ['init', '-b', 'main'], { cwd: tmp });
+        execFileSync('git', ['config', 'user.email', 'x@y.z'], { cwd: tmp });
+        execFileSync('git', ['config', 'user.name', 'x'], { cwd: tmp });
+        execFileSync('git', ['commit', '--allow-empty', '-m', 'init'], { cwd: tmp });
+
+        const reg = await request(app).post('/projects').send({ repoPath: tmp }).expect(200);
+        const goneSlug = reg.body.slug;
+
+        // Remove the directory out from under the session
+        rmSync(tmp, { recursive: true, force: true });
+
+        const res = await request(app).get('/projects').expect(200);
+        const gone = res.body.projects.find((p: { slug: string }) => p.slug === goneSlug);
+        expect(gone).toBeDefined();
+        expect(gone.branch).toBeNull();
+        expect(gone.pr).toBeNull();
+        // Counts still work — they don't touch git
+        expect(gone.userCommentCount).toBe(0);
+        expect(gone.claudeCommentCount).toBe(0);
+
+        manager.deregister(goneSlug);
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
       }
     });
   });
