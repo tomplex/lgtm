@@ -76,6 +76,34 @@ describe('routes', () => {
       expect(project.claudeCommentCount).toBe(0);
       expect(project.userCommentCount).toBe(0);
     });
+
+    it('GET /projects counts include active+resolved, exclude dismissed and replies', async () => {
+      // Set up four comments in a known state
+      const mk = async (body: object) => {
+        const r = await request(app).post(`/project/${slug}/comments`).send(body).expect(200);
+        return r.body.comment.id;
+      };
+      const a1 = await mk({ author: 'user', text: 'active user', item: 'diff' });
+      const a2 = await mk({ author: 'user', text: 'will resolve', item: 'diff' });
+      const a3 = await mk({ author: 'user', text: 'will dismiss', item: 'diff' });
+      const a4 = await mk({ author: 'claude', text: 'claude top', item: 'diff' });
+      const r1 = await mk({ author: 'user', text: 'reply', item: 'diff', parentId: a1 });
+
+      await request(app).patch(`/project/${slug}/comments/${a2}`).send({ status: 'resolved' }).expect(200);
+      await request(app).patch(`/project/${slug}/comments/${a3}`).send({ status: 'dismissed' }).expect(200);
+
+      const res = await request(app).get('/projects').expect(200);
+      const project = res.body.projects.find((p: { slug: string }) => p.slug === slug);
+      // userCommentCount: a1 active, a2 resolved → counted; a3 dismissed → excluded; reply → excluded. Count = 2.
+      expect(project.userCommentCount).toBe(2);
+      expect(project.claudeCommentCount).toBe(1);
+
+      // Cleanup so later tests in the file see the original state.
+      // Delete reply first so its parent still exists when it's removed.
+      for (const id of [r1, a1, a2, a3, a4]) {
+        await request(app).delete(`/project/${slug}/comments/${id}`).expect(200);
+      }
+    });
   });
 
   describe('diff and commits', () => {
