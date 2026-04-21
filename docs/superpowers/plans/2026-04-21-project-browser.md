@@ -427,23 +427,27 @@ Expected: FAIL — module `../components/palette/filter` does not exist.
 
 - [ ] **Step 3: Implement the filter**
 
-Create `frontend/src/components/palette/filter.ts`:
+Create `frontend/src/components/palette/filter.ts`. Match is per-field — the query must subsequence-match at least one of `repoName`, `slug`, `repoPath`, `description`. A single concatenated haystack would produce false positives (e.g. query `pipeline` matches `plugin-dev /Users/tom/dev/plugin-dev` if concatenated).
 
 ```ts
 import type { ProjectSummary } from '../../api';
+
+function subsequenceMatch(haystack: string, needle: string): boolean {
+  let cursor = 0;
+  for (const ch of needle) {
+    const idx = haystack.indexOf(ch, cursor);
+    if (idx === -1) return false;
+    cursor = idx + 1;
+  }
+  return true;
+}
 
 export function filterProjects(projects: ProjectSummary[], query: string): ProjectSummary[] {
   const q = query.trim().toLowerCase();
   if (!q) return projects;
   return projects.filter((p) => {
-    const haystack = `${p.repoName} ${p.slug} ${p.repoPath} ${p.description}`.toLowerCase();
-    let cursor = 0;
-    for (const ch of q) {
-      const idx = haystack.indexOf(ch, cursor);
-      if (idx === -1) return false;
-      cursor = idx + 1;
-    }
-    return true;
+    const fields = [p.repoName, p.slug, p.repoPath, p.description];
+    return fields.some((field) => subsequenceMatch(field.toLowerCase(), q));
   });
 }
 ```
