@@ -22,6 +22,8 @@ import {
   setSelectedShas,
   repoMeta,
   allCommits,
+  paletteOpen,
+  setPaletteOpen,
 } from './state';
 import {
   fetchItems,
@@ -246,6 +248,7 @@ export default function ProjectView() {
     onToggleCommits: () => setCommitPanelOpen(!commitPanelOpen()),
     onJumpComment: jumpToComment,
     onSymbolSearch: () => setSymbolSearchOpen(!symbolSearchOpen()),
+    onOpenPalette: () => setPaletteOpen(!paletteOpen()),
   });
 
   // --- SSE ---

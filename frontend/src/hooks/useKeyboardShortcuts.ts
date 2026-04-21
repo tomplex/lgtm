@@ -15,6 +15,7 @@ interface Options {
   onToggleCommits: () => void;
   onJumpComment: (direction: 'next' | 'prev') => void;
   onSymbolSearch: () => void;
+  onOpenPalette: () => void;
 }
 
 export function useKeyboardShortcuts(options: Options) {
@@ -54,6 +55,12 @@ export function useKeyboardShortcuts(options: Options) {
   function handler(e: KeyboardEvent) {
     if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
 
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      options.onOpenPalette();
+      return;
+    }
+
     if (e.key === 'j' || e.key === 'ArrowDown') {
       const nextIdx = getAdjacentFileIdx('next');
       if (nextIdx !== null) {
@@ -61,7 +68,7 @@ export function useKeyboardShortcuts(options: Options) {
         setWholeFileView(false);
         window.location.hash = 'file=' + encodeURIComponent(files()[nextIdx].path);
       }
-    } else if (e.key === 'k' || e.key === 'ArrowUp') {
+    } else if ((e.key === 'k' || e.key === 'ArrowUp') && !e.metaKey && !e.ctrlKey) {
       const prevIdx = getAdjacentFileIdx('prev');
       if (prevIdx !== null) {
         setActiveFileIdx(prevIdx);
