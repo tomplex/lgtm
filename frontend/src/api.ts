@@ -1,7 +1,7 @@
 import type { SessionItem, Commit, RepoMeta, Analysis } from './state';
 import type { Comment } from './comment-types';
 
-function getProjectSlug(): string {
+export function getProjectSlug(): string {
   const match = window.location.pathname.match(/^\/project\/([^/]+)/);
   return match?.[1] ?? '';
 }
@@ -51,6 +51,18 @@ interface FileData {
 interface ErrorData {
   mode: 'error';
   error: string;
+}
+
+export interface ProjectSummary {
+  slug: string;
+  repoPath: string;
+  description: string;
+  repoName: string;
+  branch: string | null;
+  baseBranch: string;
+  pr: { number: number; url: string } | null;
+  claudeCommentCount: number;
+  userCommentCount: number;
 }
 
 type ItemData = DiffData | FileData | ErrorData;
@@ -179,4 +191,15 @@ interface SymbolResponse {
 export async function fetchSymbol(name: string): Promise<SymbolResponse> {
   const resp = await fetch(`${baseUrl()}/symbol?name=${encodeURIComponent(name)}`);
   return checkedJson<SymbolResponse>(resp);
+}
+
+export async function fetchRegisteredProjects(): Promise<ProjectSummary[]> {
+  const resp = await fetch('/projects');
+  const data = await checkedJson<{ projects?: ProjectSummary[] }>(resp);
+  return data.projects ?? [];
+}
+
+export async function deregisterProject(slug: string): Promise<void> {
+  const resp = await fetch(`/projects/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+  await checkedJson<{ ok: boolean }>(resp);
 }
