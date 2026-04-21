@@ -1864,3 +1864,148 @@ body.cmd-held .line-content .hljs-type {
   text-decoration-color: var(--text-muted);
   cursor: pointer;
 }
+
+.landing {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+.landing-header {
+  margin-bottom: 32px;
+}
+.landing-header h1 {
+  margin: 0 0 4px 0;
+  font-size: 28px;
+}
+.landing-subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.landing-empty {
+  color: var(--text-muted);
+  padding: 32px 0;
+  font-size: 14px;
+}
+.landing-empty code {
+  background: var(--bg-secondary);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.landing-card {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  transition: border-color 0.12s;
+}
+.landing-card:hover {
+  border-color: var(--accent);
+}
+.landing-card.missing {
+  opacity: 0.6;
+}
+.landing-card.missing:hover {
+  border-color: var(--border);
+}
+.landing-card-body {
+  cursor: pointer;
+}
+.landing-card.missing .landing-card-body {
+  cursor: default;
+}
+.landing-card-body:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.landing-card-body:focus:not(:focus-visible) {
+  outline: none;
+}
+.landing-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.landing-card-branch {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.landing-card-pr {
+  margin-left: 8px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.landing-card-pr:hover {
+  text-decoration: underline;
+}
+.landing-card-counts {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.landing-card-counts .count-muted {
+  color: var(--text-muted);
+}
+.landing-card-description {
+  color: var(--text);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.landing-card-path {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.landing-card-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.landing-card-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+  padding: 0 4px;
+  line-height: 1;
+}
+.landing-card:hover .landing-card-remove {
+  opacity: 1;
+}
+.landing-card-remove:hover {
+  color: var(--text);
+}
+.landing-card-confirm-text {
+  color: var(--text-muted);
+}
+.landing-card-confirm-yes,
+.landing-card-confirm-no {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.landing-card-confirm-yes:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.landing-card-confirm-no:hover {
+  border-color: var(--text);
+  color: var(--text);
+}

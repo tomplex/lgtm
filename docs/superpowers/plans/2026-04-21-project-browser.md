@@ -635,6 +635,14 @@ function ProjectCard(props: CardProps) {
         class="landing-card-body"
         onClick={() => { if (!missing()) props.onOpen(); }}
         role={missing() ? undefined : 'button'}
+        tabindex={missing() ? undefined : 0}
+        onKeyDown={(e) => {
+          if (missing()) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            props.onOpen();
+          }
+        }}
       >
         <div class="landing-card-title">{p().repoName}</div>
         <div class="landing-card-branch">
@@ -818,6 +826,18 @@ Append to `frontend/src/style.css`:
 .landing-card-confirm-yes:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+.landing-card-confirm-no:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+.landing-card-body:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.landing-card-body:focus:not(:focus-visible) {
+  outline: none;
 }
 ```
 
