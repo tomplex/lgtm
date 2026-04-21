@@ -101,6 +101,9 @@ export default function ProjectPalette() {
                       <Show when={p.branch} fallback={<em>(repo missing)</em>}>
                         {p.branch}
                       </Show>
+                      <Show when={p.pr}>
+                        {(pr) => <>{' '}<span class="project-palette-row-pr">PR #{pr().number}</span></>}
+                      </Show>
                       <Show when={p.slug === currentSlug()}>
                         {' '}<span class="project-palette-row-current">(current)</span>
                       </Show>

@@ -72,6 +72,7 @@ function ProjectCard(props: CardProps) {
         tabindex={missing() ? undefined : 0}
         onKeyDown={(e) => {
           if (missing()) return;
+          if (e.target !== e.currentTarget) return;
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             props.onOpen();

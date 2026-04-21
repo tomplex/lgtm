@@ -2155,3 +2155,12 @@ body.cmd-held .line-content .hljs-type {
 .header-project-btn:hover .header-project-chevron {
   color: var(--accent);
 }
+
+.project-palette-row-pr {
+  color: var(--accent);
+}
+.project-palette-row-remove:focus-visible {
+  opacity: 1;
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
