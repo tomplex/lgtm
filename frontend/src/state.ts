@@ -128,6 +128,8 @@ export const [peekState, setPeekState] = createSignal<PeekState | null>(null);
 
 export const [symbolSearchOpen, setSymbolSearchOpen] = createSignal(false);
 
+export const [paletteOpen, setPaletteOpen] = createSignal(false);
+
 // --- Stores (partial updates) ---
 
 export const [comments, setComments] = createStore<{ list: Comment[] }>({ list: [] });
