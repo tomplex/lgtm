@@ -62,6 +62,20 @@ describe('routes', () => {
       expect(res.body.projects).toBeInstanceOf(Array);
       expect(res.body.projects.some((p: { slug: string }) => p.slug === slug)).toBe(true);
     });
+
+    it('GET /projects returns enriched fields for a fresh project', async () => {
+      const res = await request(app)
+        .get('/projects')
+        .expect(200);
+      const project = res.body.projects.find((p: { slug: string }) => p.slug === slug);
+      expect(project).toBeDefined();
+      expect(project.repoName).toBe(require('node:path').basename(fixture.repoPath));
+      expect(project.branch).toBe('feature');
+      expect(project.baseBranch).toBe('main');
+      expect(project.pr).toBeNull();
+      expect(project.claudeCommentCount).toBe(0);
+      expect(project.userCommentCount).toBe(0);
+    });
   });
 
   describe('diff and commits', () => {

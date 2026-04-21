@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type NextFunction, Router } from 'express';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getFileLines, getBranchCommits, gitRun, getRepoMeta } from './git-ops.js';
 import { type Session, type SSEClient } from './session.js';
@@ -36,7 +36,32 @@ export function createApp(manager: SessionManager): express.Express {
   });
 
   app.get('/projects', (_req, res) => {
-    res.json({ projects: manager.list() });
+    const projects = manager.list().map((p) => {
+      const session = manager.get(p.slug)!;
+
+      let branch: string | null = null;
+      let baseBranch = session.baseBranch;
+      let pr: { number: number; url: string } | null = null;
+      let repoName = basename(p.repoPath);
+      try {
+        const meta = getRepoMeta(session.repoPath, session.baseBranch);
+        branch = meta.branch;
+        baseBranch = meta.baseBranch;
+        repoName = meta.repoName;
+        if (meta.pr) pr = { number: meta.pr.number, url: meta.pr.url };
+      } catch {
+        // repo missing or git failed — branch stays null
+      }
+
+      const topLevel = session
+        .listComments()
+        .filter((c) => c.parentId == null && c.status !== 'dismissed');
+      const claudeCommentCount = topLevel.filter((c) => c.author === 'claude').length;
+      const userCommentCount = topLevel.filter((c) => c.author === 'user').length;
+
+      return { ...p, repoName, branch, baseBranch, pr, claudeCommentCount, userCommentCount };
+    });
+    res.json({ projects });
   });
 
   app.delete('/projects/:slug', (req, res) => {
