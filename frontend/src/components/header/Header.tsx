@@ -1,5 +1,5 @@
 import { Show, createSignal, createMemo } from 'solid-js';
-import { repoMeta, files, reviewedFiles, userCommentCount, activeItemId, sessionItems } from '../../state';
+import { repoMeta, files, reviewedFiles, userCommentCount, activeItemId, sessionItems, setPaletteOpen } from '../../state';
 
 export type SubmitTarget = 'claude' | 'github';
 export type GithubEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
@@ -48,7 +48,10 @@ export default function Header(props: Props) {
     <header>
       <div class="header-top">
         <h1>
-          <strong>{meta().repoName || 'Code Review'}</strong>{' '}
+          <button class="header-project-btn" onClick={() => setPaletteOpen(true)} title="Switch project (Cmd-K)">
+            <strong>{meta().repoName || 'Code Review'}</strong>
+            <span class="header-project-chevron">&#9662;</span>
+          </button>{' '}
           <Show when={meta().branch}>
             <span class="header-branch">
               {meta().branch} → {meta().baseBranch || 'main'}
