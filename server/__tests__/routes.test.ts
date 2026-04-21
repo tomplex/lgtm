@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createGitFixture, type GitFixture } from './helpers/git-fixture.js';
 import { initStore, closeStore } from '../store.js';
@@ -69,7 +69,7 @@ describe('routes', () => {
         .expect(200);
       const project = res.body.projects.find((p: { slug: string }) => p.slug === slug);
       expect(project).toBeDefined();
-      expect(project.repoName).toBe(require('node:path').basename(fixture.repoPath));
+      expect(project.repoName).toBe(basename(fixture.repoPath));
       expect(project.branch).toBe('feature');
       expect(project.baseBranch).toBe('main');
       expect(project.pr).toBeNull();
