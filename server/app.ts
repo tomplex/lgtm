@@ -304,6 +304,47 @@ export function createApp(manager: SessionManager): express.Express {
     }
   });
 
+  projectRouter.get('/references', async (req, res) => {
+    const session = res.locals.session;
+    const file = (req.query.file as string) ?? '';
+    const line = parseInt((req.query.line as string) ?? '-1', 10);
+    const character = parseInt((req.query.character as string) ?? '-1', 10);
+    if (!file || line < 0 || character < 0) {
+      res.status(400).json({ error: 'file, line, character required' });
+      return;
+    }
+    const language = extensionToLanguage(file);
+    if (!language) {
+      res.json({ status: 'missing', result: { references: [] } });
+      return;
+    }
+    const client = await session.lsp.get(language);
+    if (!client) {
+      res.json({ status: 'missing', result: { references: [] } });
+      return;
+    }
+    const absPath = pathResolve(session.repoPath, file);
+    const cfg = getLanguageConfig(language);
+    if (cfg.requiresOpen) await client.openFile(absPath);
+    try {
+      const locs = await client.references(absPath, { line, character });
+      const references = locs.map((loc: { uri: string; range: { start: { line: number } } }) => {
+        const target = fromFileUri(loc.uri);
+        let snippet = '';
+        try {
+          const lines = readFileSync(target, 'utf8').split('\n');
+          snippet = (lines[loc.range.start.line] ?? '').trim();
+        } catch { /* ignore */ }
+        const rel = pathRelative(session.repoPath, target) || target;
+        return { file: rel, line: loc.range.start.line + 1, snippet };
+      });
+      res.json({ status: 'ok', result: { references } });
+    } catch (err) {
+      console.log(`LSP_REFERENCES_FAIL language=${language} error=${(err as Error).message}`);
+      res.json({ status: 'fallback', result: { references: [] } });
+    }
+  });
+
   // --- User state routes ---
 
   projectRouter.get('/user-state', (_req, res) => {
