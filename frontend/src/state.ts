@@ -1,6 +1,7 @@
 import { createSignal, createMemo } from 'solid-js';
 import { createStore, reconcile } from 'solid-js/store';
 import type { Comment } from './comment-types';
+import { buildTree, flattenVisible, type TreeNode } from './tree';
 
 // --- Types (re-exported for consumers) ---
 
@@ -76,7 +77,6 @@ export type LspStatus = 'ok' | 'indexing' | 'missing' | 'crashed' | 'partial';
 // --- Signals (replaced wholesale) ---
 
 export const [files, setFiles] = createSignal<DiffFile[]>([]);
-export const [activeFileIdx, setActiveFileIdx] = createSignal(0);
 export const [activeItemId, setActiveItemId] = createSignal('diff');
 export const [appMode, setAppMode] = createSignal<'diff' | 'file'>('diff');
 export const [wholeFileView, setWholeFileView] = createSignal(false);
@@ -214,7 +214,60 @@ export function undismissAll() {
 
 // --- Derived state ---
 
-export const activeFile = createMemo(() => files()[activeFileIdx()]);
+export const claudeCommentedPaths = createMemo(() => {
+  const set = new Set<string>();
+  for (const c of comments.list) {
+    if (c?.author === 'claude' && c.file && !c.parentId && c.status !== 'dismissed') {
+      set.add(c.file);
+    }
+  }
+  return set;
+});
+
+export const [filterQuery, setFilterQuery] = createSignal('');
+
+export const tree = createMemo<TreeNode[]>(() =>
+  buildTree(files(), analysis(), {
+    sort: sortMode(),
+    group: analysis() ? groupMode() : 'none',
+    claudeCommentedPaths: claudeCommentedPaths(),
+  }),
+);
+
+export const visibleRows = createMemo<TreeNode[]>(() => {
+  const dfSet = new Set(Object.keys(dismissedFiles).filter((k) => dismissedFiles[k]));
+  const dfoSet = new Set(Object.keys(dismissedFolders).filter((k) => dismissedFolders[k]));
+  return flattenVisible(tree(), {
+    collapsedFolders: { ...collapsedFolders },
+    dismissedFolders: dfoSet,
+    dismissedFiles: dfSet,
+    filterQuery: filterQuery(),
+  });
+});
+
+export const activeFile = createMemo(() => {
+  const rowId = activeRowId();
+  if (!rowId) return undefined;
+  for (const row of visibleRows()) {
+    if (row.kind === 'file' && row.id === rowId) return row.file;
+  }
+  return undefined;
+});
+
+// Legacy index-based selection — derived from activeRowId during migration.
+// TODO: remove once all consumers use activeFile()/activeRowId().
+export const activeFileIdx = createMemo(() => {
+  const f = activeFile();
+  if (!f) return 0;
+  const idx = files().findIndex((file) => file.path === f.path);
+  return idx >= 0 ? idx : 0;
+});
+
+export function setActiveFileIdx(idx: number) {
+  const f = files()[idx];
+  if (f) setActiveRowId(f.path);
+  else setActiveRowId(null);
+}
 
 export const commentsByFile = createMemo(() => {
   const result: Record<string, Comment[]> = {};
