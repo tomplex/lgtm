@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { LspClient } from '../../lsp/client.js';
 import type { MessageConnection } from 'vscode-jsonrpc/node.js';
 
@@ -152,5 +155,64 @@ describe('LspClient request methods', () => {
     await client.initialize();
     const refs = await client.references('/tmp/proj/a.py', { line: 0, character: 0 });
     expect(refs).toHaveLength(2);
+  });
+});
+
+describe('LspClient openFile / closeFile', () => {
+  it('openFile sends didOpen with file content', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lsp-client-open-'));
+    const file = path.join(tmp, 'x.py');
+    fs.writeFileSync(file, 'print(1)\n');
+    const conn = makeFakeConnection();
+    const client = new LspClient({ language: 'python', projectPath: tmp, connection: conn });
+    await client.initialize();
+    await client.openFile(file);
+    const call = (conn.sendNotification as any).mock.calls.find((c: any[]) => c[0] === 'textDocument/didOpen');
+    expect(call).toBeTruthy();
+    expect(call[1].textDocument.text).toBe('print(1)\n');
+    expect(client.isOpen(file)).toBe(true);
+    fs.rmSync(tmp, { recursive: true });
+  });
+
+  it('closeFile sends didClose and drops from open set', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lsp-client-close-'));
+    const file = path.join(tmp, 'x.py');
+    fs.writeFileSync(file, 'y = 2\n');
+    const conn = makeFakeConnection();
+    const client = new LspClient({ language: 'python', projectPath: tmp, connection: conn });
+    await client.initialize();
+    await client.openFile(file);
+    await client.closeFile(file);
+    const call = (conn.sendNotification as any).mock.calls.find((c: any[]) => c[0] === 'textDocument/didClose');
+    expect(call).toBeTruthy();
+    expect(client.isOpen(file)).toBe(false);
+    fs.rmSync(tmp, { recursive: true });
+  });
+
+  it('openFile is idempotent', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lsp-client-idem-'));
+    const file = path.join(tmp, 'x.py');
+    fs.writeFileSync(file, '');
+    const conn = makeFakeConnection();
+    const client = new LspClient({ language: 'python', projectPath: tmp, connection: conn });
+    await client.initialize();
+    await client.openFile(file);
+    await client.openFile(file);
+    const opens = (conn.sendNotification as any).mock.calls.filter((c: any[]) => c[0] === 'textDocument/didOpen');
+    expect(opens).toHaveLength(1);
+    fs.rmSync(tmp, { recursive: true });
+  });
+});
+
+describe('LspClient crash marking', () => {
+  it('markCrashed flips state to crashed and rejects ready waiters', async () => {
+    const conn = makeFakeConnection();
+    const client = new LspClient({ language: 'rust', projectPath: '/tmp/proj', connection: conn });
+    const ready = client.waitReady(1000);
+    await client.initialize();
+    expect(client.state).toBe('indexing');
+    client.markCrashed('exit code 101');
+    await expect(ready).rejects.toThrow(/crashed/);
+    expect(client.state).toBe('crashed');
   });
 });

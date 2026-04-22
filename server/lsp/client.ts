@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
 import type { MessageConnection } from 'vscode-jsonrpc/node.js';
 import { getLanguageConfig } from './languages.js';
 import { toFileUri } from './uri.js';
@@ -21,6 +23,8 @@ export class LspClient {
   private _state: ClientState = 'initializing';
   private _capabilities: Record<string, unknown> = {};
   private _readyWaiters: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
+  private readonly _openFiles = new Set<string>();
+  private _child: ChildProcess | null = null;
 
   constructor(opts: LspClientOptions) {
     this.language = opts.language;
@@ -132,19 +136,76 @@ export class LspClient {
     return result;
   }
 
+  async openFile(filePath: string): Promise<void> {
+    if (this._openFiles.has(filePath)) return;
+    const text = fs.readFileSync(filePath, 'utf8');
+    const uri = toFileUri(filePath);
+    this._connection.sendNotification('textDocument/didOpen', {
+      textDocument: {
+        uri,
+        languageId: this.language,
+        version: 1,
+        text,
+      },
+    });
+    this._openFiles.add(filePath);
+  }
+
+  async closeFile(filePath: string): Promise<void> {
+    if (!this._openFiles.has(filePath)) return;
+    const uri = toFileUri(filePath);
+    this._connection.sendNotification('textDocument/didClose', {
+      textDocument: { uri },
+    });
+    this._openFiles.delete(filePath);
+  }
+
+  isOpen(filePath: string): boolean {
+    return this._openFiles.has(filePath);
+  }
+
+  openFiles(): string[] {
+    return Array.from(this._openFiles);
+  }
+
+  attachChild(child: ChildProcess): void {
+    this._child = child;
+  }
+
+  markCrashed(reason: string): void {
+    if (this._state === 'shuttingDown' || this._state === 'crashed') return;
+    this._state = 'crashed';
+    this.appendStderr(`[client] crashed: ${reason}`);
+    const waiters = this._readyWaiters;
+    this._readyWaiters = [];
+    for (const w of waiters) w.reject(new Error(`LSP crashed: ${reason}`));
+  }
+
   async shutdown(): Promise<void> {
     if (this._state === 'shuttingDown' || this._state === 'crashed') return;
     this._state = 'shuttingDown';
+    for (const f of Array.from(this._openFiles)) {
+      try { await this.closeFile(f); } catch { /* ignore */ }
+    }
     const waiters = this._readyWaiters;
     this._readyWaiters = [];
     for (const w of waiters) w.reject(new Error('client shutting down'));
-    try {
-      await this._connection.sendRequest('shutdown', null);
-    } catch { /* server may have already exited */ }
-    try {
-      this._connection.sendNotification('exit');
-    } catch { /* ditto */ }
+    try { await this._connection.sendRequest('shutdown', null); } catch { /* ignored */ }
+    try { this._connection.sendNotification('exit'); } catch { /* ignored */ }
     this._connection.dispose();
+
+    const child = this._child;
+    if (!child || child.killed || child.exitCode != null) return;
+
+    const waitExit = (ms: number) => new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(false), ms);
+      child.once('exit', () => { clearTimeout(timer); resolve(true); });
+    });
+
+    if (await waitExit(2000)) return;
+    child.kill('SIGTERM');
+    if (await waitExit(3000)) return;
+    child.kill('SIGKILL');
   }
 
   appendStderr(line: string): void {
