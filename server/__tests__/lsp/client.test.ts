@@ -204,6 +204,49 @@ describe('LspClient openFile / closeFile', () => {
   });
 });
 
+describe('LspClient request lifecycle', () => {
+  it('timeout rejects with LspTimeoutError', async () => {
+    const conn = makeFakeConnection({
+      sendRequest: vi.fn(async (method: string) => {
+        if (method === 'initialize') return { capabilities: {} };
+        return new Promise(() => {}); // hangs forever
+      }) as any,
+    });
+    const client = new LspClient({ language: 'python', projectPath: '/tmp/proj', connection: conn, requestTimeoutMs: 50 });
+    await client.initialize();
+    await expect(client.definition('/tmp/proj/foo.py', { line: 0, character: 0 }))
+      .rejects.toThrow(/timed out/);
+  });
+
+  it('dedups concurrent identical requests into one in-flight promise', async () => {
+    const send = vi.fn(async (method: string) => {
+      if (method === 'initialize') return { capabilities: {} };
+      await new Promise(r => setTimeout(r, 20));
+      return [];
+    });
+    const conn = makeFakeConnection({ sendRequest: send as any });
+    const client = new LspClient({ language: 'python', projectPath: '/tmp/proj', connection: conn });
+    await client.initialize();
+    const [a, b] = await Promise.all([
+      client.definition('/tmp/proj/foo.py', { line: 0, character: 0 }),
+      client.definition('/tmp/proj/foo.py', { line: 0, character: 0 }),
+    ]);
+    expect(a).toBe(b);
+    const defCalls = send.mock.calls.filter((c: any[]) => c[0] === 'textDocument/definition');
+    expect(defCalls).toHaveLength(1);
+  });
+
+  it('shutting-down state rejects new requests immediately', async () => {
+    const conn = makeFakeConnection();
+    const client = new LspClient({ language: 'python', projectPath: '/tmp/proj', connection: conn });
+    await client.initialize();
+    const shutdownPromise = client.shutdown();
+    await expect(client.definition('/tmp/proj/foo.py', { line: 0, character: 0 }))
+      .rejects.toThrow(/shutting down/);
+    await shutdownPromise;
+  });
+});
+
 describe('LspClient crash marking', () => {
   it('markCrashed flips state to crashed and rejects ready waiters', async () => {
     const conn = makeFakeConnection();

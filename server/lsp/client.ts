@@ -3,7 +3,7 @@ import type { ChildProcess } from 'node:child_process';
 import type { MessageConnection } from 'vscode-jsonrpc/node.js';
 import { getLanguageConfig } from './languages.js';
 import { toFileUri } from './uri.js';
-import type { Language } from './types.js';
+import { LspTimeoutError, LspShuttingDownError, type Language } from './types.js';
 
 type ClientState = 'initializing' | 'indexing' | 'ready' | 'crashed' | 'shuttingDown';
 
@@ -12,6 +12,7 @@ interface LspClientOptions {
   projectPath: string;
   connection: MessageConnection;
   stderrLines?: number;
+  requestTimeoutMs?: number;
 }
 
 export class LspClient {
@@ -25,12 +26,15 @@ export class LspClient {
   private _readyWaiters: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
   private readonly _openFiles = new Set<string>();
   private _child: ChildProcess | null = null;
+  private readonly _requestTimeoutMs: number;
+  private readonly _inflight = new Map<string, Promise<unknown>>();
 
   constructor(opts: LspClientOptions) {
     this.language = opts.language;
     this.projectPath = opts.projectPath;
     this._connection = opts.connection;
     this._stderrCap = opts.stderrLines ?? 100;
+    this._requestTimeoutMs = opts.requestTimeoutMs ?? 5000;
 
     this._connection.onNotification('experimental/serverStatus', (params: unknown) => {
       const p = params as { quiescent?: boolean; health?: string; message?: string };
@@ -102,38 +106,67 @@ export class LspClient {
     });
   }
 
-  async definition(filePath: string, pos: { line: number; character: number }): Promise<Array<{ uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }>> {
+  private async _request<T>(method: string, params: unknown, dedupKey: string): Promise<T> {
+    if (this._state === 'shuttingDown') throw new LspShuttingDownError();
+
+    const existing = this._inflight.get(dedupKey);
+    if (existing) return existing as Promise<T>;
+
+    const promise = (async () => {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new LspTimeoutError(method, this._requestTimeoutMs)), this._requestTimeoutMs),
+      );
+      try {
+        return await Promise.race([
+          this._connection.sendRequest(method, params) as Promise<T>,
+          timeoutPromise,
+        ]);
+      } finally {
+        this._inflight.delete(dedupKey);
+      }
+    })();
+
+    this._inflight.set(dedupKey, promise);
+    return promise;
+  }
+
+  async definition(filePath: string, pos: { line: number; character: number }) {
     const uri = toFileUri(filePath);
-    const result = await this._connection.sendRequest('textDocument/definition', {
-      textDocument: { uri },
-      position: pos,
-    });
+    const key = `definition:${filePath}:${pos.line}:${pos.character}`;
+    const result = await this._request<unknown>(
+      'textDocument/definition',
+      { textDocument: { uri }, position: pos },
+      key,
+    );
     if (!result) return [];
-    return Array.isArray(result) ? result : [result];
+    return (Array.isArray(result) ? result : [result]) as Array<{ uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }>;
   }
 
   async hover(filePath: string, pos: { line: number; character: number }): Promise<string | null> {
     const uri = toFileUri(filePath);
-    const result = await this._connection.sendRequest('textDocument/hover', {
-      textDocument: { uri },
-      position: pos,
-    }) as { contents?: { kind?: string; value?: string } | string | Array<{ value?: string } | string> } | null;
+    const key = `hover:${filePath}:${pos.line}:${pos.character}`;
+    const result = await this._request<{ contents?: unknown } | null>(
+      'textDocument/hover',
+      { textDocument: { uri }, position: pos },
+      key,
+    );
     if (!result || !result.contents) return null;
-    const c = result.contents;
+    const c = result.contents as unknown;
     if (typeof c === 'string') return c;
-    if (Array.isArray(c)) return c.map(x => typeof x === 'string' ? x : (x.value ?? '')).join('\n');
-    return c.value ?? null;
+    if (Array.isArray(c)) return c.map((x: unknown) => typeof x === 'string' ? x : ((x as { value?: string }).value ?? '')).join('\n');
+    return (c as { value?: string }).value ?? null;
   }
 
-  async references(filePath: string, pos: { line: number; character: number }): Promise<Array<{ uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }>> {
+  async references(filePath: string, pos: { line: number; character: number }) {
     const uri = toFileUri(filePath);
-    const result = await this._connection.sendRequest('textDocument/references', {
-      textDocument: { uri },
-      position: pos,
-      context: { includeDeclaration: false },
-    });
+    const key = `references:${filePath}:${pos.line}:${pos.character}`;
+    const result = await this._request<unknown>(
+      'textDocument/references',
+      { textDocument: { uri }, position: pos, context: { includeDeclaration: false } },
+      key,
+    );
     if (!result || !Array.isArray(result)) return [];
-    return result;
+    return result as Array<{ uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }>;
   }
 
   async openFile(filePath: string): Promise<void> {
