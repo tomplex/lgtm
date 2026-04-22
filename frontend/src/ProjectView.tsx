@@ -1,7 +1,8 @@
 import { createSignal, Show, onMount } from 'solid-js';
 import {
   files,
-  activeFileIdx,
+  activeFile,
+  setActiveRowId,
   activeItemId,
   setActiveItemId,
   appMode,
@@ -14,7 +15,6 @@ import {
   replaceComments,
   setAnalysis,
   setWholeFileView,
-  setActiveFileIdx,
   comments,
   sessionItems,
   setSessionItems,
@@ -24,6 +24,12 @@ import {
   allCommits,
   paletteOpen,
   setPaletteOpen,
+  collapsedFolders,
+  setCollapsedFolders,
+  dismissedFolders,
+  setDismissedFoldersStore,
+  symbolSearchOpen,
+  setSymbolSearchOpen,
 } from './state';
 import {
   fetchItems,
@@ -42,7 +48,6 @@ import { formatAllComments } from './format-comments';
 import { loadState, clearPersistedState, watchAndSave } from './persistence';
 import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { symbolSearchOpen, setSymbolSearchOpen } from './state';
 import SymbolSearch from './components/diff/SymbolSearch';
 import ProjectPalette from './components/palette/ProjectPalette';
 
@@ -59,14 +64,14 @@ export default function ProjectView() {
   const [commitPanelOpen, setCommitPanelOpen] = createSignal(false);
   const activeItemKey = `lgtm-active-item:${getProjectSlug()}`;
 
-  // Per-item state: remembers file index and scroll position per tab
-  const itemState = new Map<string, { fileIdx: number; scrollTop: number }>();
+  // Per-item state: remembers active file path and scroll position per tab
+  const itemState = new Map<string, { filePath: string | null; scrollTop: number }>();
 
   function saveCurrentItemState() {
     const id = activeItemId();
     const container = document.getElementById('diff-container');
     itemState.set(id, {
-      fileIdx: activeFileIdx(),
+      filePath: activeFile()?.path ?? null,
       scrollTop: container?.scrollTop ?? 0,
     });
   }
@@ -112,10 +117,14 @@ export default function ProjectView() {
       setAppMode('diff');
       setFiles(parseDiff(data.diff));
       const saved = itemState.get(itemId);
-      if (saved && saved.fileIdx < files().length) {
-        setActiveFileIdx(saved.fileIdx);
-      } else if (files().length > 0 && activeFileIdx() >= files().length) {
-        setActiveFileIdx(0);
+      const restoredPath = saved?.filePath;
+      const f = restoredPath ? files().find((x) => x.path === restoredPath) : undefined;
+      if (f) {
+        setActiveRowId(f.path);
+      } else if (files().length > 0) {
+        setActiveRowId(files()[0].path);
+      } else {
+        setActiveRowId(null);
       }
       setWholeFileView(false);
       await loadComments();
@@ -217,7 +226,7 @@ export default function ProjectView() {
       const data = await fetchItemData('diff', commits);
       if (data.mode !== 'diff') return;
       setFiles(parseDiff(data.diff));
-      if (activeFileIdx() >= files().length) setActiveFileIdx(0);
+      if (!activeFile() && files().length > 0) setActiveRowId(files()[0].path);
       showToast(`Showing ${shas.length} commit${shas.length !== 1 ? 's' : ''}`);
     } catch (e: any) {
       showToast('Failed to apply: ' + e.message);
@@ -330,16 +339,28 @@ export default function ProjectView() {
 
   // --- Hash navigation ---
 
-  window.addEventListener('hashchange', () => {
+  function navigateToHashFile() {
     const match = window.location.hash.match(/#file=(.+)/);
     if (!match) return;
     const path = decodeURIComponent(match[1]);
-    const idx = files().findIndex((f) => f.path === path);
-    if (idx >= 0 && idx !== activeFileIdx()) {
-      setActiveFileIdx(idx);
+    const f = files().find((x) => x.path === path);
+    if (!f) return;
+
+    // Force-expand every ancestor folder so the file is visible.
+    const segments = path.split('/');
+    for (let i = 1; i < segments.length; i++) {
+      const ancestor = segments.slice(0, i).join('/') + '/';
+      if (collapsedFolders[ancestor]) setCollapsedFolders(ancestor, false);
+      if (dismissedFolders[ancestor]) setDismissedFoldersStore(ancestor, false);
+    }
+
+    if (activeFile()?.path !== path) {
+      setActiveRowId(path);
       setWholeFileView(false);
     }
-  });
+  }
+
+  window.addEventListener('hashchange', navigateToHashFile);
 
   return (
     <>
