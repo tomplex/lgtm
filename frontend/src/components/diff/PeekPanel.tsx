@@ -1,19 +1,52 @@
 import { createSignal, createResource, Show, For, onMount, onCleanup } from 'solid-js';
-import { peekState, setPeekState } from '../../state';
-import { fetchSymbol, type SymbolResult } from '../../api';
+import { peekState, setPeekState, setLspStatus } from '../../state';
+import {
+  fetchSymbol, fetchDefinition, fetchHover, fetchReferences, cancelLspRequest,
+  type SymbolResult,
+} from '../../api';
 import { highlightLine, detectLang, escapeHtml } from '../../utils';
 import { showToast } from '../shared/Toast';
+import type { Language } from '../../state';
+
+function languageFromFile(file: string): Language | null {
+  const lower = file.toLowerCase();
+  if (lower.endsWith('.py')) return 'python';
+  if (lower.endsWith('.ts') || lower.endsWith('.tsx') || lower.endsWith('.js') || lower.endsWith('.jsx')) return 'typescript';
+  if (lower.endsWith('.rs')) return 'rust';
+  return null;
+}
 
 export default function PeekPanel() {
   const [activeTab, setActiveTab] = createSignal(0);
+  const [showAllRefs, setShowAllRefs] = createSignal(false);
   let panelRef: HTMLDivElement | undefined;
 
+  // Definition — LSP when character is present, else name-search fallback
   const [data] = createResource(
-    () => peekState()?.symbol,
-    async (symbol) => {
-      if (!symbol) return null;
+    () => peekState(),
+    async (state) => {
+      if (!state) return null;
       try {
-        const resp = await fetchSymbol(symbol);
+        if (state.character != null) {
+          const resp = await fetchDefinition(state.filePath, state.lineIdx, state.character);
+          const lang = languageFromFile(state.filePath);
+          if (lang) {
+            const status =
+              resp.status === 'ok' ? 'ok' :
+              resp.status === 'indexing' ? 'indexing' :
+              resp.status === 'fallback' ? 'ok' :
+              'missing';
+            setLspStatus(lang, status);
+          }
+          if (resp.result.results.length === 0) {
+            showToast('No definition found');
+            setPeekState(null);
+            return null;
+          }
+          setActiveTab(0);
+          return { symbol: state.symbol, results: resp.result.results };
+        }
+        const resp = await fetchSymbol(state.symbol);
         if (resp.results.length === 0) {
           showToast('No definition found');
           setPeekState(null);
@@ -25,6 +58,32 @@ export default function PeekPanel() {
         showToast('Symbol lookup failed');
         setPeekState(null);
         return null;
+      }
+    },
+  );
+
+  const [hover] = createResource(
+    () => peekState()?.character != null ? peekState() : null,
+    async (state) => {
+      if (!state) return null;
+      try {
+        const resp = await fetchHover(state.filePath, state.lineIdx, state.character!);
+        return resp.result;
+      } catch {
+        return null;
+      }
+    },
+  );
+
+  const [refs] = createResource(
+    () => peekState()?.character != null ? peekState() : null,
+    async (state) => {
+      if (!state) return [];
+      try {
+        const resp = await fetchReferences(state.filePath, state.lineIdx, state.character!);
+        return resp.result.references;
+      } catch {
+        return [];
       }
     },
   );
@@ -43,6 +102,12 @@ export default function PeekPanel() {
   }
 
   function handleClose() {
+    const s = peekState();
+    if (s?.character != null) {
+      void cancelLspRequest('definition', s.filePath, s.lineIdx, s.character);
+      void cancelLspRequest('hover', s.filePath, s.lineIdx, s.character);
+      void cancelLspRequest('references', s.filePath, s.lineIdx, s.character);
+    }
     setPeekState(null);
   }
 
@@ -73,14 +138,13 @@ export default function PeekPanel() {
 
     const current = peekState();
     if (current) {
-      setPeekState({ ...current, symbol: word });
+      // Supersede via name-search inside a peek (no character offset available for nested peek)
+      setPeekState({ ...current, symbol: word, character: undefined });
     }
   }
 
   function onDocClick(e: MouseEvent) {
-    if (panelRef && !panelRef.contains(e.target as Node)) {
-      handleClose();
-    }
+    if (panelRef && !panelRef.contains(e.target as Node)) handleClose();
   }
 
   function onDocKeyDown(e: KeyboardEvent) {
@@ -102,6 +166,9 @@ export default function PeekPanel() {
     document.removeEventListener('keydown', onDocKeyDown);
   });
 
+  const VISIBLE_REFS = 50;
+  const visibleRefs = () => showAllRefs() ? refs() ?? [] : (refs() ?? []).slice(0, VISIBLE_REFS);
+
   return (
     <Show when={peekState() && data()?.results?.length}>
       <tr class="peek-row">
@@ -111,9 +178,7 @@ export default function PeekPanel() {
               <button class="peek-close" onClick={handleClose} title="Close (Esc)">✕</button>
               <strong class="peek-symbol">{data()!.symbol}</strong>
               <Show when={activeResult()}>
-                {(r) => (
-                  <span class="peek-location">{r().file}:{r().line}</span>
-                )}
+                {(r) => <span class="peek-location">{r().file}:{r().line}</span>}
               </Show>
               <Show when={(data()?.results.length ?? 0) > 1}>
                 <select
@@ -129,16 +194,46 @@ export default function PeekPanel() {
                 </select>
               </Show>
             </div>
+
+            <Show when={hover()?.signature}>
+              <div class="peek-hover">
+                <div class="peek-hover-signature">{hover()!.signature}</div>
+                <Show when={hover()?.docs}>
+                  <div class="peek-hover-docs">{hover()!.docs}</div>
+                </Show>
+              </div>
+            </Show>
+
             <Show when={activeResult()}>
               {(r) => (
                 <>
-                  <Show when={r().docstring}>
+                  <Show when={r().docstring && !hover()?.signature}>
                     <div class="peek-docstring">{r().docstring}</div>
                   </Show>
                   <pre class="peek-body" onClick={handleBodyClick}><code innerHTML={highlightBody(r())} /></pre>
                 </>
               )}
             </Show>
+
+            <Show when={(refs() ?? []).length > 0}>
+              <div class="peek-refs">
+                <div class="peek-refs-header">References · {(refs() ?? []).length}</div>
+                <For each={visibleRefs()}>
+                  {(ref) => (
+                    <div class="peek-ref">
+                      <span class="peek-ref-loc">{ref.file}:{ref.line}</span>
+                      <span class="peek-ref-snippet">{ref.snippet}</span>
+                    </div>
+                  )}
+                </For>
+                <Show when={(refs() ?? []).length > VISIBLE_REFS && !showAllRefs()}>
+                  <button class="peek-refs-more" onClick={() => setShowAllRefs(true)}>
+                    Show {(refs() ?? []).length - VISIBLE_REFS} more
+                  </button>
+                </Show>
+              </div>
+            </Show>
+
             <div class="peek-footer">Esc to close</div>
           </div>
         </td>

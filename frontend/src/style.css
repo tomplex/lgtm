@@ -2183,3 +2183,46 @@ body.cmd-held .line-content .hljs-type {
 .lsp-chip-indexing { background: #fff4d6; color: #8a5a00; }
 .lsp-chip-crashed { background: #fdd; color: #a00; }
 .lsp-chip-partial { background: #e8f0ff; color: #336; }
+
+/* Peek panel — hover fields + references list */
+.peek-hover {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--bg-subtle, #f8f8f8);
+}
+.peek-hover-signature { font-weight: 600; }
+.peek-hover-docs { color: var(--muted, #666); margin-top: 4px; font-family: inherit; }
+
+.peek-refs {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  background: var(--bg-subtle, #f8f8f8);
+}
+.peek-refs-header {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted, #666);
+  font-weight: 600;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.peek-ref {
+  display: flex;
+  gap: 10px;
+  font-family: ui-monospace, monospace;
+  padding: 2px 0;
+}
+.peek-ref-loc { color: var(--accent, #0066cc); min-width: 180px; }
+.peek-ref-snippet { color: var(--muted, #666); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peek-refs-more {
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
