@@ -87,6 +87,14 @@ export const [sessionItems, setSessionItems] = createSignal<SessionItem[]>([]);
 export const [allCommits, setAllCommits] = createSignal<Commit[]>([]);
 export const [analysis, setAnalysis] = createSignal<Analysis | null>(null);
 
+export type SortMode = 'path' | 'priority';
+export type GroupMode = 'none' | 'phase';
+
+export const [sortMode, setSortMode] = createSignal<SortMode>('path');
+export const [groupMode, setGroupMode] = createSignal<GroupMode>('none');
+export const [groupModeUserTouched, setGroupModeUserTouched] = createSignal(false);
+export const [activeRowId, setActiveRowId] = createSignal<string | null>(null);
+
 /** Toggle between diff and whole-file view, preserving scroll position by line number. */
 export function toggleWholeFileView() {
   const container = document.getElementById('diff-container');
@@ -183,6 +191,26 @@ export function toggleReviewed(path: string) {
 }
 
 export const [selectedShas, setSelectedShas] = createStore<Record<string, boolean>>({});
+
+export const [collapsedFolders, setCollapsedFolders] = createStore<Record<string, boolean>>({});
+
+export function toggleFolderCollapsed(fullPath: string) {
+  setCollapsedFolders(fullPath, (v) => !v);
+}
+
+export const [dismissedFiles, setDismissedFilesStore] = createStore<Record<string, boolean>>({});
+export const [dismissedFolders, setDismissedFoldersStore] = createStore<Record<string, boolean>>({});
+
+export function dismissFile(path: string) {
+  setDismissedFilesStore(path, true);
+}
+export function dismissFolder(fullPath: string) {
+  setDismissedFoldersStore(fullPath, true);
+}
+export function undismissAll() {
+  for (const k of Object.keys(dismissedFiles)) setDismissedFilesStore(k, undefined!);
+  for (const k of Object.keys(dismissedFolders)) setDismissedFoldersStore(k, undefined!);
+}
 
 // --- Derived state ---
 
