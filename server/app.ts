@@ -17,6 +17,50 @@ import {
 import { extensionToLanguage, getLanguageConfig } from './lsp/index.js';
 import { fromFileUri } from './lsp/uri.js';
 
+/**
+ * LSP hover content comes back as markdown. For TS / Rust / Python, common shapes are:
+ *   1. Single fenced block (typescript-language-server): ```ts\nsig\n```
+ *   2. Fenced block + docs:                              ```ts\nsig\n```\n\ndocs...
+ *   3. Fenced block + --- + docs (ty / some TS setups)
+ *   4. Multiple fenced blocks (rust-analyzer)
+ *   5. Plain text
+ *
+ * The goal here is to return a clean `signature` (no fences) and optional `docs`,
+ * without relying on a fragile single-shot regex.
+ */
+function parseHover(raw: string): { signature?: string; docs?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+
+  const signatureLines: string[] = [];
+  const docsLines: string[] = [];
+  let stage: 'before-fence' | 'in-fence' | 'after-fence' = 'before-fence';
+
+  for (const line of trimmed.split('\n')) {
+    if (stage === 'before-fence') {
+      if (line.startsWith('```')) {
+        stage = 'in-fence';
+      } else {
+        signatureLines.push(line);
+      }
+    } else if (stage === 'in-fence') {
+      if (line.startsWith('```')) {
+        stage = 'after-fence';
+      } else {
+        signatureLines.push(line);
+      }
+    } else {
+      if (line.startsWith('```')) continue;               // drop further fences
+      if (/^-{3,}\s*$/.test(line)) continue;              // drop --- separators
+      docsLines.push(line);
+    }
+  }
+
+  const signature = signatureLines.join('\n').trim() || undefined;
+  const docs = docsLines.join('\n').trim() || undefined;
+  return { signature, docs };
+}
+
 declare global {
   namespace Express {
     interface Locals {
@@ -294,10 +338,7 @@ export function createApp(manager: SessionManager): express.Express {
         res.json({ status: 'ok', result: {} });
         return;
       }
-      const match = raw.match(/^```[^\n]*\n([\s\S]*?)\n```\s*(?:\n+([\s\S]*))?$/);
-      const signature = match ? match[1].trim() : raw.trim();
-      const docs = match?.[2]?.trim();
-      res.json({ status: 'ok', result: { signature, docs } });
+      res.json({ status: 'ok', result: parseHover(raw) });
     } catch (err) {
       console.log(`LSP_HOVER_FAIL language=${language} error=${(err as Error).message}`);
       res.json({ status: 'fallback', result: {} });
