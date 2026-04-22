@@ -39,7 +39,7 @@ import {
 import { fetchComments } from './comment-api';
 import { parseDiff } from './diff';
 import { formatAllComments } from './format-comments';
-import { loadState, clearPersistedState } from './persistence';
+import { loadState, clearPersistedState, watchAndSave } from './persistence';
 import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { symbolSearchOpen, setSymbolSearchOpen } from './state';
@@ -284,6 +284,7 @@ export default function ProjectView() {
 
   onMount(async () => {
     await loadState();
+    watchAndSave();
     await loadItems();
 
     const analysisData = await fetchAnalysis();
