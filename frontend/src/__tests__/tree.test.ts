@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTree } from '../tree';
+import { buildTree, flattenVisible, matchesFilter } from '../tree';
 import type { DiffFile, Analysis } from '../state';
 
 function makeFile(path: string, additions = 10, deletions = 5): DiffFile {
@@ -188,5 +188,115 @@ describe('buildTree — Claude-comments-first', () => {
     const skimRoot = tree[0] as any;
     const xFolder = skimRoot.children[0];
     expect(xFolder.children.map((n: any) => n.file.path)).toEqual(['x/b.ts', 'x/a.ts']);
+  });
+});
+
+describe('matchesFilter', () => {
+  it('matches substring', () => {
+    expect(matchesFilter('src/app.ts', 'app')).toBe(true);
+    expect(matchesFilter('src/app.ts', 'nope')).toBe(false);
+  });
+  it('supports glob star', () => {
+    expect(matchesFilter('src/app.ts', '*.ts')).toBe(true);
+  });
+  it('supports negation', () => {
+    expect(matchesFilter('src/app.ts', '!test')).toBe(true);
+    expect(matchesFilter('src/test.ts', '!test')).toBe(false);
+  });
+  it('ANDs space-separated terms', () => {
+    expect(matchesFilter('src/auth/login.ts', 'auth login')).toBe(true);
+    expect(matchesFilter('src/auth/login.ts', 'auth nope')).toBe(false);
+  });
+});
+
+describe('flattenVisible', () => {
+  const files = [
+    makeFile('a.ts'),
+    makeFile('sub/b.ts'),
+    makeFile('sub/c.ts'),
+    makeFile('other/d.ts'),
+  ];
+  const tree = buildTree(files, null, { sort: 'path', group: 'none' });
+
+  it('expanded tree yields folders and files in order', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: {}, dismissedFolders: new Set(), dismissedFiles: new Set(), filterQuery: '',
+    });
+    expect(rows.map((r) => r.id)).toEqual([
+      'other/', 'other/d.ts',
+      'sub/', 'sub/b.ts', 'sub/c.ts',
+      'a.ts',
+    ]);
+  });
+
+  it('collapsed folder hides its children', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: { 'sub/': true },
+      dismissedFolders: new Set(), dismissedFiles: new Set(), filterQuery: '',
+    });
+    expect(rows.map((r) => r.id)).toEqual([
+      'other/', 'other/d.ts',
+      'sub/',
+      'a.ts',
+    ]);
+  });
+
+  it('dismissed folder hides entire subtree', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: {},
+      dismissedFolders: new Set(['sub/']),
+      dismissedFiles: new Set(), filterQuery: '',
+    });
+    expect(rows.map((r) => r.id)).toEqual([
+      'other/', 'other/d.ts',
+      'a.ts',
+    ]);
+  });
+
+  it('dismissed file hides just that file', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: {},
+      dismissedFolders: new Set(),
+      dismissedFiles: new Set(['sub/b.ts']),
+      filterQuery: '',
+    });
+    expect(rows.map((r) => r.id)).toEqual([
+      'other/', 'other/d.ts',
+      'sub/', 'sub/c.ts',
+      'a.ts',
+    ]);
+  });
+
+  it('filter hides non-matching files and empty folders', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: {}, dismissedFolders: new Set(), dismissedFiles: new Set(),
+      filterQuery: 'c.ts',
+    });
+    expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/c.ts']);
+  });
+
+  it('filter auto-expands collapsed folders with matches', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: { 'sub/': true },
+      dismissedFolders: new Set(), dismissedFiles: new Set(),
+      filterQuery: 'b.ts',
+    });
+    expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/b.ts']);
+  });
+
+  it('filter overrides dismiss (matching dismissed file becomes visible)', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: {}, dismissedFolders: new Set(['sub/']), dismissedFiles: new Set(),
+      filterQuery: 'b.ts',
+    });
+    expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/b.ts']);
+  });
+
+  it('folder-path query makes all descendants visible even when files do not match', () => {
+    const rows = flattenVisible(tree, {
+      collapsedFolders: {}, dismissedFolders: new Set(), dismissedFiles: new Set(),
+      filterQuery: 'sub/',
+    });
+    expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/b.ts', 'sub/c.ts']);
   });
 });
