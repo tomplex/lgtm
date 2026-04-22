@@ -95,7 +95,7 @@ function runRipgrep(repoPath: string, symbol: string): RgMatch[] {
   return matches;
 }
 
-function detectKind(lineText: string): SymbolResult['kind'] {
+export function detectKind(lineText: string): SymbolResult['kind'] {
   // Python
   const pyMatch = lineText.match(/^\s*(def|class)\s+/);
   if (pyMatch) {
@@ -126,7 +126,7 @@ function isPython(file: string): boolean {
   return file.endsWith('.py');
 }
 
-function extractPythonBody(lines: string[], startIndex: number): string {
+export function extractPythonBody(lines: string[], startIndex: number): string {
   const defLine = lines[startIndex];
   const defIndentMatch = defLine.match(/^(\s*)/);
   const defIndent = defIndentMatch ? defIndentMatch[1].length : 0;
@@ -165,7 +165,7 @@ function extractPythonBody(lines: string[], startIndex: number): string {
   return bodyLines.join('\n');
 }
 
-function extractTypeScriptBody(lines: string[], startIndex: number): string {
+export function extractTypeScriptBody(lines: string[], startIndex: number): string {
   const bodyLines: string[] = [];
   let depth = 0;
   let foundOpen = false;
@@ -199,7 +199,7 @@ function extractTypeScriptBody(lines: string[], startIndex: number): string {
   return bodyLines.join('\n');
 }
 
-function extractPythonDocstring(lines: string[], startIndex: number): string | null {
+export function extractPythonDocstring(lines: string[], startIndex: number): string | null {
   // Look for a triple-quoted string on the line after the def/class
   let i = startIndex + 1;
   // Skip the def line continuation lines (with parens) if any
@@ -241,7 +241,7 @@ function extractPythonDocstring(lines: string[], startIndex: number): string | n
   return docLines.join(' ').trim();
 }
 
-function extractJsDocstring(lines: string[], startIndex: number): string | null {
+export function extractJsDocstring(lines: string[], startIndex: number): string | null {
   // Look backwards from startIndex for a /** ... */ block
   if (startIndex === 0) return null;
 

@@ -1,14 +1,21 @@
 import express, { type Request, type Response, type NextFunction, Router } from 'express';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, relative as pathRelative, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getFileLines, getBranchCommits, gitRun, getRepoMeta } from './git-ops.js';
 import { type Session, type SSEClient } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 import { notifyChannel } from './mcp.js';
-import { findSymbol, sortResults } from './symbol-lookup.js';
+import {
+  findSymbol, sortResults,
+  extractPythonBody, extractTypeScriptBody,
+  extractPythonDocstring, extractJsDocstring, detectKind,
+  type SymbolResult,
+} from './symbol-lookup.js';
+import { extensionToLanguage, getLanguageConfig } from './lsp/index.js';
+import { fromFileUri } from './lsp/uri.js';
 
 declare global {
   namespace Express {
@@ -183,6 +190,80 @@ export function createApp(manager: SessionManager): express.Express {
     const results = findSymbol(session.repoPath, name);
     const sorted = sortResults(results, new Set());
     res.json({ symbol: name, results: sorted });
+  });
+
+  projectRouter.get('/definition', async (req, res) => {
+    const session = res.locals.session;
+    const file = (req.query.file as string) ?? '';
+    const line = parseInt((req.query.line as string) ?? '-1', 10);
+    const character = parseInt((req.query.character as string) ?? '-1', 10);
+    if (!file || line < 0 || character < 0) {
+      res.status(400).json({ error: 'file, line, character required' });
+      return;
+    }
+    const language = extensionToLanguage(file);
+    const absPath = pathResolve(session.repoPath, file);
+
+    const fallback = () => {
+      let name = '';
+      try {
+        const content = readFileSync(absPath, 'utf8');
+        const lines = content.split('\n');
+        const l = lines[line] ?? '';
+        let s = character;
+        let e = character;
+        while (s > 0 && /[\w]/.test(l[s - 1])) s--;
+        while (e < l.length && /[\w]/.test(l[e])) e++;
+        name = l.slice(s, e);
+      } catch { /* ignore */ }
+      if (!name) return { symbol: '', results: [] as SymbolResult[] };
+      const results = findSymbol(session.repoPath, name);
+      return { symbol: name, results: sortResults(results, new Set([file])) };
+    };
+
+    if (!language) {
+      res.json({ status: 'fallback', result: fallback() });
+      return;
+    }
+
+    const client = await session.lsp.get(language);
+    if (!client) {
+      res.json({ status: 'missing', result: fallback() });
+      return;
+    }
+
+    const cfg = getLanguageConfig(language);
+    if (cfg.requiresOpen) await client.openFile(absPath);
+
+    try {
+      const locs = await client.definition(absPath, { line, character });
+      if (locs.length === 0) {
+        res.json({ status: 'ok', result: { symbol: '', results: [] } });
+        return;
+      }
+      const results: SymbolResult[] = [];
+      for (const loc of locs) {
+        const targetPath = fromFileUri(loc.uri);
+        let content: string;
+        try { content = readFileSync(targetPath, 'utf8'); } catch { continue; }
+        const lines = content.split('\n');
+        const startLine = loc.range.start.line;
+        const lineText = lines[startLine] ?? '';
+        const kind = detectKind(lineText);
+        const body = targetPath.endsWith('.py')
+          ? extractPythonBody(lines, startLine)
+          : extractTypeScriptBody(lines, startLine);
+        const docstring = targetPath.endsWith('.py')
+          ? extractPythonDocstring(lines, startLine)
+          : extractJsDocstring(lines, startLine);
+        const relative = pathRelative(session.repoPath, targetPath) || targetPath;
+        results.push({ file: relative, line: startLine + 1, kind, body, docstring });
+      }
+      res.json({ status: 'ok', result: { symbol: '', results } });
+    } catch (err) {
+      console.log(`LSP_DEFINITION_FAIL language=${language} error=${(err as Error).message}`);
+      res.json({ status: 'fallback', result: fallback() });
+    }
   });
 
   // --- User state routes ---
