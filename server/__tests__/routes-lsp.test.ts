@@ -47,3 +47,39 @@ describe('GET /project/:slug/definition', () => {
     expect(resp.body.result.results).toBeTruthy();
   });
 });
+
+describe('GET /project/:slug/hover', () => {
+  it('returns hover content when LSP responds', async () => {
+    repoDir = makeRepo({ 'foo.py': 'x = 1\n' });
+    mgr = new SessionManager(9900);
+    const { slug } = mgr.register(repoDir);
+    const session = mgr.get(slug)!;
+    const fakeClient = {
+      hover: vi.fn(async () => '```py\nx: int\n```'),
+      openFile: vi.fn(async () => {}),
+    };
+    (session.lsp as any).get = vi.fn(async () => fakeClient);
+
+    const app = createApp(mgr);
+    const resp = await request(app)
+      .get(`/project/${slug}/hover?file=foo.py&line=0&character=0`);
+    expect(resp.status).toBe(200);
+    expect(resp.body.status).toBe('ok');
+    expect(resp.body.result.signature).toContain('x: int');
+  });
+
+  it('returns empty result when LSP is missing', async () => {
+    repoDir = makeRepo({ 'foo.py': 'x = 1\n' });
+    mgr = new SessionManager(9900);
+    const { slug } = mgr.register(repoDir);
+    const session = mgr.get(slug)!;
+    (session.lsp as any).get = vi.fn(async () => null);
+
+    const app = createApp(mgr);
+    const resp = await request(app)
+      .get(`/project/${slug}/hover?file=foo.py&line=0&character=0`);
+    expect(resp.status).toBe(200);
+    expect(resp.body.status).toBe('missing');
+    expect(resp.body.result).toEqual({});
+  });
+});
