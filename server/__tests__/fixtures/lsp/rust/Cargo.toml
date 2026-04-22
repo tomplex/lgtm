@@ -1,0 +1,11 @@
+[package]
+name = "lsp_fixture"
+version = "0.0.0"
+edition = "2021"
+
+[[bin]]
+name = "lsp-fixture"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
