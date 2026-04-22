@@ -44,7 +44,7 @@ Pure function `buildTree(files, analysis, { sort, group }) → TreeNode[]`:
 1. For each changed file path, split on `/`.
 2. Insert into a trie of directories → files.
 3. Walk the trie; collapse single-child directory chains: any directory with exactly one child directory and no files of its own merges with that child. Merging stops when the chain branches or when the directory contains files. Result: rows like `frontend/src/`, `components/sidebar/`.
-4. If `group === 'phase'`, replace the top level with three synthetic root nodes keyed by phase. Each root builds its own independent compact-folder sub-tree from the files in that phase.
+4. If `group === 'phase'`, replace the top level with three synthetic root nodes keyed by phase. Each root builds its own independent compact-folder sub-tree from the files in that phase. Sort rules in step 5 apply within each phase's sub-tree independently; the three phase roots themselves are fixed in order (`review` → `skim` → `rubber-stamp`).
 5. Sort at each folder:
    - Folders first, then files (matches VS Code / Finder convention).
    - Claude-commented files float to the top of their containing folder, irrespective of sort mode.
@@ -93,7 +93,7 @@ A single `createMemo` over `files()`, `analysis()`, `sortMode()`, `groupMode()` 
 
 The existing filter logic (space-separated terms, glob `*`, `!` negation, AND across terms) is preserved. Two extensions:
 
-1. **Folder-path matching.** A query term is matched against each file's full path (existing) *and* each compact-folder's full path. A folder is considered a match if its path matches; its files inherit visibility. This lets `sidebar/` filter the tree to just that subtree.
+1. **Folder-path matching.** A query term is matched against each file's full path (existing) *and* each compact-folder's full path. When a folder matches the filter, *every* file inside that folder (recursively) is treated as visible, even if the file paths themselves don't independently match. This lets `sidebar/` act as a subtree filter.
 2. **Auto-expand on match.** When `filterQuery()` is non-empty, folders with visible descendants auto-expand regardless of their persisted collapse state. Persisted state is restored the moment the filter clears.
 
 ## Folder affordances
@@ -126,8 +126,8 @@ Unchanged: `e` toggles reviewed on the active file; `f` focuses filter; `Enter`/
 - `groupModeUserTouched: Signal<boolean>` — set true the first time the user clicks a `Group by` chip. Persisted per-project.
 - `collapsedFolders: Store<Record<string, boolean>>` — keyed by compact-folder path. Persisted per-project.
 - `dismissedFolders: Signal<Set<string>>` — session-only, parallel to existing `dismissedFiles`.
-- `activeRowId: Signal<string | null>` — replaces `activeFileIdx` as the selection anchor.
-- `activeFile: () => DiffFile | null` — derived memo returning the `DiffFile` when `activeRowId` is a file row, else `null`. All existing `files()[activeFileIdx()]` consumers route through this.
+- `activeRowId: Signal<string | null>` — replaces `activeFileIdx` as the selection anchor. The value is the `id` of a `TreeNode` (phase-prefixed file or folder path when grouped, plain path otherwise), not a file path directly.
+- `activeFile: () => DiffFile | null` — derived memo that looks up `activeRowId` in the current visible-rows list and returns the `DiffFile` when it resolves to a `FileNode`, else `null`. All existing `files()[activeFileIdx()]` consumers route through this.
 
 ### Removed
 
