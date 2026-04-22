@@ -100,3 +100,57 @@ describe('LspClient rust-analyzer quiescent wait', () => {
     expect(client.state).toBe('ready');
   });
 });
+
+describe('LspClient request methods', () => {
+  it('definition sends textDocument/definition with uri + position', async () => {
+    const conn = makeFakeConnection({
+      sendRequest: vi.fn(async (method: string, params?: unknown) => {
+        if (method === 'initialize') return { capabilities: {} };
+        if (method === 'textDocument/definition') {
+          expect(params).toMatchObject({
+            textDocument: { uri: expect.stringContaining('/tmp/proj/foo.py') },
+            position: { line: 10, character: 4 },
+          });
+          return [{ uri: 'file:///tmp/proj/bar.py', range: { start: { line: 1, character: 0 }, end: { line: 1, character: 5 } } }];
+        }
+        return null;
+      }) as any,
+    });
+    const client = new LspClient({ language: 'python', projectPath: '/tmp/proj', connection: conn });
+    await client.initialize();
+    const locs = await client.definition('/tmp/proj/foo.py', { line: 10, character: 4 });
+    expect(locs).toHaveLength(1);
+    expect(locs[0].uri).toContain('bar.py');
+  });
+
+  it('hover returns markdown-string contents', async () => {
+    const conn = makeFakeConnection({
+      sendRequest: vi.fn(async (method: string) => {
+        if (method === 'initialize') return { capabilities: {} };
+        if (method === 'textDocument/hover') return { contents: { kind: 'markdown', value: '```py\ndef foo(x: int) -> str\n```' } };
+        return null;
+      }) as any,
+    });
+    const client = new LspClient({ language: 'python', projectPath: '/tmp/proj', connection: conn });
+    await client.initialize();
+    const hover = await client.hover('/tmp/proj/foo.py', { line: 0, character: 0 });
+    expect(hover).toContain('def foo');
+  });
+
+  it('references returns array of Locations', async () => {
+    const conn = makeFakeConnection({
+      sendRequest: vi.fn(async (method: string) => {
+        if (method === 'initialize') return { capabilities: {} };
+        if (method === 'textDocument/references') return [
+          { uri: 'file:///tmp/proj/a.py', range: { start: { line: 5, character: 0 }, end: { line: 5, character: 3 } } },
+          { uri: 'file:///tmp/proj/b.py', range: { start: { line: 9, character: 2 }, end: { line: 9, character: 5 } } },
+        ];
+        return null;
+      }) as any,
+    });
+    const client = new LspClient({ language: 'python', projectPath: '/tmp/proj', connection: conn });
+    await client.initialize();
+    const refs = await client.references('/tmp/proj/a.py', { line: 0, character: 0 });
+    expect(refs).toHaveLength(2);
+  });
+});

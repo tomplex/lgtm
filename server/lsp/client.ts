@@ -98,6 +98,40 @@ export class LspClient {
     });
   }
 
+  async definition(filePath: string, pos: { line: number; character: number }): Promise<Array<{ uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }>> {
+    const uri = toFileUri(filePath);
+    const result = await this._connection.sendRequest('textDocument/definition', {
+      textDocument: { uri },
+      position: pos,
+    });
+    if (!result) return [];
+    return Array.isArray(result) ? result : [result];
+  }
+
+  async hover(filePath: string, pos: { line: number; character: number }): Promise<string | null> {
+    const uri = toFileUri(filePath);
+    const result = await this._connection.sendRequest('textDocument/hover', {
+      textDocument: { uri },
+      position: pos,
+    }) as { contents?: { kind?: string; value?: string } | string | Array<{ value?: string } | string> } | null;
+    if (!result || !result.contents) return null;
+    const c = result.contents;
+    if (typeof c === 'string') return c;
+    if (Array.isArray(c)) return c.map(x => typeof x === 'string' ? x : (x.value ?? '')).join('\n');
+    return c.value ?? null;
+  }
+
+  async references(filePath: string, pos: { line: number; character: number }): Promise<Array<{ uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }>> {
+    const uri = toFileUri(filePath);
+    const result = await this._connection.sendRequest('textDocument/references', {
+      textDocument: { uri },
+      position: pos,
+      context: { includeDeclaration: false },
+    });
+    if (!result || !Array.isArray(result)) return [];
+    return result;
+  }
+
   async shutdown(): Promise<void> {
     if (this._state === 'shuttingDown' || this._state === 'crashed') return;
     this._state = 'shuttingDown';
