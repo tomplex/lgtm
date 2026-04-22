@@ -251,21 +251,6 @@ export const activeFile = createMemo(() => {
   return undefined;
 });
 
-// Legacy index-based selection — derived from activeRowId during migration.
-// TODO: remove once all consumers use activeFile()/activeRowId().
-export const activeFileIdx = createMemo(() => {
-  const f = activeFile();
-  if (!f) return 0;
-  const idx = files().findIndex((file) => file.path === f.path);
-  return idx >= 0 ? idx : 0;
-});
-
-export function setActiveFileIdx(idx: number) {
-  const f = files()[idx];
-  if (f) setActiveRowId(f.path);
-  else setActiveRowId(null);
-}
-
 export const commentsByFile = createMemo(() => {
   const result: Record<string, Comment[]> = {};
   for (const c of comments.list) {
