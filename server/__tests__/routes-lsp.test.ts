@@ -127,3 +127,42 @@ describe('GET /project/:slug/references', () => {
     expect(resp.body.result.references).toEqual([]);
   });
 });
+
+describe('GET /project/:slug/lsp/debug', () => {
+  it('returns per-language stderr ring buffer and state', async () => {
+    repoDir = makeRepo({ 'foo.py': 'x = 1\n' });
+    mgr = new SessionManager(9900);
+    const { slug } = mgr.register(repoDir);
+    const session = mgr.get(slug)!;
+    const fakeClient = {
+      state: 'ready',
+      stderrRing: ['line a', 'line b'],
+      openFiles: () => ['/tmp/proj/foo.py'],
+    };
+    (session.lsp as any).get = vi.fn(async (lang: string) => lang === 'python' ? fakeClient : null);
+
+    const app = createApp(mgr);
+    const resp = await request(app).get(`/project/${slug}/lsp/debug`);
+    expect(resp.status).toBe(200);
+    expect(resp.body.python).toMatchObject({ state: 'ready', stderr: ['line a', 'line b'] });
+    expect(resp.body.typescript).toMatchObject({ state: 'missing' });
+  });
+});
+
+describe('DELETE /project/:slug/lsp/request', () => {
+  it('calls client.cancel for the specified method + position', async () => {
+    repoDir = makeRepo({ 'foo.py': 'x = 1\n' });
+    mgr = new SessionManager(9900);
+    const { slug } = mgr.register(repoDir);
+    const session = mgr.get(slug)!;
+    const cancel = vi.fn();
+    const fakeClient = { cancel };
+    (session.lsp as any).get = vi.fn(async () => fakeClient);
+
+    const app = createApp(mgr);
+    const resp = await request(app)
+      .delete(`/project/${slug}/lsp/request?method=definition&file=foo.py&line=0&character=0`);
+    expect(resp.status).toBe(200);
+    expect(cancel).toHaveBeenCalledWith('definition', expect.stringContaining('foo.py'), { line: 0, character: 0 });
+  });
+});

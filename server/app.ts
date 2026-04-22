@@ -345,6 +345,44 @@ export function createApp(manager: SessionManager): express.Express {
     }
   });
 
+  projectRouter.get('/lsp/debug', async (_req, res) => {
+    const session = res.locals.session;
+    const result: Record<string, unknown> = {};
+    for (const lang of ['python', 'typescript', 'rust'] as const) {
+      const client = await session.lsp.get(lang).catch(() => null);
+      if (!client) {
+        result[lang] = { state: 'missing' };
+      } else {
+        result[lang] = {
+          state: (client as { state?: string }).state ?? 'unknown',
+          stderr: (client as { stderrRing?: string[] }).stderrRing ?? [],
+          openFiles: (client as { openFiles?: () => string[] }).openFiles?.() ?? [],
+        };
+      }
+    }
+    res.json(result);
+  });
+
+  projectRouter.delete('/lsp/request', async (req, res) => {
+    const session = res.locals.session;
+    const method = (req.query.method as string) as 'definition' | 'hover' | 'references';
+    const file = (req.query.file as string) ?? '';
+    const line = parseInt((req.query.line as string) ?? '-1', 10);
+    const character = parseInt((req.query.character as string) ?? '-1', 10);
+    if (!['definition', 'hover', 'references'].includes(method) || !file || line < 0 || character < 0) {
+      res.status(400).json({ error: 'method, file, line, character required' });
+      return;
+    }
+    const language = extensionToLanguage(file);
+    if (!language) { res.json({ ok: true }); return; }
+    const client = await session.lsp.get(language);
+    if (!client) { res.json({ ok: true }); return; }
+    const absPath = pathResolve(session.repoPath, file);
+    (client as { cancel: (m: string, p: string, pos: { line: number; character: number }) => void })
+      .cancel(method, absPath, { line, character });
+    res.json({ ok: true });
+  });
+
   // --- User state routes ---
 
   projectRouter.get('/user-state', (_req, res) => {
