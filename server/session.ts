@@ -9,6 +9,7 @@ import { storePut, type ProjectBlob } from './store.js';
 import { CommentStore } from './comment-store.js';
 import { migrateBlob } from './comment-migration.js';
 import type { Comment, CreateComment, CommentFilter } from './comment-types.js';
+import { LspManager } from './lsp/index.js';
 
 // --- Types ---
 
@@ -42,6 +43,7 @@ export class Session {
   private _reviewedFiles = new Set<string>();
   private _sidebarView = 'flat';
   private _metaCache: { meta: RepoMeta; at: number } | null = null;
+  private _lsp: LspManager;
 
   constructor(opts: {
     repoPath: string;
@@ -55,6 +57,15 @@ export class Session {
     this.description = opts.description ?? '';
     this.outputPath = opts.outputPath ?? '';
     this._slug = opts.slug ?? '';
+    this._lsp = new LspManager({ projectPath: this.repoPath });
+  }
+
+  get lsp(): LspManager {
+    return this._lsp;
+  }
+
+  async destroy(): Promise<void> {
+    await this._lsp.shutdown();
   }
 
   // --- Persistence ---
