@@ -20,6 +20,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['frontend/src/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+  },
+  {
     ignores: ['dist/**', 'frontend/dist/**', 'node_modules/**'],
   },
 );

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildTree } from '../tree';
-import type { DiffFile, Analysis } from '../state';
+import type { DiffFile } from '../state';
 
 function makeFile(path: string, additions = 10, deletions = 5): DiffFile {
   return { path, additions, deletions, lines: [] };
