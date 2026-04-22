@@ -70,6 +70,9 @@ export interface Analysis {
 
 export type SidebarView = 'flat' | 'grouped' | 'phased';
 
+export type Language = 'python' | 'typescript' | 'rust';
+export type LspStatus = 'ok' | 'indexing' | 'missing' | 'crashed' | 'partial';
+
 // --- Signals (replaced wholesale) ---
 
 export const [files, setFiles] = createSignal<DiffFile[]>([]);
@@ -122,9 +125,28 @@ export interface PeekState {
   filePath: string;
   lineIdx: number;
   symbol: string;
+  /** UTF-16 code-unit offset within the line; present when the peek came from a Cmd+click. */
+  character?: number;
 }
 
 export const [peekState, setPeekState] = createSignal<PeekState | null>(null);
+
+const [_lspStatus, _setLspStatus] = createStore<Record<Language, LspStatus>>({
+  python: 'missing',
+  typescript: 'missing',
+  rust: 'missing',
+});
+export const lspStatus = _lspStatus;
+
+export function setLspStatus(language: Language, status: LspStatus): void;
+export function setLspStatus(next: Record<Language, LspStatus>): void;
+export function setLspStatus(
+  arg1: Language | Record<Language, LspStatus>,
+  status?: LspStatus,
+): void {
+  if (typeof arg1 === 'string') _setLspStatus(arg1 as Language, status!);
+  else _setLspStatus(arg1);
+}
 
 export const [symbolSearchOpen, setSymbolSearchOpen] = createSignal(false);
 

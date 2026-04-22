@@ -193,6 +193,52 @@ export async function fetchSymbol(name: string): Promise<SymbolResponse> {
   return checkedJson<SymbolResponse>(resp);
 }
 
+export interface DefinitionPayload {
+  result: { symbol: string; results: SymbolResult[] };
+  status: 'ok' | 'indexing' | 'fallback' | 'partial' | 'missing';
+}
+
+export interface HoverPayload {
+  result: { signature?: string; type?: string; docs?: string };
+  status: 'ok' | 'fallback' | 'missing';
+}
+
+export interface ReferencesPayload {
+  result: { references: Array<{ file: string; line: number; snippet: string }> };
+  status: 'ok' | 'fallback' | 'missing';
+}
+
+function posQuery(file: string, line: number, character: number): string {
+  return `file=${encodeURIComponent(file)}&line=${line}&character=${character}`;
+}
+
+export async function fetchDefinition(file: string, line: number, character: number): Promise<DefinitionPayload> {
+  const resp = await fetch(`${baseUrl()}/definition?${posQuery(file, line, character)}`);
+  return checkedJson<DefinitionPayload>(resp);
+}
+
+export async function fetchHover(file: string, line: number, character: number): Promise<HoverPayload> {
+  const resp = await fetch(`${baseUrl()}/hover?${posQuery(file, line, character)}`);
+  return checkedJson<HoverPayload>(resp);
+}
+
+export async function fetchReferences(file: string, line: number, character: number): Promise<ReferencesPayload> {
+  const resp = await fetch(`${baseUrl()}/references?${posQuery(file, line, character)}`);
+  return checkedJson<ReferencesPayload>(resp);
+}
+
+export async function cancelLspRequest(
+  method: 'definition' | 'hover' | 'references',
+  file: string,
+  line: number,
+  character: number,
+): Promise<void> {
+  await fetch(
+    `${baseUrl()}/lsp/request?method=${method}&${posQuery(file, line, character)}`,
+    { method: 'DELETE' },
+  );
+}
+
 export async function fetchRegisteredProjects(): Promise<ProjectSummary[]> {
   const resp = await fetch('/projects');
   const data = await checkedJson<{ projects?: ProjectSummary[] }>(resp);
