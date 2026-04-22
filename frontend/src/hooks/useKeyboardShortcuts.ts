@@ -1,13 +1,14 @@
 import { onMount, onCleanup } from 'solid-js';
 import {
   appMode,
+  activeFile,
   files,
   activeFileIdx,
   setActiveFileIdx,
   setWholeFileView,
-  toggleWholeFileView,
   allCommits,
   toggleReviewed,
+  toggleWholeFileView,
 } from '../state';
 
 interface Options {
@@ -83,12 +84,10 @@ export function useKeyboardShortcuts(options: Options) {
     } else if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
       if (allCommits().length > 0) options.onToggleCommits();
     } else if (e.key === 'e' && !e.metaKey && !e.ctrlKey) {
-      const file = files()[activeFileIdx()];
-      if (file) toggleReviewed(file.path);
+      const f = activeFile();
+      if (f) toggleReviewed(f.path);
     } else if (e.key === 'w' && !e.metaKey && !e.ctrlKey) {
-      if (appMode() === 'diff' && files()[activeFileIdx()]) {
-        toggleWholeFileView();
-      }
+      if (appMode() === 'diff' && activeFile()) toggleWholeFileView();
     } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
       options.onJumpComment('next');
     } else if (e.key === 'p' && !e.metaKey && !e.ctrlKey) {

@@ -1,12 +1,12 @@
 import { createResource, For, Show, createMemo } from 'solid-js';
-import { files, activeFileIdx, toggleWholeFileView } from '../../state';
+import { activeFile, toggleWholeFileView } from '../../state';
 import { fetchFile } from '../../api';
 import { escapeHtml, detectLang } from '../../utils';
 import DiffLine from './DiffLine';
 import type { DiffLine as DiffLineType } from '../../state';
 
 export default function WholeFileView() {
-  const file = createMemo(() => files()[activeFileIdx()]);
+  const file = activeFile;
   const lang = createMemo(() => (file() ? detectLang(file()!.path) : null));
 
   const [wholeFileLines] = createResource(

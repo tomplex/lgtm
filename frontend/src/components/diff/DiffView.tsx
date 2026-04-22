@@ -1,5 +1,5 @@
 import { For, Show, createMemo } from 'solid-js';
-import { files, activeFileIdx, analysis, wholeFileView, toggleWholeFileView } from '../../state';
+import { activeFile, analysis, wholeFileView, toggleWholeFileView } from '../../state';
 import type { DiffFile, DiffLine as DiffLineType } from '../../state';
 import { fetchContext } from '../../api';
 import { escapeHtml, detectLang, highlightLine } from '../../utils';
@@ -20,7 +20,7 @@ function precomputeWordDiffs(lines: DiffLineType[]): Record<number, string> {
 }
 
 export default function DiffView() {
-  const file = createMemo(() => files()[activeFileIdx()]);
+  const file = activeFile;
   const lang = createMemo(() => (file() ? detectLang(file()!.path) : null));
   const wordDiffs = createMemo(() => (file() ? precomputeWordDiffs(file()!.lines) : {}));
 
