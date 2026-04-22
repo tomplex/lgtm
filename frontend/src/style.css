@@ -2175,54 +2175,79 @@ body.cmd-held .line-content .hljs-type {
 .lsp-chip {
   padding: 2px 6px;
   border-radius: 3px;
-  background: var(--bg-subtle, #eee);
-  color: var(--muted, #666);
-  font-family: ui-monospace, monospace;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-family: 'SF Mono', 'Fira Code', monospace;
 }
-.lsp-chip-missing { background: #f0f0f0; color: #888; }
-.lsp-chip-indexing { background: #fff4d6; color: #8a5a00; }
-.lsp-chip-crashed { background: #fdd; color: #a00; }
-.lsp-chip-partial { background: #e8f0ff; color: #336; }
+.lsp-chip-missing   { color: var(--text-muted); }
+.lsp-chip-indexing  { color: var(--hunk-text); }
+.lsp-chip-crashed   { color: var(--del-text); }
+.lsp-chip-partial   { color: var(--accent); }
 
 /* Peek panel — hover fields + references list */
 .peek-hover {
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
-  font-family: ui-monospace, monospace;
+  font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 12px;
-  background: var(--bg-subtle, #f8f8f8);
+  background: var(--bg-tertiary);
+  color: var(--text);
+  flex-shrink: 0;
 }
-.peek-hover-signature { font-weight: 600; }
-.peek-hover-docs { color: var(--muted, #666); margin-top: 4px; font-family: inherit; }
+.peek-hover-signature { font-weight: 600; color: var(--text); white-space: pre-wrap; }
+.peek-hover-docs {
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-family: inherit;
+  white-space: pre-wrap;
+}
 
 .peek-refs {
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-top: 1px solid var(--border);
   font-size: 12px;
-  background: var(--bg-subtle, #f8f8f8);
+  background: var(--bg-tertiary);
+  color: var(--text);
+  flex-shrink: 0;
+  max-height: 180px;
+  overflow: auto;
 }
 .peek-refs-header {
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--muted, #666);
+  color: var(--text-muted);
   font-weight: 600;
   font-size: 11px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .peek-ref {
   display: flex;
-  gap: 10px;
-  font-family: ui-monospace, monospace;
+  gap: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
   padding: 2px 0;
 }
-.peek-ref-loc { color: var(--accent, #0066cc); min-width: 180px; }
-.peek-ref-snippet { color: var(--muted, #666); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peek-ref-loc {
+  color: var(--accent);
+  min-width: 200px;
+  flex-shrink: 0;
+}
+.peek-ref-snippet {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 .peek-refs-more {
   margin-top: 6px;
   background: transparent;
   border: 1px solid var(--border);
+  color: var(--text);
   padding: 2px 8px;
   border-radius: 3px;
   cursor: pointer;
   font-size: 11px;
+  font-family: inherit;
 }
+.peek-refs-more:hover { background: var(--hover); }
