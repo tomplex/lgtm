@@ -2,7 +2,7 @@
 
 **Status:** Design approved, pending implementation plan.
 **Date:** 2026-04-22
-**Scope:** `frontend/src/components/sidebar/*`, `frontend/src/state.ts`, `frontend/src/App.tsx` keyboard handler; new `frontend/src/tree.ts`; tests under `frontend/src/__tests__/`.
+**Scope:** `frontend/src/components/sidebar/*`, `frontend/src/state.ts`, `frontend/src/persistence.ts`, `frontend/src/hooks/useKeyboardShortcuts.ts`, `frontend/src/ProjectView.tsx`, `frontend/src/api.ts`, consumers of `activeFileIdx` in `frontend/src/components/diff/*`; new `frontend/src/tree.ts`; tests under `frontend/src/__tests__/` and `server/__tests__/`. Server: extend `/user-state` schema in `server/app.ts` and the session store.
 
 ## Goal
 
@@ -15,9 +15,10 @@ Today's sidebar has three separate view modes — each reshapes the list differe
 ## Non-goals
 
 - No change to comment data model, review submission flow, diff rendering, or SSE wiring.
-- No backend changes. This is frontend-only.
 - No visual/CSS redesign beyond what the new structural components require.
 - No new review heuristics or AI behaviors.
+
+Note: backend changes *are* required — the existing `/user-state` API persists `sidebarView` and `reviewedFiles`; `sidebarView` is being replaced by `sortMode`, `groupMode`, `groupModeUserTouched`, and `collapsedFolders`. See [Persistence](#persistence).
 
 ## UX shape
 
@@ -48,8 +49,8 @@ Pure function `buildTree(files, analysis, { sort, group }) → TreeNode[]`:
 5. Sort at each folder:
    - Folders first, then files (matches VS Code / Finder convention).
    - Claude-commented files float to the top of their containing folder, irrespective of sort mode.
-   - Then active sort: `Path` = alphabetical; `Priority` = critical → important → normal → trivial, with `Path` as tie-break.
-   - If analysis is absent, `Priority` degrades to pure alphabetical (priority is null).
+   - Then active sort: `Path` = alphabetical; `Priority` = `critical` → `important` → `normal` → `low`, with `Path` as tie-break. (Priority enum matches `FileAnalysis.priority` in `state.ts` — `low`, not `trivial`.)
+   - Files without analysis entries (or when `analysis()` is null) get effective priority `low` and fall through to the `Path` tie-break. Existing `analysis.ts::sortFilesByPriority` uses *original array order* as tie-break; it needs to be updated to match the spec's `Path` tie-break, or `buildTree` should inline its own comparator.
 
 ### Node shape
 
@@ -95,13 +96,18 @@ The existing filter logic (space-separated terms, glob `*`, `!` negation, AND ac
 
 1. **Folder-path matching.** A query term is matched against each file's full path (existing) *and* each compact-folder's full path. When a folder matches the filter, *every* file inside that folder (recursively) is treated as visible, even if the file paths themselves don't independently match. This lets `sidebar/` act as a subtree filter.
 2. **Auto-expand on match.** When `filterQuery()` is non-empty, folders with visible descendants auto-expand regardless of their persisted collapse state. Persisted state is restored the moment the filter clears.
+3. **Filter overrides dismiss.** When a filter is active, dismissed folders and files become visible again if they match. Consistent with (2) — the filter is the user explicitly asking to see matching things. Dismiss state is preserved (not cleared); it resumes effect when the filter clears.
 
 ## Folder affordances
 
 - **Chevron** (▾ / ▸) — click toggles collapse.
 - **Progress indicator** — right-aligned `reviewed/total` count over the folder's files (recursive). When `reviewed === total && total > 0`, the count renders in the "done" muted/green style and the folder auto-collapses (one-shot: if the user reopens it, it stays open).
 - **Dismiss `×`** — hides the whole subtree for the session. Same undismiss-all banner surfaces when either files or folders are dismissed.
-- **Compact-folder rows** behave as a single node: one chevron, one collapse state, one count spanning the whole chain's files.
+- **Compact-folder rows** behave as a single node: one chevron, one collapse state, one count spanning the whole chain's files. `h` on a file inside a compact chain jumps to that single folder row.
+
+**Empty state.** When `files()` is empty, the chip row is hidden (no analysis-driven controls matter) and the tree area renders nothing — the existing `<div class="empty-state">No changes to review</div>` in `ProjectView.tsx` continues to fill the diff pane. When `files()` is non-empty but every file is filtered out, the tree area renders a small "No matches" row (new).
+
+**Accessibility.** The tree container gets `role="tree"`. Folder rows get `role="treeitem"` with `aria-expanded`, `aria-level`, and `aria-selected`. File rows get `role="treeitem"` with `aria-level` and `aria-selected`. The reviewed/total counter on a folder gets an `aria-label` (e.g. `"2 of 4 files reviewed"`) so screen readers announce progress. Keyboard focus follows `activeRowId`.
 
 ## Keyboard
 
@@ -115,7 +121,7 @@ New / changed:
 
 Unchanged: `e` toggles reviewed on the active file; `f` focuses filter; `Enter`/`Esc` in filter.
 
-**Selection semantics:** landing on a file row via `j`/`k` loads the diff (current behavior). Landing on a folder row does not load anything — focus just sits there.
+**Selection semantics:** landing on a file row via `j`/`k` loads the diff *and* rewrites the `#file=` hash (current `activeFileIdx` behavior, preserved through the `activeFile()` shim). Landing on a folder row is ephemeral: no hash update, no `wholeFileView` reset, no per-tab `fileIdx` save. Folder focus exists only to anchor `h`/`l`/`o`/chevron actions; it doesn't become the "current file" from the diff pane's perspective.
 
 ## State
 
@@ -127,27 +133,53 @@ Unchanged: `e` toggles reviewed on the active file; `f` focuses filter; `Enter`/
 - `collapsedFolders: Store<Record<string, boolean>>` — keyed by compact-folder path. Persisted per-project.
 - `dismissedFolders: Signal<Set<string>>` — session-only, parallel to existing `dismissedFiles`.
 - `activeRowId: Signal<string | null>` — replaces `activeFileIdx` as the selection anchor. The value is the `id` of a `TreeNode` (phase-prefixed file or folder path when grouped, plain path otherwise), not a file path directly.
-- `activeFile: () => DiffFile | null` — derived memo that looks up `activeRowId` in the current visible-rows list and returns the `DiffFile` when it resolves to a `FileNode`, else `null`. All existing `files()[activeFileIdx()]` consumers route through this.
+- `activeFile: () => DiffFile | null` — **replaces** the existing `activeFile` memo at `state.ts:189` (which today is `createMemo(() => files()[activeFileIdx()])`). The new memo looks up `activeRowId` in the current visible-rows list and returns the `DiffFile` when it resolves to a `FileNode`, else `null`. All direct readers of `files()[activeFileIdx()]` — today in `DiffView.tsx`, `WholeFileView.tsx`, `ProjectView.tsx`, `useKeyboardShortcuts.ts`, `FileList.tsx` — switch to calling `activeFile()` instead.
+
+**`activeRowId` stability across tree rebuilds.** When `files()` / `analysis()` / `sortMode` / `groupMode` change and `activeRowId` no longer resolves to a visible row, snap to the first visible file row (or `null` if none). Rationale: the row-id format encodes phase prefix, so simply flipping `groupMode` invalidates every id; we can't preserve the selection across that boundary without an explicit recovery rule.
+
+**Hash-nav into a hidden row.** When the URL `#file=<path>` changes, or on initial load, resolve the file to its current row id. If ancestor folders are collapsed, force-expand them (writing to `collapsedFolders`). If an ancestor folder is dismissed this session, un-dismiss it. Hash-nav wins over persisted collapse and session dismiss — the user asked to see that file.
 
 ### Removed
 
-- `sidebarView: Signal<'flat' | 'grouped' | 'phased'>`, `setSidebarView`, the `SidebarView` type.
+- `sidebarView: Signal<'flat' | 'grouped' | 'phased'>`, `setSidebarView`, the `SidebarView` type. Referenced in `state.ts`, `api.ts`, `persistence.ts`, `ViewToggle.tsx`, `FileList.tsx` — all must be updated or deleted.
 - `activeFileIdx` — replaced by `activeRowId` with the `activeFile` shim.
 
 ### Persistence
 
-`localStorage` key `lgtm.sidebar.<projectSlug>` stores one blob:
+Persistence follows the **existing server-side `/user-state` pattern** (see `frontend/src/persistence.ts` and `server/app.ts:429-459`), not localStorage. The current API round-trips `reviewedFiles` and `sidebarView`; this spec replaces the `sidebarView` field with four new fields:
 
-```json
+```ts
+// /project/:slug/user-state response shape (extended)
 {
-  "sortMode": "path",
-  "groupMode": "phase",
-  "groupModeUserTouched": true,
-  "collapsedFolders": { "frontend/src/components/sidebar/": true }
+  reviewedFiles: string[],                          // unchanged
+  sortMode: 'path' | 'priority',                    // new
+  groupMode: 'none' | 'phase',                      // new
+  groupModeUserTouched: boolean,                    // new
+  collapsedFolders: Record<string, boolean>,        // new
+  // sidebarView: removed
 }
 ```
 
-Loaded when the active project changes; written on any of the above signals changing. `dismissedFiles` and `dismissedFolders` stay in-memory only.
+**Server changes required:**
+- Extend the session-store schema used by `/user-state` (likely `server/store.ts` / `server/session.ts` — verify during implementation).
+- Replace `PUT /user-state/sidebar-view` with endpoints for the new fields. Simplest path: one `PUT /user-state/sidebar-prefs` endpoint that accepts a partial of the four new fields. `reviewedFiles` keeps its own dedicated endpoint unchanged.
+- Update `server/__tests__/routes.test.ts` — remove the `sidebar-view` cases, add `sidebar-prefs` cases.
+- `frontend/src/persistence.ts` — rewrite `loadState`/`saveState` to load and diff the new fields. `lastSidebarView` becomes per-field diff tracking.
+- `frontend/src/api.ts` — replace `putUserSidebarView` with `putUserSidebarPrefs`.
+
+**`groupModeUserTouched` promotion scope.** Per-project. The flag is part of the server-persisted state blob keyed by project slug. Opening a different project reads that project's own flag; the "auto-promote to phase on first load when analysis arrives" rule fires per-project.
+
+**`collapsedFolders` semantics.**
+- Keyed by compact-folder path (the fully-merged chain path).
+- Best-effort across rebuilds: when the file set changes and a chain's shape shifts (e.g. a sibling file appears mid-chain and splits it), stale keys linger but do nothing — they just reference paths that don't exist in the current tree. No GC pass; acceptable drift.
+- Written on any user-initiated collapse/expand. Not written for hash-nav force-expand (transient).
+
+**Auto-enabled analysis views outliving analysis.**
+- If `sortMode === 'priority'` but `analysis()` is null: effective sort degrades to pure `Path`. Stored signal value is untouched; when analysis returns, priority sort resumes.
+- If `groupMode === 'phase'` but `analysis()` is null: effective grouping degrades to `'none'`. Stored signal value is untouched; when analysis returns, phase grouping resumes.
+- The chip row is hidden when analysis is absent, so the user cannot see or adjust these values in that state — but their persisted choice survives.
+
+`dismissedFiles` and `dismissedFolders` stay in-memory only (session-scoped).
 
 ## Components
 
@@ -174,14 +206,20 @@ Lifted:
 - `flattenVisible(tree, opts) → TreeNode[]`.
 - `matchesFilter(path, query)` — extended from existing `fileMatchesFilter` to handle folder-path queries.
 
-No server changes. No new dependencies.
+No new dependencies. (`tree.ts` itself is pure frontend; server-side changes are scoped to the `/user-state` schema — see [Persistence](#persistence).)
 
 ## Call-site updates
 
-- `App.tsx` keyboard handler — swap `activeFileIdx` nav for `activeRowId` nav; add `h`/`l`/`[`/`]`/`o`.
-- `App.tsx` hash sync (`#file=<path>`) — wire through `activeFile()` shim; folders never appear in the hash.
-- Any other reader of `activeFileIdx` (comment routing, `setWholeFileView`, etc.) — route through `activeFile()`.
-- `frontend/src/analysis.ts` — `sortFilesByPriority`, `groupFiles`, `phaseFiles` stay; they're still useful as primitives for `buildTree`.
+`App.tsx` is an 8-line router and is **not** touched. The logic lives further down:
+
+- `frontend/src/hooks/useKeyboardShortcuts.ts` — the real keyboard handler. Swap `activeFileIdx` nav for `activeRowId` nav; add `h`/`l`/`[`/`]`/`o`; preserve `e`, `f`, existing j/k hash-write behavior (but only when the active row is a file).
+- `frontend/src/ProjectView.tsx` — hash sync (`hashchange` listener, initial-load `#file=` resolution around lines 117 / 220 / 332-341) routes through the `activeFile()` shim; per-tab scroll state cache at lines 63-82 currently keys on `activeFileIdx` — retarget to the active row's file path (or drop if no active file).
+- `frontend/src/components/diff/DiffView.tsx`, `frontend/src/components/diff/WholeFileView.tsx` — direct `files()[activeFileIdx()]` readers; switch to `activeFile()`.
+- `frontend/src/persistence.ts` — rewritten to load/save `sortMode`, `groupMode`, `groupModeUserTouched`, `collapsedFolders` against the extended `/user-state` API. `lastSidebarView` becomes four per-field diff trackers.
+- `frontend/src/api.ts` — replace `putUserSidebarView` with `putUserSidebarPrefs`; drop the `SidebarView`-related typing.
+- `frontend/src/analysis.ts` — `sortFilesByPriority`, `groupFiles`, `phaseFiles` stay as primitives. `sortFilesByPriority`'s tie-break needs a path-based update to match the spec, or `buildTree` inlines its own comparator and the primitive goes unused by the new code.
+- `server/app.ts` — replace `PUT /user-state/sidebar-view` route with `PUT /user-state/sidebar-prefs`; extend `GET /user-state` response shape.
+- Server session-store schema — add fields; verify the exact file during implementation (likely `server/store.ts` or `server/session.ts`).
 
 ## Testing
 
@@ -190,22 +228,34 @@ New test files:
 - `frontend/src/__tests__/tree.test.ts` — pure tree logic:
   - Compact-folder merging across simple chains, branching stops merge, folders with own files stop merge.
   - Phase grouping produces three independent sub-trees with correct membership.
-  - Sort modes: `Path` alphabetical, `Priority` ordering with tie-break, analysis-absent degradation.
+  - Sort modes: `Path` alphabetical, `Priority` ordering with `Path` tie-break, analysis-absent degradation.
   - Claude-comments-first float within a folder.
-  - Filter: file-path match, folder-path match, empty-folder hiding, negation, glob, auto-expand.
+  - Filter: file-path match, folder-path match, empty-folder hiding, negation, glob, auto-expand, filter-overrides-dismiss.
+  - `activeRowId` survival across rebuild: snap-to-first-visible rule when the prior row disappears.
 - `frontend/src/__tests__/sidebar-keyboard.test.ts` — keyboard semantics:
   - `j`/`k` across mixed folder/file rows.
   - `h`/`l` folder behavior + file→parent.
   - `[`/`]` folder jump.
   - `o` toggle on file's containing folder.
+  - Folder row is ephemeral (no hash write, no `wholeFileView` reset).
+- `frontend/src/__tests__/persistence.test.ts` *(if absent; extend if present)* — round-trip of `sortMode`/`groupMode`/`groupModeUserTouched`/`collapsedFolders`; graceful handling of absent server state; analysis-disappears-mid-session preserving signal values.
+
+Server tests:
+
+- `server/__tests__/routes.test.ts` — remove `PUT /user-state/sidebar-view` cases; add `PUT /user-state/sidebar-prefs` cases (partial updates, validation of enum values, rejection of unknown fields).
+- Update `GET /user-state` test for the new response shape.
 
 Existing tests: update or delete anything that references `sidebarView`, `FlatFileList`, `GroupedFileList`, `PhasedFileList`.
 
 ## Migration
 
-Replace, don't gate. Small codebase, single primary user, all pre-existing behaviors preserved either directly (comments-float, dismiss, reviewed checks, priority classes) or re-expressed through the new chips (phased view → `Group by: Phase`; grouped view drops; flat view → tree with `Group by: None`). Users with stale `sidebarView` in localStorage get a fresh default on first load — the key is simply not read.
+Replace, don't gate. Small codebase, single primary user, all pre-existing behaviors preserved either directly (comments-float, dismiss, reviewed checks, priority classes) or re-expressed through the new chips (phased view → `Group by: Phase`; grouped view drops; flat view → tree with `Group by: None`). Servers with stale `sidebarView` in the user-state blob get their field ignored on first load — the read path will skip unknown fields and the write path will never set it again.
 
-**Behavior drop:** the current `Grouped` view — which uses AI-classified thematic group names from `analysis.groups` — has no direct analog in the tree. That taxonomy is orthogonal to directory structure and doesn't map cleanly onto sort/group chips. Accepted loss: analysis-driven thematic grouping goes away; phase-driven grouping remains as the primary AI lens.
+**Behavior drops / changes:**
+- The current `Grouped` view — which uses AI-classified thematic group names from `analysis.groups` — has no direct analog in the tree. That taxonomy is orthogonal to directory structure. Accepted loss: analysis-driven thematic grouping goes away; phase-driven grouping remains as the primary AI lens.
+- Claude-commented files currently float to the *global top* of the flat list. In the tree, they float to the top of their *containing folder* instead. This is a real behavioral change, not a carry-over; it's consistent with the one-tree mental model but callers who rely on "look at the top of the list for Claude's flagged files" see the signal distributed across folders. The chip badges still make them findable.
+- The dismiss banner copy (`N hidden files — show all`) needs updating for the mixed case when both files and folders are dismissed — e.g. `3 hidden items — show all`.
+- The chip row appears/disappears when analysis arrives mid-session (SSE), causing a one-time layout shift. Acceptable; not reserving space.
 
 ## Open questions
 
