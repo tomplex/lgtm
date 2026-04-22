@@ -20,6 +20,13 @@ interface SessionItem {
   path?: string;
 }
 
+interface SidebarPrefs {
+  sortMode: 'path' | 'priority';
+  groupMode: 'none' | 'phase';
+  groupModeUserTouched: boolean;
+  collapsedFolders: Record<string, boolean>;
+}
+
 export interface SSEClient {
   send: (event: string, data: unknown) => void;
 }
@@ -288,17 +295,12 @@ export class Session {
     return Array.from(this._reviewedFiles);
   }
 
-  get userSidebarPrefs(): {
-    sortMode: 'path' | 'priority';
-    groupMode: 'none' | 'phase';
-    groupModeUserTouched: boolean;
-    collapsedFolders: Record<string, boolean>;
-  } {
+  get userSidebarPrefs(): SidebarPrefs {
     return {
       sortMode: this._sortMode,
       groupMode: this._groupMode,
       groupModeUserTouched: this._groupModeUserTouched,
-      collapsedFolders: this._collapsedFolders,
+      collapsedFolders: { ...this._collapsedFolders },
     };
   }
 
@@ -315,12 +317,7 @@ export class Session {
     return nowReviewed;
   }
 
-  setUserSidebarPrefs(prefs: Partial<{
-    sortMode: 'path' | 'priority';
-    groupMode: 'none' | 'phase';
-    groupModeUserTouched: boolean;
-    collapsedFolders: Record<string, boolean>;
-  }>): void {
+  setUserSidebarPrefs(prefs: Partial<SidebarPrefs>): void {
     if (prefs.sortMode !== undefined) this._sortMode = prefs.sortMode;
     if (prefs.groupMode !== undefined) this._groupMode = prefs.groupMode;
     if (prefs.groupModeUserTouched !== undefined) this._groupModeUserTouched = prefs.groupModeUserTouched;
