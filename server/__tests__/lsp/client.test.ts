@@ -247,6 +247,26 @@ describe('LspClient request lifecycle', () => {
   });
 });
 
+describe('LspClient request cancellation', () => {
+  it('cancelling an in-flight request rejects it and sends $/cancelRequest', async () => {
+    let cancelled = false;
+    const conn = makeFakeConnection({
+      sendRequest: vi.fn(async (method: string, _params?: unknown, token?: any) => {
+        if (method === 'initialize') return { capabilities: {} };
+        return new Promise((_resolve, reject) => {
+          token?.onCancellationRequested?.(() => { cancelled = true; reject(new Error('cancelled')); });
+        });
+      }) as any,
+    });
+    const client = new LspClient({ language: 'python', projectPath: '/tmp/proj', connection: conn });
+    await client.initialize();
+    const p = client.definition('/tmp/proj/foo.py', { line: 0, character: 0 });
+    client.cancel('definition', '/tmp/proj/foo.py', { line: 0, character: 0 });
+    await expect(p).rejects.toThrow(/cancelled/);
+    expect(cancelled).toBe(true);
+  });
+});
+
 describe('LspClient crash marking', () => {
   it('markCrashed flips state to crashed and rejects ready waiters', async () => {
     const conn = makeFakeConnection();

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import type { ChildProcess } from 'node:child_process';
-import type { MessageConnection } from 'vscode-jsonrpc/node.js';
+import { CancellationTokenSource, type MessageConnection } from 'vscode-jsonrpc/node.js';
 import { getLanguageConfig } from './languages.js';
 import { toFileUri } from './uri.js';
 import { LspTimeoutError, LspShuttingDownError, type Language } from './types.js';
@@ -27,7 +27,7 @@ export class LspClient {
   private readonly _openFiles = new Set<string>();
   private _child: ChildProcess | null = null;
   private readonly _requestTimeoutMs: number;
-  private readonly _inflight = new Map<string, Promise<unknown>>();
+  private readonly _inflight = new Map<string, { promise: Promise<unknown>; source: CancellationTokenSource }>();
 
   constructor(opts: LspClientOptions) {
     this.language = opts.language;
@@ -110,24 +110,32 @@ export class LspClient {
     if (this._state === 'shuttingDown') throw new LspShuttingDownError();
 
     const existing = this._inflight.get(dedupKey);
-    if (existing) return existing as Promise<T>;
+    if (existing) return existing.promise as Promise<T>;
 
+    const source = new CancellationTokenSource();
     const promise = (async () => {
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new LspTimeoutError(method, this._requestTimeoutMs)), this._requestTimeoutMs),
       );
       try {
         return await Promise.race([
-          this._connection.sendRequest(method, params) as Promise<T>,
+          this._connection.sendRequest(method, params, source.token) as Promise<T>,
           timeoutPromise,
         ]);
       } finally {
         this._inflight.delete(dedupKey);
+        source.dispose();
       }
     })();
 
-    this._inflight.set(dedupKey, promise);
+    this._inflight.set(dedupKey, { promise, source });
     return promise;
+  }
+
+  cancel(method: 'definition' | 'hover' | 'references', filePath: string, pos: { line: number; character: number }): void {
+    const key = `${method}:${filePath}:${pos.line}:${pos.character}`;
+    const entry = this._inflight.get(key);
+    if (entry) entry.source.cancel();
   }
 
   async definition(filePath: string, pos: { line: number; character: number }) {
