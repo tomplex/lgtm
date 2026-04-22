@@ -1,18 +1,15 @@
-import { createSignal } from 'solid-js';
 import FileSearch from './FileSearch';
-import ViewToggle from './ViewToggle';
-import FileList from './FileList';
+import SortGroupControls from './SortGroupControls';
+import FileTree from './FileTree';
 
 export default function Sidebar() {
-  const [filterQuery, setFilterQuery] = createSignal('');
-
   return (
     <div class="sidebar">
       <div class="sidebar-controls">
-        <ViewToggle />
-        <FileSearch onFilter={setFilterQuery} />
+        <FileSearch />
+        <SortGroupControls />
       </div>
-      <FileList filterQuery={filterQuery()} />
+      <FileTree />
     </div>
   );
 }

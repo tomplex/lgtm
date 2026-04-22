@@ -69,8 +69,6 @@ export interface Analysis {
   groups: AnalysisGroup[];
 }
 
-export type SidebarView = 'flat' | 'grouped' | 'phased';
-
 export type Language = 'python' | 'typescript' | 'rust';
 export type LspStatus = 'ok' | 'indexing' | 'missing' | 'crashed' | 'partial';
 
@@ -80,7 +78,6 @@ export const [files, setFiles] = createSignal<DiffFile[]>([]);
 export const [activeItemId, setActiveItemId] = createSignal('diff');
 export const [appMode, setAppMode] = createSignal<'diff' | 'file'>('diff');
 export const [wholeFileView, setWholeFileView] = createSignal(false);
-export const [sidebarView, setSidebarView] = createSignal<SidebarView>('flat');
 export const [repoMeta, setRepoMeta] = createSignal<RepoMeta>({});
 export const [mdMeta, setMdMeta] = createSignal<MdMeta>({});
 export const [sessionItems, setSessionItems] = createSignal<SessionItem[]>([]);

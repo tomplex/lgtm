@@ -1,21 +1,19 @@
-interface Props {
-  onFilter: (query: string) => void;
-}
+import { filterQuery, setFilterQuery } from '../../state';
 
-export default function FileSearch(props: Props) {
+export default function FileSearch() {
   let inputRef!: HTMLInputElement;
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       inputRef.value = '';
-      props.onFilter('');
+      setFilterQuery('');
       inputRef.blur();
     } else if (e.key === 'Enter') {
       inputRef.blur();
     }
   }
 
-  // Expose focus for keyboard shortcut
+  // Expose focus for the `f` keyboard shortcut.
   (window as any).__focusFileSearch = () => inputRef?.focus();
 
   return (
@@ -26,7 +24,8 @@ export default function FileSearch(props: Props) {
         id="file-search"
         placeholder="Filter files... (f)"
         autocomplete="off"
-        onInput={(e) => props.onFilter(e.currentTarget.value)}
+        value={filterQuery()}
+        onInput={(e) => setFilterQuery(e.currentTarget.value)}
         onKeyDown={handleKeyDown}
       />
     </div>
