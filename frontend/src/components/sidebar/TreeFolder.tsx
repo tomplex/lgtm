@@ -1,9 +1,10 @@
-import { Show, createMemo } from 'solid-js';
+import { Show, createMemo, createEffect } from 'solid-js';
 import type { FolderNode, FileNode } from '../../tree';
 import {
   activeRowId,
   setActiveRowId,
   collapsedFolders,
+  setCollapsedFolders,
   toggleFolderCollapsed,
   dismissFolder,
   reviewedFiles,
@@ -34,6 +35,20 @@ export default function TreeFolder(props: Props) {
   const total = () => descendants().length;
   const reviewedCount = () => descendants().filter((f) => reviewedFiles[f.file.path]).length;
   const allReviewed = () => total() > 0 && reviewedCount() === total();
+
+  // One-shot auto-collapse: when this folder flips to "all reviewed", collapse it.
+  // If the user re-opens it, `wasAllReviewed` stays true so we don't keep re-collapsing.
+  let wasAllReviewed = false;
+  createEffect(() => {
+    const done = allReviewed();
+    if (done && !wasAllReviewed) {
+      wasAllReviewed = true;
+      if (!collapsedFolders[props.node.fullPath]) {
+        setCollapsedFolders(props.node.fullPath, true);
+      }
+    }
+    if (!done) wasAllReviewed = false;
+  });
 
   function handleClick() {
     setActiveRowId(props.node.id);
