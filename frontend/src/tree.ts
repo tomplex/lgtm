@@ -23,6 +23,19 @@ export interface BuildOpts {
   group: 'none' | 'phase';
 }
 
+const PHASE_ORDER = ['review', 'skim', 'rubber-stamp'] as const;
+type Phase = (typeof PHASE_ORDER)[number];
+
+const PHASE_LABEL: Record<Phase, string> = {
+  review: '● Review carefully',
+  skim: '◐ Skim',
+  'rubber-stamp': '○ Rubber stamp',
+};
+
+function filePhase(file: DiffFile, analysis: Analysis | null): Phase {
+  return (analysis?.files[file.path]?.phase as Phase) ?? 'skim';
+}
+
 interface TrieNode {
   dirs: Map<string, TrieNode>;
   files: DiffFile[];
@@ -83,7 +96,30 @@ function buildFromTrie(trie: TrieNode, pathPrefix: string, depth: number, idPref
   return out;
 }
 
-export function buildTree(files: DiffFile[], _analysis: Analysis | null, _opts: BuildOpts): TreeNode[] {
+export function buildTree(files: DiffFile[], analysis: Analysis | null, opts: BuildOpts): TreeNode[] {
+  if (opts.group === 'phase' && analysis) {
+    const byPhase: Record<Phase, DiffFile[]> = { review: [], skim: [], 'rubber-stamp': [] };
+    for (const f of files) byPhase[filePhase(f, analysis)].push(f);
+
+    const roots: TreeNode[] = [];
+    for (const phase of PHASE_ORDER) {
+      const phaseFiles = byPhase[phase];
+      if (phaseFiles.length === 0) continue;
+      const trie = emptyTrie();
+      for (const f of phaseFiles) insert(trie, f);
+      const idPrefix = phase + ':';
+      roots.push({
+        kind: 'folder',
+        id: idPrefix + '__root__',
+        name: PHASE_LABEL[phase],
+        fullPath: idPrefix + '__root__',
+        depth: 0,
+        children: buildFromTrie(trie, '', 1, idPrefix),
+      });
+    }
+    return roots;
+  }
+
   const trie = emptyTrie();
   for (const f of files) insert(trie, f);
   return buildFromTrie(trie, '', 0, '');

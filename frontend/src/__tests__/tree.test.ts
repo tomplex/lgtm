@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildTree } from '../tree';
-import type { DiffFile } from '../state';
+import type { DiffFile, Analysis } from '../state';
 
 function makeFile(path: string, additions = 10, deletions = 5): DiffFile {
   return { path, additions, deletions, lines: [] };
@@ -67,5 +67,54 @@ describe('buildTree — compact folders', () => {
     expect(frontend.children).toHaveLength(2); // src/ folder + README.md file
     const srcFolder = frontend.children.find((c: any) => c.kind === 'folder');
     expect(srcFolder.name).toBe('src/');
+  });
+});
+
+describe('buildTree — phase grouping', () => {
+  const analysis: Analysis = {
+    overview: '',
+    reviewStrategy: '',
+    files: {
+      'server/app.ts': { priority: 'critical', phase: 'review', summary: '', category: '' },
+      'server/log.ts': { priority: 'normal', phase: 'skim', summary: '', category: '' },
+      'dist/out.js': { priority: 'low', phase: 'rubber-stamp', summary: '', category: '' },
+    },
+    groups: [],
+  };
+
+  it('produces three synthetic phase roots in fixed order', () => {
+    const files = [makeFile('server/app.ts'), makeFile('server/log.ts'), makeFile('dist/out.js')];
+    const tree = buildTree(files, analysis, { sort: 'path', group: 'phase' });
+    expect(tree).toHaveLength(3);
+    expect(tree.map((n) => (n as any).name)).toEqual([
+      '● Review carefully',
+      '◐ Skim',
+      '○ Rubber stamp',
+    ]);
+    expect(tree.every((n) => n.kind === 'folder')).toBe(true);
+  });
+
+  it('builds an independent compact-folder subtree under each phase', () => {
+    const files = [makeFile('server/app.ts'), makeFile('server/log.ts'), makeFile('dist/out.js')];
+    const tree = buildTree(files, analysis, { sort: 'path', group: 'phase' });
+    const reviewRoot = tree[0] as any;
+    expect(reviewRoot.children).toHaveLength(1);
+    expect(reviewRoot.children[0].name).toBe('server/');
+    expect(reviewRoot.children[0].children).toHaveLength(1);
+    expect(reviewRoot.children[0].children[0].id).toBe('review:server/app.ts');
+  });
+
+  it('omits a phase root with no files', () => {
+    const files = [makeFile('server/app.ts')];
+    const tree = buildTree(files, analysis, { sort: 'path', group: 'phase' });
+    expect(tree).toHaveLength(1);
+    expect((tree[0] as any).name).toBe('● Review carefully');
+  });
+
+  it('defaults to phase=skim when a file lacks analysis', () => {
+    const files = [makeFile('unknown.ts')];
+    const tree = buildTree(files, analysis, { sort: 'path', group: 'phase' });
+    expect(tree).toHaveLength(1);
+    expect((tree[0] as any).name).toBe('◐ Skim');
   });
 });
