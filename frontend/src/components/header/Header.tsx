@@ -1,5 +1,6 @@
 import { Show, createSignal, createMemo } from 'solid-js';
 import { repoMeta, files, reviewedFiles, userCommentCount, activeItemId, sessionItems, setPaletteOpen } from '../../state';
+import LspStatusBadge from './LspStatusBadge';
 
 export type SubmitTarget = 'claude' | 'github';
 export type GithubEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
@@ -81,6 +82,7 @@ export default function Header(props: Props) {
           </Show>
         </div>
         <div class="header-actions">
+          <LspStatusBadge />
           <Show when={props.showCommitToggle}>
             <div class="commit-toggle" id="commit-toggle-wrap">
               <button class="header-btn" onClick={props.onToggleCommits}>
