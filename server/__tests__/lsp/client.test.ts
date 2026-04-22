@@ -61,3 +61,42 @@ describe('LspClient', () => {
     expect(client.state).toBe('shuttingDown');
   });
 });
+
+describe('LspClient rust-analyzer quiescent wait', () => {
+  it('stays indexing until experimental/serverStatus quiescent arrives', async () => {
+    let statusHandler: ((p: unknown) => void) | null = null;
+    const conn = makeFakeConnection({
+      onNotification: ((method: string, handler: (p: unknown) => void) => {
+        if (method === 'experimental/serverStatus') statusHandler = handler;
+        return { dispose: () => {} };
+      }) as any,
+    });
+    const client = new LspClient({
+      language: 'rust',
+      projectPath: '/tmp/proj',
+      connection: conn,
+      stderrLines: 10,
+    });
+    const ready = client.waitReady(1000);
+    await client.initialize();
+    expect(client.state).toBe('indexing');
+    statusHandler!({ quiescent: false, health: 'ok', message: 'Building' });
+    expect(client.state).toBe('indexing');
+    statusHandler!({ quiescent: true, health: 'ok', message: 'Done' });
+    await ready;
+    expect(client.state).toBe('ready');
+  });
+
+  it('non-rust language resolves waitReady immediately', async () => {
+    const conn = makeFakeConnection();
+    const client = new LspClient({
+      language: 'python',
+      projectPath: '/tmp/proj',
+      connection: conn,
+      stderrLines: 10,
+    });
+    await client.initialize();
+    await client.waitReady(1000);
+    expect(client.state).toBe('ready');
+  });
+});

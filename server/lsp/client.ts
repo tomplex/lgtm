@@ -20,12 +20,23 @@ export class LspClient {
   private readonly _stderrCap: number;
   private _state: ClientState = 'initializing';
   private _capabilities: Record<string, unknown> = {};
+  private _readyWaiters: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
 
   constructor(opts: LspClientOptions) {
     this.language = opts.language;
     this.projectPath = opts.projectPath;
     this._connection = opts.connection;
     this._stderrCap = opts.stderrLines ?? 100;
+
+    this._connection.onNotification('experimental/serverStatus', (params: unknown) => {
+      const p = params as { quiescent?: boolean; health?: string; message?: string };
+      if (p.quiescent === true && this._state === 'indexing') {
+        this._state = 'ready';
+        const waiters = this._readyWaiters;
+        this._readyWaiters = [];
+        for (const w of waiters) w.resolve();
+      }
+    });
   }
 
   get state(): ClientState {
@@ -64,27 +75,41 @@ export class LspClient {
     this._connection.sendNotification('initialized', {});
     this._state = 'indexing';
 
-    if (cfg.waitForServerStatus) {
-      // Handled in Task 6 when we wire experimental/serverStatus
-      this._state = 'indexing';
-    } else {
+    if (!cfg.waitForServerStatus) {
       this._state = 'ready';
     }
+  }
+
+  waitReady(timeoutMs: number): Promise<void> {
+    if (this._state === 'ready') return Promise.resolve();
+    if (this._state === 'crashed' || this._state === 'shuttingDown') {
+      return Promise.reject(new Error(`LspClient is ${this._state}`));
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const idx = this._readyWaiters.findIndex(w => w.resolve === resolve);
+        if (idx >= 0) this._readyWaiters.splice(idx, 1);
+        reject(new Error(`waitReady timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+      this._readyWaiters.push({
+        resolve: () => { clearTimeout(timer); resolve(); },
+        reject: (e) => { clearTimeout(timer); reject(e); },
+      });
+    });
   }
 
   async shutdown(): Promise<void> {
     if (this._state === 'shuttingDown' || this._state === 'crashed') return;
     this._state = 'shuttingDown';
+    const waiters = this._readyWaiters;
+    this._readyWaiters = [];
+    for (const w of waiters) w.reject(new Error('client shutting down'));
     try {
       await this._connection.sendRequest('shutdown', null);
-    } catch {
-      /* server may have already exited */
-    }
+    } catch { /* server may have already exited */ }
     try {
       this._connection.sendNotification('exit');
-    } catch {
-      /* ditto */
-    }
+    } catch { /* ditto */ }
     this._connection.dispose();
   }
 
