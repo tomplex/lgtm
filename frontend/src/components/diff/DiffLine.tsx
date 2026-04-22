@@ -85,15 +85,18 @@ export default function DiffLine(props: Props) {
       return;
     if ((e.target as HTMLElement).closest('.peek-panel')) return;
 
-    // Cmd+click: symbol lookup
+    // Cmd+click: symbol lookup. Only send LSP position info for lines that exist on
+    // the HEAD side — deletions can't be resolved against the on-disk worktree.
     if (e.metaKey || e.ctrlKey) {
       const hit = getWordAtClick(e);
       if (hit) {
+        const newLine = props.line.newLine;
         setPeekState({
           filePath: props.filePath,
           lineIdx: props.lineIdx,
           symbol: hit.word,
-          character: hit.character,
+          line: newLine != null ? newLine - 1 : undefined,
+          character: newLine != null ? hit.character : undefined,
         });
       }
       return;

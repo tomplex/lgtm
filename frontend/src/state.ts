@@ -125,7 +125,10 @@ export interface PeekState {
   filePath: string;
   lineIdx: number;
   symbol: string;
-  /** UTF-16 code-unit offset within the line; present when the peek came from a Cmd+click. */
+  /** 0-based file line on the HEAD side. Present only when we can resolve the click
+   *  against on-disk content (i.e., not a pure deletion). */
+  line?: number;
+  /** UTF-16 code-unit offset within the line; present alongside `line`. */
   character?: number;
 }
 

@@ -21,14 +21,18 @@ export default function PeekPanel() {
   const [showAllRefs, setShowAllRefs] = createSignal(false);
   let panelRef: HTMLDivElement | undefined;
 
-  // Definition — LSP when character is present, else name-search fallback
+  // A LSP-resolvable peek has both `line` (0-based file line) and `character` (UTF-16 offset).
+  const hasLspPos = (s: ReturnType<typeof peekState>): s is NonNullable<ReturnType<typeof peekState>> & { line: number; character: number } =>
+    s != null && s.line != null && s.character != null;
+
+  // Definition — LSP when position is present, else name-search fallback
   const [data] = createResource(
     () => peekState(),
     async (state) => {
       if (!state) return null;
       try {
-        if (state.character != null) {
-          const resp = await fetchDefinition(state.filePath, state.lineIdx, state.character);
+        if (hasLspPos(state)) {
+          const resp = await fetchDefinition(state.filePath, state.line, state.character);
           const lang = languageFromFile(state.filePath);
           if (lang) {
             const status =
@@ -63,11 +67,13 @@ export default function PeekPanel() {
   );
 
   const [hover] = createResource(
-    () => peekState()?.character != null ? peekState() : null,
+    () => {
+      const s = peekState();
+      return hasLspPos(s) ? s : null;
+    },
     async (state) => {
-      if (!state) return null;
       try {
-        const resp = await fetchHover(state.filePath, state.lineIdx, state.character!);
+        const resp = await fetchHover(state.filePath, state.line, state.character);
         return resp.result;
       } catch {
         return null;
@@ -76,11 +82,13 @@ export default function PeekPanel() {
   );
 
   const [refs] = createResource(
-    () => peekState()?.character != null ? peekState() : null,
+    () => {
+      const s = peekState();
+      return hasLspPos(s) ? s : null;
+    },
     async (state) => {
-      if (!state) return [];
       try {
-        const resp = await fetchReferences(state.filePath, state.lineIdx, state.character!);
+        const resp = await fetchReferences(state.filePath, state.line, state.character);
         return resp.result.references;
       } catch {
         return [];
@@ -103,10 +111,10 @@ export default function PeekPanel() {
 
   function handleClose() {
     const s = peekState();
-    if (s?.character != null) {
-      void cancelLspRequest('definition', s.filePath, s.lineIdx, s.character);
-      void cancelLspRequest('hover', s.filePath, s.lineIdx, s.character);
-      void cancelLspRequest('references', s.filePath, s.lineIdx, s.character);
+    if (hasLspPos(s)) {
+      void cancelLspRequest('definition', s.filePath, s.line, s.character);
+      void cancelLspRequest('hover', s.filePath, s.line, s.character);
+      void cancelLspRequest('references', s.filePath, s.line, s.character);
     }
     setPeekState(null);
   }
@@ -138,8 +146,8 @@ export default function PeekPanel() {
 
     const current = peekState();
     if (current) {
-      // Supersede via name-search inside a peek (no character offset available for nested peek)
-      setPeekState({ ...current, symbol: word, character: undefined });
+      // Nested peek: use name-search since we don't have a file position for the click inside the peek body.
+      setPeekState({ ...current, symbol: word, line: undefined, character: undefined });
     }
   }
 
