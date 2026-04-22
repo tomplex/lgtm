@@ -25,9 +25,15 @@ async function checkedJson<T>(resp: Response): Promise<T> {
   return resp.json();
 }
 
-interface UserState {
+export interface SidebarPrefs {
+  sortMode: 'path' | 'priority';
+  groupMode: 'none' | 'phase';
+  groupModeUserTouched: boolean;
+  collapsedFolders: Record<string, boolean>;
+}
+
+interface UserState extends SidebarPrefs {
   reviewedFiles: string[];
-  sidebarView: string;
 }
 
 interface DiffData {
@@ -167,11 +173,11 @@ export async function putUserReviewed(path: string): Promise<void> {
   });
 }
 
-export async function putUserSidebarView(view: string): Promise<void> {
-  await fetch(`${baseUrl()}/user-state/sidebar-view`, {
+export async function putUserSidebarPrefs(prefs: Partial<SidebarPrefs>): Promise<void> {
+  await fetch(`${baseUrl()}/user-state/sidebar-prefs`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ view }),
+    body: JSON.stringify(prefs),
   });
 }
 
