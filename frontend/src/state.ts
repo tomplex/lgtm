@@ -103,7 +103,10 @@ export function toggleWholeFileView() {
     for (const row of rows) {
       if (row.offsetTop >= top) {
         const num = row.querySelector('.line-num')?.textContent?.trim();
-        if (num) { targetLineNum = parseInt(num); break; }
+        if (num) {
+          targetLineNum = parseInt(num);
+          break;
+        }
       }
     }
   }
@@ -148,10 +151,7 @@ export const lspStatus = _lspStatus;
 
 export function setLspStatus(language: Language, status: LspStatus): void;
 export function setLspStatus(next: Record<Language, LspStatus>): void;
-export function setLspStatus(
-  arg1: Language | Record<Language, LspStatus>,
-  status?: LspStatus,
-): void {
+export function setLspStatus(arg1: Language | Record<Language, LspStatus>, status?: LspStatus): void {
   if (typeof arg1 === 'string') _setLspStatus(arg1 as Language, status!);
   else _setLspStatus(arg1);
 }

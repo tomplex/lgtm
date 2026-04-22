@@ -43,10 +43,7 @@ describe('buildTree — compact folders', () => {
   });
 
   it('stops merging when a chain branches', () => {
-    const files = [
-      makeFile('frontend/src/a.ts'),
-      makeFile('frontend/dist/b.js'),
-    ];
+    const files = [makeFile('frontend/src/a.ts'), makeFile('frontend/dist/b.js')];
     const tree = buildTree(files, null, { sort: 'path', group: 'none' });
     expect(tree).toHaveLength(1);
     const frontend = tree[0] as any;
@@ -56,10 +53,7 @@ describe('buildTree — compact folders', () => {
 
   it('stops merging when a directory contains files', () => {
     // frontend/ has its own file → cannot merge with src/
-    const files = [
-      makeFile('frontend/README.md'),
-      makeFile('frontend/src/app.ts'),
-    ];
+    const files = [makeFile('frontend/README.md'), makeFile('frontend/src/app.ts')];
     const tree = buildTree(files, null, { sort: 'path', group: 'none' });
     expect(tree).toHaveLength(1);
     const frontend = tree[0] as any;
@@ -86,11 +80,7 @@ describe('buildTree — phase grouping', () => {
     const files = [makeFile('server/app.ts'), makeFile('server/log.ts'), makeFile('dist/out.js')];
     const tree = buildTree(files, analysis, { sort: 'path', group: 'phase' });
     expect(tree).toHaveLength(3);
-    expect(tree.map((n) => (n as any).name)).toEqual([
-      '● Review carefully',
-      '◐ Skim',
-      '○ Rubber stamp',
-    ]);
+    expect(tree.map((n) => (n as any).name)).toEqual(['● Review carefully', '◐ Skim', '○ Rubber stamp']);
     expect(tree.every((n) => n.kind === 'folder')).toBe(true);
   });
 
@@ -121,22 +111,16 @@ describe('buildTree — phase grouping', () => {
 
 describe('buildTree — sort', () => {
   it('sort=path orders files alphabetically within a folder, folders before files', () => {
-    const files = [
-      makeFile('z.ts'),
-      makeFile('a.ts'),
-      makeFile('sub/b.ts'),
-    ];
+    const files = [makeFile('z.ts'), makeFile('a.ts'), makeFile('sub/b.ts')];
     const tree = buildTree(files, null, { sort: 'path', group: 'none' });
-    expect(tree.map((n) => (n as any).name ?? (n as any).file.path)).toEqual([
-      'sub/',
-      'a.ts',
-      'z.ts',
-    ]);
+    expect(tree.map((n) => (n as any).name ?? (n as any).file.path)).toEqual(['sub/', 'a.ts', 'z.ts']);
   });
 
   it('sort=priority orders critical → important → normal → low with path tie-break', () => {
     const analysis: Analysis = {
-      overview: '', reviewStrategy: '', groups: [],
+      overview: '',
+      reviewStrategy: '',
+      groups: [],
       files: {
         'b.ts': { priority: 'critical', phase: 'review', summary: '', category: '' },
         'a.ts': { priority: 'normal', phase: 'skim', summary: '', category: '' },
@@ -158,11 +142,7 @@ describe('buildTree — sort', () => {
 
 describe('buildTree — Claude-comments-first', () => {
   it('floats files with claudeComments to top within their folder', () => {
-    const files = [
-      { ...makeFile('a.ts') },
-      { ...makeFile('b.ts') },
-      { ...makeFile('c.ts') },
-    ];
+    const files = [{ ...makeFile('a.ts') }, { ...makeFile('b.ts') }, { ...makeFile('c.ts') }];
     const claudeCommentedPaths = new Set(['c.ts']);
     const tree = buildTree(files, null, {
       sort: 'path',
@@ -174,7 +154,9 @@ describe('buildTree — Claude-comments-first', () => {
 
   it('floats claude-commented files within phase roots, per folder', () => {
     const analysis: Analysis = {
-      overview: '', reviewStrategy: '', groups: [],
+      overview: '',
+      reviewStrategy: '',
+      groups: [],
       files: {
         'x/a.ts': { priority: 'normal', phase: 'skim', summary: '', category: '' },
         'x/b.ts': { priority: 'normal', phase: 'skim', summary: '', category: '' },
@@ -183,7 +165,9 @@ describe('buildTree — Claude-comments-first', () => {
     const files = [makeFile('x/a.ts'), makeFile('x/b.ts')];
     const claudeCommentedPaths = new Set(['x/b.ts']);
     const tree = buildTree(files, analysis, {
-      sort: 'path', group: 'phase', claudeCommentedPaths,
+      sort: 'path',
+      group: 'phase',
+      claudeCommentedPaths,
     } as any);
     const skimRoot = tree[0] as any;
     const xFolder = skimRoot.children[0];
@@ -210,47 +194,37 @@ describe('matchesFilter', () => {
 });
 
 describe('flattenVisible', () => {
-  const files = [
-    makeFile('a.ts'),
-    makeFile('sub/b.ts'),
-    makeFile('sub/c.ts'),
-    makeFile('other/d.ts'),
-  ];
+  const files = [makeFile('a.ts'), makeFile('sub/b.ts'), makeFile('sub/c.ts'), makeFile('other/d.ts')];
   const tree = buildTree(files, null, { sort: 'path', group: 'none' });
 
   it('expanded tree yields folders and files in order', () => {
     const rows = flattenVisible(tree, {
-      collapsedFolders: {}, dismissedFolders: new Set(), dismissedFiles: new Set(), filterQuery: '',
+      collapsedFolders: {},
+      dismissedFolders: new Set(),
+      dismissedFiles: new Set(),
+      filterQuery: '',
     });
-    expect(rows.map((r) => r.id)).toEqual([
-      'other/', 'other/d.ts',
-      'sub/', 'sub/b.ts', 'sub/c.ts',
-      'a.ts',
-    ]);
+    expect(rows.map((r) => r.id)).toEqual(['other/', 'other/d.ts', 'sub/', 'sub/b.ts', 'sub/c.ts', 'a.ts']);
   });
 
   it('collapsed folder hides its children', () => {
     const rows = flattenVisible(tree, {
       collapsedFolders: { 'sub/': true },
-      dismissedFolders: new Set(), dismissedFiles: new Set(), filterQuery: '',
+      dismissedFolders: new Set(),
+      dismissedFiles: new Set(),
+      filterQuery: '',
     });
-    expect(rows.map((r) => r.id)).toEqual([
-      'other/', 'other/d.ts',
-      'sub/',
-      'a.ts',
-    ]);
+    expect(rows.map((r) => r.id)).toEqual(['other/', 'other/d.ts', 'sub/', 'a.ts']);
   });
 
   it('dismissed folder hides entire subtree', () => {
     const rows = flattenVisible(tree, {
       collapsedFolders: {},
       dismissedFolders: new Set(['sub/']),
-      dismissedFiles: new Set(), filterQuery: '',
+      dismissedFiles: new Set(),
+      filterQuery: '',
     });
-    expect(rows.map((r) => r.id)).toEqual([
-      'other/', 'other/d.ts',
-      'a.ts',
-    ]);
+    expect(rows.map((r) => r.id)).toEqual(['other/', 'other/d.ts', 'a.ts']);
   });
 
   it('dismissed file hides just that file', () => {
@@ -260,16 +234,14 @@ describe('flattenVisible', () => {
       dismissedFiles: new Set(['sub/b.ts']),
       filterQuery: '',
     });
-    expect(rows.map((r) => r.id)).toEqual([
-      'other/', 'other/d.ts',
-      'sub/', 'sub/c.ts',
-      'a.ts',
-    ]);
+    expect(rows.map((r) => r.id)).toEqual(['other/', 'other/d.ts', 'sub/', 'sub/c.ts', 'a.ts']);
   });
 
   it('filter hides non-matching files and empty folders', () => {
     const rows = flattenVisible(tree, {
-      collapsedFolders: {}, dismissedFolders: new Set(), dismissedFiles: new Set(),
+      collapsedFolders: {},
+      dismissedFolders: new Set(),
+      dismissedFiles: new Set(),
       filterQuery: 'c.ts',
     });
     expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/c.ts']);
@@ -278,7 +250,8 @@ describe('flattenVisible', () => {
   it('filter auto-expands collapsed folders with matches', () => {
     const rows = flattenVisible(tree, {
       collapsedFolders: { 'sub/': true },
-      dismissedFolders: new Set(), dismissedFiles: new Set(),
+      dismissedFolders: new Set(),
+      dismissedFiles: new Set(),
       filterQuery: 'b.ts',
     });
     expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/b.ts']);
@@ -286,7 +259,9 @@ describe('flattenVisible', () => {
 
   it('filter overrides dismiss (matching dismissed file becomes visible)', () => {
     const rows = flattenVisible(tree, {
-      collapsedFolders: {}, dismissedFolders: new Set(['sub/']), dismissedFiles: new Set(),
+      collapsedFolders: {},
+      dismissedFolders: new Set(['sub/']),
+      dismissedFiles: new Set(),
       filterQuery: 'b.ts',
     });
     expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/b.ts']);
@@ -294,7 +269,9 @@ describe('flattenVisible', () => {
 
   it('folder-path query makes all descendants visible even when files do not match', () => {
     const rows = flattenVisible(tree, {
-      collapsedFolders: {}, dismissedFolders: new Set(), dismissedFiles: new Set(),
+      collapsedFolders: {},
+      dismissedFolders: new Set(),
+      dismissedFiles: new Set(),
       filterQuery: 'sub/',
     });
     expect(rows.map((r) => r.id)).toEqual(['sub/', 'sub/b.ts', 'sub/c.ts']);

@@ -30,7 +30,6 @@ export default function DiffView() {
     return f && a ? a.files[f.path] : undefined;
   });
 
-
   return (
     <Show when={file()}>
       {(f) => (
@@ -43,12 +42,16 @@ export default function DiffView() {
                   class="file-summary-toggle"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const el = (e.currentTarget as HTMLElement).closest('.diff-file-header')?.querySelector('.file-header-summary') as HTMLElement;
+                    const el = (e.currentTarget as HTMLElement)
+                      .closest('.diff-file-header')
+                      ?.querySelector('.file-header-summary') as HTMLElement;
                     if (el) el.classList.toggle('hidden');
                     (e.currentTarget as HTMLElement).classList.toggle('collapsed');
                   }}
                   title="Toggle file description"
-                >&#9662;</span>
+                >
+                  &#9662;
+                </span>
               </Show>
               <a
                 style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent);cursor:pointer;text-decoration:none"

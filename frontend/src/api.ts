@@ -239,10 +239,7 @@ export async function cancelLspRequest(
   line: number,
   character: number,
 ): Promise<void> {
-  await fetch(
-    `${baseUrl()}/lsp/request?method=${method}&${posQuery(file, line, character)}`,
-    { method: 'DELETE' },
-  );
+  await fetch(`${baseUrl()}/lsp/request?method=${method}&${posQuery(file, line, character)}`, { method: 'DELETE' });
 }
 
 export async function fetchRegisteredProjects(): Promise<ProjectSummary[]> {

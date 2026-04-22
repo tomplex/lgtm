@@ -181,7 +181,10 @@ export default function ProjectView() {
 
       const formatted = formatAllComments(comments.list, files(), sessionItems(), blockPreviews, currentItem);
       const result = await apiSubmitReview(formatted, {}, currentItem);
-      const label = currentItem === 'diff' ? 'Code Changes' : sessionItems().find((i) => i.id === currentItem)?.title ?? currentItem;
+      const label =
+        currentItem === 'diff'
+          ? 'Code Changes'
+          : (sessionItems().find((i) => i.id === currentItem)?.title ?? currentItem);
       showToast(`Review round ${result.round} submitted for ${label}!`, 3000);
       // Only clear comments for the submitted item
       setComments('list', (prev) => prev.filter((c) => c.item !== currentItem));
@@ -281,7 +284,9 @@ export default function ProjectView() {
       try {
         const commits = await fetchCommits();
         setAllCommits(commits);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
     es.onerror = () => {
       es.close();

@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  nextRow,
-  prevRow,
-  nextFolder,
-  prevFolder,
-  folderOf,
-} from '../hooks/useKeyboardShortcuts-helpers';
+import { nextRow, prevRow, nextFolder, prevFolder, folderOf } from '../hooks/useKeyboardShortcuts-helpers';
 import type { TreeNode } from '../tree';
 
 function folder(id: string, depth: number): TreeNode {
@@ -16,13 +10,7 @@ function file(id: string, depth: number): TreeNode {
 }
 
 describe('keyboard helpers', () => {
-  const rows: TreeNode[] = [
-    folder('a/', 0),
-    file('a/x.ts', 1),
-    file('a/y.ts', 1),
-    folder('b/', 0),
-    file('b/z.ts', 1),
-  ];
+  const rows: TreeNode[] = [folder('a/', 0), file('a/x.ts', 1), file('a/y.ts', 1), folder('b/', 0), file('b/z.ts', 1)];
 
   it('nextRow moves through files and folders in order', () => {
     expect(nextRow(rows, 'a/')).toBe('a/x.ts');

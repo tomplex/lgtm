@@ -74,19 +74,12 @@ export default function TreeFolder(props: Props) {
       <span class="folder-chevron">{collapsed() ? '▸' : '▾'}</span>
       <span class="folder-name">{props.node.name}</span>
       <Show when={total() > 0}>
-        <span
-          class="folder-progress"
-          aria-label={`${reviewedCount()} of ${total()} files reviewed`}
-        >
+        <span class="folder-progress" aria-label={`${reviewedCount()} of ${total()} files reviewed`}>
           {reviewedCount()}/{total()}
         </span>
       </Show>
       <Show when={!isSynthPhaseRoot()}>
-        <span
-          class="folder-dismiss"
-          title="Hide folder"
-          onClick={handleDismiss}
-        >
+        <span class="folder-dismiss" title="Hide folder" onClick={handleDismiss}>
           &times;
         </span>
       </Show>
