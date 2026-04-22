@@ -8,6 +8,15 @@ import CommentRow from '../comments/CommentRow';
 import CommentTextarea from '../comments/CommentTextarea';
 import PeekPanel from './PeekPanel';
 
+/**
+ * Convert a caret offset within a line into a UTF-16 code-unit offset. JS strings are already
+ * UTF-16 internally so this is effectively identity, but we name it explicitly so the caller
+ * contract with LSP is clear.
+ */
+export function computeUtf16Offset(line: string, caretOffsetWithinLine: number): number {
+  return line.substring(0, caretOffsetWithinLine).length;
+}
+
 interface Props {
   line: DiffLineType;
   lineIdx: number;
@@ -51,7 +60,7 @@ export default function DiffLine(props: Props) {
         c.status !== 'dismissed',
     );
 
-  function getWordAtClick(e: MouseEvent): string | null {
+  function getWordAtClick(e: MouseEvent): { word: string; character: number } | null {
     const sel = document.caretPositionFromPoint?.(e.clientX, e.clientY)
       ?? (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
     if (!sel) return null;
@@ -68,7 +77,7 @@ export default function DiffLine(props: Props) {
 
     const word = text.slice(start, end);
     if (word.length < 2 || !/^[a-zA-Z_]/.test(word)) return null;
-    return word;
+    return { word, character: computeUtf16Offset(props.line.content, start) };
   }
 
   function handleLineClick(e: MouseEvent) {
@@ -78,9 +87,14 @@ export default function DiffLine(props: Props) {
 
     // Cmd+click: symbol lookup
     if (e.metaKey || e.ctrlKey) {
-      const word = getWordAtClick(e);
-      if (word) {
-        setPeekState({ filePath: props.filePath, lineIdx: props.lineIdx, symbol: word });
+      const hit = getWordAtClick(e);
+      if (hit) {
+        setPeekState({
+          filePath: props.filePath,
+          lineIdx: props.lineIdx,
+          symbol: hit.word,
+          character: hit.character,
+        });
       }
       return;
     }
