@@ -14,15 +14,10 @@ interface LspManagerOptions {
 
 async function defaultClientFactory(language: Language, projectPath: string): Promise<LspClient> {
   const cfg = getLanguageConfig(language);
-  let child: ChildProcess;
-  try {
-    child = spawn(cfg.command, cfg.args, {
-      cwd: projectPath,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-  } catch (err) {
-    throw err;
-  }
+  const child: ChildProcess = spawn(cfg.command, cfg.args, {
+    cwd: projectPath,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
   const connection = createMessageConnection(
     new StreamMessageReader(child.stdout!),
     new StreamMessageWriter(child.stdin!),
