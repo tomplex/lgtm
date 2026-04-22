@@ -118,3 +118,75 @@ describe('buildTree — phase grouping', () => {
     expect((tree[0] as any).name).toBe('◐ Skim');
   });
 });
+
+describe('buildTree — sort', () => {
+  it('sort=path orders files alphabetically within a folder, folders before files', () => {
+    const files = [
+      makeFile('z.ts'),
+      makeFile('a.ts'),
+      makeFile('sub/b.ts'),
+    ];
+    const tree = buildTree(files, null, { sort: 'path', group: 'none' });
+    expect(tree.map((n) => (n as any).name ?? (n as any).file.path)).toEqual([
+      'sub/',
+      'a.ts',
+      'z.ts',
+    ]);
+  });
+
+  it('sort=priority orders critical → important → normal → low with path tie-break', () => {
+    const analysis: Analysis = {
+      overview: '', reviewStrategy: '', groups: [],
+      files: {
+        'b.ts': { priority: 'critical', phase: 'review', summary: '', category: '' },
+        'a.ts': { priority: 'normal', phase: 'skim', summary: '', category: '' },
+        'c.ts': { priority: 'critical', phase: 'review', summary: '', category: '' },
+        'd.ts': { priority: 'low', phase: 'rubber-stamp', summary: '', category: '' },
+      },
+    };
+    const files = [makeFile('a.ts'), makeFile('b.ts'), makeFile('c.ts'), makeFile('d.ts')];
+    const tree = buildTree(files, analysis, { sort: 'priority', group: 'none' });
+    expect(tree.map((n) => (n as any).file.path)).toEqual(['b.ts', 'c.ts', 'a.ts', 'd.ts']);
+  });
+
+  it('sort=priority falls back to path sort when analysis is null', () => {
+    const files = [makeFile('z.ts'), makeFile('a.ts')];
+    const tree = buildTree(files, null, { sort: 'priority', group: 'none' });
+    expect(tree.map((n) => (n as any).file.path)).toEqual(['a.ts', 'z.ts']);
+  });
+});
+
+describe('buildTree — Claude-comments-first', () => {
+  it('floats files with claudeComments to top within their folder', () => {
+    const files = [
+      { ...makeFile('a.ts') },
+      { ...makeFile('b.ts') },
+      { ...makeFile('c.ts') },
+    ];
+    const claudeCommentedPaths = new Set(['c.ts']);
+    const tree = buildTree(files, null, {
+      sort: 'path',
+      group: 'none',
+      claudeCommentedPaths,
+    } as any);
+    expect(tree.map((n) => (n as any).file.path)).toEqual(['c.ts', 'a.ts', 'b.ts']);
+  });
+
+  it('floats claude-commented files within phase roots, per folder', () => {
+    const analysis: Analysis = {
+      overview: '', reviewStrategy: '', groups: [],
+      files: {
+        'x/a.ts': { priority: 'normal', phase: 'skim', summary: '', category: '' },
+        'x/b.ts': { priority: 'normal', phase: 'skim', summary: '', category: '' },
+      },
+    };
+    const files = [makeFile('x/a.ts'), makeFile('x/b.ts')];
+    const claudeCommentedPaths = new Set(['x/b.ts']);
+    const tree = buildTree(files, analysis, {
+      sort: 'path', group: 'phase', claudeCommentedPaths,
+    } as any);
+    const skimRoot = tree[0] as any;
+    const xFolder = skimRoot.children[0];
+    expect(xFolder.children.map((n: any) => n.file.path)).toEqual(['x/b.ts', 'x/a.ts']);
+  });
+});

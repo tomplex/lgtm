@@ -21,6 +21,7 @@ export type TreeNode = FolderNode | FileNode;
 export interface BuildOpts {
   sort: 'path' | 'priority';
   group: 'none' | 'phase';
+  claudeCommentedPaths?: Set<string>;
 }
 
 const PHASE_ORDER = ['review', 'skim', 'rubber-stamp'] as const;
@@ -34,6 +35,18 @@ const PHASE_LABEL: Record<Phase, string> = {
 
 function filePhase(file: DiffFile, analysis: Analysis | null): Phase {
   return (analysis?.files[file.path]?.phase as Phase) ?? 'skim';
+}
+
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  important: 1,
+  normal: 2,
+  low: 3,
+};
+
+function priorityRank(file: DiffFile, analysis: Analysis | null): number {
+  if (!analysis) return 3;
+  return PRIORITY_ORDER[analysis.files[file.path]?.priority ?? 'low'] ?? 3;
 }
 
 interface TrieNode {
@@ -58,11 +71,18 @@ function insert(trie: TrieNode, file: DiffFile): void {
   void fileName;
 }
 
-function buildFromTrie(trie: TrieNode, pathPrefix: string, depth: number, idPrefix: string): TreeNode[] {
-  const out: TreeNode[] = [];
+function buildFromTrie(
+  trie: TrieNode,
+  pathPrefix: string,
+  depth: number,
+  idPrefix: string,
+  opts: BuildOpts,
+  analysis: Analysis | null,
+): TreeNode[] {
+  const folders: FolderNode[] = [];
 
-  for (const [dirName, sub] of trie.dirs) {
-    // Walk a single-child chain and merge
+  const dirEntries = Array.from(trie.dirs.entries()).sort(([a], [b]) => a.localeCompare(b));
+  for (const [dirName, sub] of dirEntries) {
     let chain = dirName + '/';
     let curPrefix = pathPrefix + chain;
     let cur = sub;
@@ -73,27 +93,38 @@ function buildFromTrie(trie: TrieNode, pathPrefix: string, depth: number, idPref
       cur = nextNode;
     }
 
-    const folder: FolderNode = {
+    folders.push({
       kind: 'folder',
       id: idPrefix + curPrefix,
       name: chain,
       fullPath: curPrefix,
       depth,
-      children: buildFromTrie(cur, curPrefix, depth + 1, idPrefix),
-    };
-    out.push(folder);
-  }
-
-  for (const f of trie.files) {
-    out.push({
-      kind: 'file',
-      id: idPrefix + f.path,
-      file: f,
-      depth,
+      children: buildFromTrie(cur, curPrefix, depth + 1, idPrefix, opts, analysis),
     });
   }
 
-  return out;
+  const filesSorted = [...trie.files].sort((a, b) => {
+    const aClaude = opts.claudeCommentedPaths?.has(a.path) ? 0 : 1;
+    const bClaude = opts.claudeCommentedPaths?.has(b.path) ? 0 : 1;
+    if (aClaude !== bClaude) return aClaude - bClaude;
+
+    if (opts.sort === 'priority') {
+      const pa = priorityRank(a, analysis);
+      const pb = priorityRank(b, analysis);
+      if (pa !== pb) return pa - pb;
+    }
+
+    return a.path.localeCompare(b.path);
+  });
+
+  const fileNodes: FileNode[] = filesSorted.map((f) => ({
+    kind: 'file',
+    id: idPrefix + f.path,
+    file: f,
+    depth,
+  }));
+
+  return [...folders, ...fileNodes];
 }
 
 export function buildTree(files: DiffFile[], analysis: Analysis | null, opts: BuildOpts): TreeNode[] {
@@ -114,7 +145,7 @@ export function buildTree(files: DiffFile[], analysis: Analysis | null, opts: Bu
         name: PHASE_LABEL[phase],
         fullPath: idPrefix + '__root__',
         depth: 0,
-        children: buildFromTrie(trie, '', 1, idPrefix),
+        children: buildFromTrie(trie, '', 1, idPrefix, opts, analysis),
       });
     }
     return roots;
@@ -122,5 +153,5 @@ export function buildTree(files: DiffFile[], analysis: Analysis | null, opts: Bu
 
   const trie = emptyTrie();
   for (const f of files) insert(trie, f);
-  return buildFromTrie(trie, '', 0, '');
+  return buildFromTrie(trie, '', 0, '', opts, analysis);
 }
