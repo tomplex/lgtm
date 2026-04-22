@@ -49,14 +49,24 @@ function buildFromTrie(trie: TrieNode, pathPrefix: string, depth: number, idPref
   const out: TreeNode[] = [];
 
   for (const [dirName, sub] of trie.dirs) {
-    const folderPath = pathPrefix + dirName + '/';
+    // Walk a single-child chain and merge
+    let chain = dirName + '/';
+    let curPrefix = pathPrefix + chain;
+    let cur = sub;
+    while (cur.files.length === 0 && cur.dirs.size === 1) {
+      const [nextName, nextNode] = cur.dirs.entries().next().value as [string, TrieNode];
+      chain += nextName + '/';
+      curPrefix += nextName + '/';
+      cur = nextNode;
+    }
+
     const folder: FolderNode = {
       kind: 'folder',
-      id: idPrefix + folderPath,
-      name: dirName + '/',
-      fullPath: folderPath,
+      id: idPrefix + curPrefix,
+      name: chain,
+      fullPath: curPrefix,
       depth,
-      children: buildFromTrie(sub, folderPath, depth + 1, idPrefix),
+      children: buildFromTrie(cur, curPrefix, depth + 1, idPrefix),
     };
     out.push(folder);
   }

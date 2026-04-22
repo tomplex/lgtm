@@ -28,3 +28,44 @@ describe('buildTree — empty and flat', () => {
     expect(tree[0].kind === 'folder' && tree[0].children).toHaveLength(2);
   });
 });
+
+describe('buildTree — compact folders', () => {
+  it('merges single-child directory chains', () => {
+    const files = [makeFile('frontend/src/components/sidebar/FileList.tsx')];
+    const tree = buildTree(files, null, { sort: 'path', group: 'none' });
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({
+      kind: 'folder',
+      name: 'frontend/src/components/sidebar/',
+      fullPath: 'frontend/src/components/sidebar/',
+      depth: 0,
+    });
+  });
+
+  it('stops merging when a chain branches', () => {
+    const files = [
+      makeFile('frontend/src/a.ts'),
+      makeFile('frontend/dist/b.js'),
+    ];
+    const tree = buildTree(files, null, { sort: 'path', group: 'none' });
+    expect(tree).toHaveLength(1);
+    const frontend = tree[0] as any;
+    expect(frontend.name).toBe('frontend/');
+    expect(frontend.children).toHaveLength(2); // src/, dist/
+  });
+
+  it('stops merging when a directory contains files', () => {
+    // frontend/ has its own file → cannot merge with src/
+    const files = [
+      makeFile('frontend/README.md'),
+      makeFile('frontend/src/app.ts'),
+    ];
+    const tree = buildTree(files, null, { sort: 'path', group: 'none' });
+    expect(tree).toHaveLength(1);
+    const frontend = tree[0] as any;
+    expect(frontend.name).toBe('frontend/');
+    expect(frontend.children).toHaveLength(2); // src/ folder + README.md file
+    const srcFolder = frontend.children.find((c: any) => c.kind === 'folder');
+    expect(srcFolder.name).toBe('src/');
+  });
+});
