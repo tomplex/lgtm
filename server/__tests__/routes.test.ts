@@ -225,7 +225,10 @@ describe('routes', () => {
         .get(`/project/${slug}/user-state`)
         .expect(200);
       expect(res.body.reviewedFiles).toBeInstanceOf(Array);
-      expect(res.body.sidebarView).toBeTruthy();
+      expect(res.body.sortMode).toBe('path');
+      expect(res.body.groupMode).toBe('none');
+      expect(res.body.groupModeUserTouched).toBe(false);
+      expect(res.body.collapsedFolders).toEqual({});
     });
 
     it('PUT /project/:slug/user-state/reviewed toggles file', async () => {
@@ -243,21 +246,40 @@ describe('routes', () => {
         .expect(400);
     });
 
-    it('PUT /project/:slug/user-state/sidebar-view sets view', async () => {
+    it('PUT /project/:slug/user-state/sidebar-prefs accepts partial updates', async () => {
       await request(app)
-        .put(`/project/${slug}/user-state/sidebar-view`)
-        .send({ view: 'grouped' })
+        .put(`/project/${slug}/user-state/sidebar-prefs`)
+        .send({ sortMode: 'priority' })
         .expect(200);
       const res = await request(app)
         .get(`/project/${slug}/user-state`)
         .expect(200);
-      expect(res.body.sidebarView).toBe('grouped');
+      expect(res.body.sortMode).toBe('priority');
+      expect(res.body.groupMode).toBe('none');
     });
 
-    it('PUT /project/:slug/user-state/sidebar-view rejects invalid view', async () => {
+    it('PUT /project/:slug/user-state/sidebar-prefs merges collapsedFolders', async () => {
       await request(app)
-        .put(`/project/${slug}/user-state/sidebar-view`)
-        .send({ view: 'invalid' })
+        .put(`/project/${slug}/user-state/sidebar-prefs`)
+        .send({ collapsedFolders: { 'frontend/src/': true } })
+        .expect(200);
+      const res = await request(app)
+        .get(`/project/${slug}/user-state`)
+        .expect(200);
+      expect(res.body.collapsedFolders).toEqual({ 'frontend/src/': true });
+    });
+
+    it('PUT /project/:slug/user-state/sidebar-prefs rejects invalid sortMode', async () => {
+      await request(app)
+        .put(`/project/${slug}/user-state/sidebar-prefs`)
+        .send({ sortMode: 'nope' })
+        .expect(400);
+    });
+
+    it('PUT /project/:slug/user-state/sidebar-prefs rejects invalid groupMode', async () => {
+      await request(app)
+        .put(`/project/${slug}/user-state/sidebar-prefs`)
+        .send({ groupMode: 'bogus' })
         .expect(400);
     });
   });

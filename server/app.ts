@@ -430,7 +430,7 @@ export function createApp(manager: SessionManager): express.Express {
     const session = res.locals.session;
     res.json({
       reviewedFiles: session.userReviewedFiles,
-      sidebarView: session.userSidebarView,
+      ...session.userSidebarPrefs,
     });
   });
 
@@ -445,14 +445,50 @@ export function createApp(manager: SessionManager): express.Express {
     res.json({ ok: true, reviewed });
   });
 
-  projectRouter.put('/user-state/sidebar-view', (req, res) => {
+  projectRouter.put('/user-state/sidebar-prefs', (req, res) => {
     const session = res.locals.session;
-    const { view } = req.body;
-    if (!view || !['flat', 'grouped', 'phased'].includes(view)) {
-      res.status(400).json({ error: 'view must be flat, grouped, or phased' });
-      return;
+    const prefs: {
+      sortMode?: 'path' | 'priority';
+      groupMode?: 'none' | 'phase';
+      groupModeUserTouched?: boolean;
+      collapsedFolders?: Record<string, boolean>;
+    } = {};
+
+    const { sortMode, groupMode, groupModeUserTouched, collapsedFolders } = req.body ?? {};
+
+    if (sortMode !== undefined) {
+      if (sortMode !== 'path' && sortMode !== 'priority') {
+        res.status(400).json({ error: 'sortMode must be path or priority' });
+        return;
+      }
+      prefs.sortMode = sortMode;
     }
-    session.setUserSidebarView(view);
+
+    if (groupMode !== undefined) {
+      if (groupMode !== 'none' && groupMode !== 'phase') {
+        res.status(400).json({ error: 'groupMode must be none or phase' });
+        return;
+      }
+      prefs.groupMode = groupMode;
+    }
+
+    if (groupModeUserTouched !== undefined) {
+      if (typeof groupModeUserTouched !== 'boolean') {
+        res.status(400).json({ error: 'groupModeUserTouched must be boolean' });
+        return;
+      }
+      prefs.groupModeUserTouched = groupModeUserTouched;
+    }
+
+    if (collapsedFolders !== undefined) {
+      if (typeof collapsedFolders !== 'object' || collapsedFolders === null || Array.isArray(collapsedFolders)) {
+        res.status(400).json({ error: 'collapsedFolders must be an object' });
+        return;
+      }
+      prefs.collapsedFolders = collapsedFolders;
+    }
+
+    session.setUserSidebarPrefs(prefs);
     res.json({ ok: true });
   });
 

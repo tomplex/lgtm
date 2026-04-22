@@ -157,10 +157,10 @@ describe('Session', () => {
       expect(session.userReviewedFiles).not.toContain('app.ts');
     });
 
-    it('setUserSidebarView persists', () => {
+    it('setUserSidebarPrefs persists', () => {
       const session = makeSession('user-sidebar');
-      session.setUserSidebarView('phased');
-      expect(session.userSidebarView).toBe('phased');
+      session.setUserSidebarPrefs({ sortMode: 'priority' });
+      expect(session.userSidebarPrefs.sortMode).toBe('priority');
     });
   });
 
@@ -192,7 +192,7 @@ describe('Session', () => {
       session.addComment({ author: 'user', text: 'Persisted comment', item: 'diff', file: 'a.ts', line: 1 });
       session.addItem('doc1', 'Design', join(fixture.repoPath, 'README.md'));
       session.toggleUserReviewedFile('src/app.ts');
-      session.setUserSidebarView('grouped');
+      session.setUserSidebarPrefs({ sortMode: 'priority' });
       session.persist();
 
       const blob = storeGet('persist-test');
@@ -202,7 +202,7 @@ describe('Session', () => {
       expect(restored.listComments()[0].text).toBe('Persisted comment');
       expect(restored.items).toHaveLength(2);
       expect(restored.userReviewedFiles).toContain('src/app.ts');
-      expect(restored.userSidebarView).toBe('grouped');
+      expect(restored.userSidebarPrefs.sortMode).toBe('priority');
     });
   });
 
