@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, relative as pathRelative, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getFileLines, getBranchCommits, gitRun, getRepoMeta } from './git-ops.js';
-import { type Session, type SSEClient } from './session.js';
+import { type Session, type SSEClient, type SidebarPrefs } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 import { notifyChannel } from './mcp.js';
@@ -447,12 +447,7 @@ export function createApp(manager: SessionManager): express.Express {
 
   projectRouter.put('/user-state/sidebar-prefs', (req, res) => {
     const session = res.locals.session;
-    const prefs: {
-      sortMode?: 'path' | 'priority';
-      groupMode?: 'none' | 'phase';
-      groupModeUserTouched?: boolean;
-      collapsedFolders?: Record<string, boolean>;
-    } = {};
+    const prefs: Partial<SidebarPrefs> = {};
 
     const { sortMode, groupMode, groupModeUserTouched, collapsedFolders } = req.body ?? {};
 
@@ -484,6 +479,12 @@ export function createApp(manager: SessionManager): express.Express {
       if (typeof collapsedFolders !== 'object' || collapsedFolders === null || Array.isArray(collapsedFolders)) {
         res.status(400).json({ error: 'collapsedFolders must be an object' });
         return;
+      }
+      for (const [key, value] of Object.entries(collapsedFolders)) {
+        if (typeof value !== 'boolean') {
+          res.status(400).json({ error: `collapsedFolders values must be boolean, got ${typeof value} for key "${key}"` });
+          return;
+        }
       }
       prefs.collapsedFolders = collapsedFolders;
     }

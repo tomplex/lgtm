@@ -258,7 +258,7 @@ describe('routes', () => {
       expect(res.body.groupMode).toBe('none');
     });
 
-    it('PUT /project/:slug/user-state/sidebar-prefs merges collapsedFolders', async () => {
+    it('PUT /project/:slug/user-state/sidebar-prefs persists collapsedFolders', async () => {
       await request(app)
         .put(`/project/${slug}/user-state/sidebar-prefs`)
         .send({ collapsedFolders: { 'frontend/src/': true } })
@@ -267,6 +267,13 @@ describe('routes', () => {
         .get(`/project/${slug}/user-state`)
         .expect(200);
       expect(res.body.collapsedFolders).toEqual({ 'frontend/src/': true });
+    });
+
+    it('PUT /project/:slug/user-state/sidebar-prefs rejects non-boolean collapsedFolders values', async () => {
+      await request(app)
+        .put(`/project/${slug}/user-state/sidebar-prefs`)
+        .send({ collapsedFolders: { 'a/': 'yes' } })
+        .expect(400);
     });
 
     it('PUT /project/:slug/user-state/sidebar-prefs rejects invalid sortMode', async () => {

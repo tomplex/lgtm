@@ -20,7 +20,7 @@ interface SessionItem {
   path?: string;
 }
 
-interface SidebarPrefs {
+export interface SidebarPrefs {
   sortMode: 'path' | 'priority';
   groupMode: 'none' | 'phase';
   groupModeUserTouched: boolean;
