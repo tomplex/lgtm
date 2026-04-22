@@ -13,7 +13,10 @@ export interface ProjectBlob {
   analysis: Record<string, unknown> | null;
   rounds: Record<string, number>;
   reviewedFiles: string[];
-  sidebarView: string;
+  sortMode: 'path' | 'priority';
+  groupMode: 'none' | 'phase';
+  groupModeUserTouched: boolean;
+  collapsedFolders: Record<string, boolean>;
 }
 
 function defaultDbPath(): string {

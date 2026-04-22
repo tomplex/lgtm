@@ -41,7 +41,10 @@ export class Session {
   private _sseClients: SSEClient[] = [];
   private _analysis: Record<string, unknown> | null = null;
   private _reviewedFiles = new Set<string>();
-  private _sidebarView = 'flat';
+  private _sortMode: 'path' | 'priority' = 'path';
+  private _groupMode: 'none' | 'phase' = 'none';
+  private _groupModeUserTouched = false;
+  private _collapsedFolders: Record<string, boolean> = {};
   private _metaCache: { meta: RepoMeta; at: number } | null = null;
   private _lsp: LspManager;
 
@@ -81,7 +84,10 @@ export class Session {
       analysis: this._analysis,
       rounds: this._rounds,
       reviewedFiles: Array.from(this._reviewedFiles),
-      sidebarView: this._sidebarView,
+      sortMode: this._sortMode,
+      groupMode: this._groupMode,
+      groupModeUserTouched: this._groupModeUserTouched,
+      collapsedFolders: this._collapsedFolders,
     };
   }
 
@@ -109,7 +115,11 @@ export class Session {
       session._rounds = { diff: migrated.round as number };
     }
     session._reviewedFiles = new Set(migrated.reviewedFiles as string[]);
-    session._sidebarView = (migrated.sidebarView as string) ?? 'flat';
+    session._sortMode = (migrated.sortMode as 'path' | 'priority') ?? 'path';
+    session._groupMode = (migrated.groupMode as 'none' | 'phase') ?? 'none';
+    session._groupModeUserTouched = (migrated.groupModeUserTouched as boolean) ?? false;
+    session._collapsedFolders = (migrated.collapsedFolders as Record<string, boolean>) ?? {};
+    // Legacy `sidebarView` field is read and discarded; persisted blobs will no longer include it.
     return session;
   }
 
@@ -278,8 +288,18 @@ export class Session {
     return Array.from(this._reviewedFiles);
   }
 
-  get userSidebarView(): string {
-    return this._sidebarView;
+  get userSidebarPrefs(): {
+    sortMode: 'path' | 'priority';
+    groupMode: 'none' | 'phase';
+    groupModeUserTouched: boolean;
+    collapsedFolders: Record<string, boolean>;
+  } {
+    return {
+      sortMode: this._sortMode,
+      groupMode: this._groupMode,
+      groupModeUserTouched: this._groupModeUserTouched,
+      collapsedFolders: this._collapsedFolders,
+    };
   }
 
   setUserReviewedFiles(files: string[]): void {
@@ -295,8 +315,16 @@ export class Session {
     return nowReviewed;
   }
 
-  setUserSidebarView(view: string): void {
-    this._sidebarView = view;
+  setUserSidebarPrefs(prefs: Partial<{
+    sortMode: 'path' | 'priority';
+    groupMode: 'none' | 'phase';
+    groupModeUserTouched: boolean;
+    collapsedFolders: Record<string, boolean>;
+  }>): void {
+    if (prefs.sortMode !== undefined) this._sortMode = prefs.sortMode;
+    if (prefs.groupMode !== undefined) this._groupMode = prefs.groupMode;
+    if (prefs.groupModeUserTouched !== undefined) this._groupModeUserTouched = prefs.groupModeUserTouched;
+    if (prefs.collapsedFolders !== undefined) this._collapsedFolders = prefs.collapsedFolders;
     this.persist();
   }
 
