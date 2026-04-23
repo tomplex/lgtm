@@ -14,6 +14,11 @@ import {
   collapsedFolders,
   setCollapsedFolders,
   toggleFolderCollapsed,
+  walkthroughMode,
+  setWalkthroughMode,
+  walkthrough,
+  activeStopIdx,
+  setActiveStopIdx,
 } from '../state';
 import { collectFiles } from '../tree';
 import { nextRow, prevRow, nextFolder, prevFolder, folderOf } from './useKeyboardShortcuts-helpers';
@@ -29,6 +34,7 @@ interface Options {
 export function useKeyboardShortcuts(options: Options) {
   let lastShiftUp = 0;
   let shiftDownClean = false;
+  let _pendingJump = false;
 
   function onKeyDown(e: KeyboardEvent) {
     shiftDownClean = e.key === 'Shift';
@@ -64,6 +70,45 @@ export function useKeyboardShortcuts(options: Options) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       options.onOpenPalette();
+      return;
+    }
+
+    // --- Walkthrough-mode keys ---
+    if (walkthroughMode()) {
+      const w = walkthrough();
+      const len = w?.stops.length ?? 0;
+      if (e.key === 'd' && !e.metaKey && !e.ctrlKey) {
+        setWalkthroughMode(false);
+        _pendingJump = false;
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        setActiveStopIdx(Math.min(activeStopIdx() + 1, Math.max(0, len - 1)));
+        _pendingJump = false;
+        return;
+      }
+      if (e.key === 'Enter' && e.shiftKey) {
+        setActiveStopIdx(Math.max(activeStopIdx() - 1, 0));
+        _pendingJump = false;
+        return;
+      }
+      if (e.key === 'g') {
+        _pendingJump = true;
+        return;
+      }
+      if (_pendingJump && /^[0-9]$/.test(e.key)) {
+        const target = parseInt(e.key, 10) - 1;
+        if (target >= 0 && target < len) setActiveStopIdx(target);
+        _pendingJump = false;
+        return;
+      }
+      _pendingJump = false;
+      return;
+    }
+
+    // --- Entering walkthrough from diff mode ---
+    if (e.key === 'W' && !e.metaKey && !e.ctrlKey && walkthrough()) {
+      setWalkthroughMode(true);
       return;
     }
 
