@@ -36,7 +36,7 @@ export interface SSEClient {
 export class Session {
   readonly repoPath: string;
   baseBranch: string;
-  readonly description: string;
+  description: string;
   readonly outputPath: string;
 
   private _slug: string = '';
