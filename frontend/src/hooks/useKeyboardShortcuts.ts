@@ -8,11 +8,14 @@ import {
   toggleWholeFileView,
   allCommits,
   toggleReviewed,
+  reviewedFiles,
+  setReviewedFiles,
   visibleRows,
   collapsedFolders,
   setCollapsedFolders,
   toggleFolderCollapsed,
 } from '../state';
+import { collectFiles } from '../tree';
 import { nextRow, prevRow, nextFolder, prevFolder, folderOf } from './useKeyboardShortcuts-helpers';
 
 interface Options {
@@ -109,8 +112,22 @@ export function useKeyboardShortcuts(options: Options) {
     } else if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
       if (allCommits().length > 0) options.onToggleCommits();
     } else if (e.key === 'e' && !e.metaKey && !e.ctrlKey) {
-      const f = activeFile();
-      if (f) toggleReviewed(f.path);
+      const cur = activeRowId();
+      const row = cur ? visibleRows().find((r) => r.id === cur) : undefined;
+      if (!row) return;
+      if (row.kind === 'file') {
+        toggleReviewed(row.file.path);
+      } else {
+        const descendants = collectFiles(row);
+        if (descendants.length === 0) return;
+        const allReviewed = descendants.every((f) => reviewedFiles[f.file.path]);
+        const target = !allReviewed;
+        for (const f of descendants) {
+          if ((reviewedFiles[f.file.path] ?? false) !== target) {
+            setReviewedFiles(f.file.path, target);
+          }
+        }
+      }
     } else if (e.key === 'w' && !e.metaKey && !e.ctrlKey) {
       if (appMode() === 'diff' && activeFile()) toggleWholeFileView();
     } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {

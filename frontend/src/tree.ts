@@ -18,6 +18,15 @@ export interface FileNode {
 
 export type TreeNode = FolderNode | FileNode;
 
+/** Walk a folder's subtree and collect every descendant file. */
+export function collectFiles(node: FolderNode, out: FileNode[] = []): FileNode[] {
+  for (const child of node.children) {
+    if (child.kind === 'file') out.push(child);
+    else collectFiles(child, out);
+  }
+  return out;
+}
+
 export interface BuildOpts {
   sort: 'path' | 'priority';
   group: 'none' | 'phase';

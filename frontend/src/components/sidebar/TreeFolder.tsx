@@ -1,5 +1,6 @@
 import { Show, createMemo, createEffect } from 'solid-js';
-import type { FolderNode, FileNode } from '../../tree';
+import type { FolderNode } from '../../tree';
+import { collectFiles } from '../../tree';
 import {
   activeRowId,
   setActiveRowId,
@@ -15,23 +16,12 @@ interface Props {
   node: FolderNode;
 }
 
-function collectFiles(node: FolderNode, out: FileNode[]): void {
-  for (const child of node.children) {
-    if (child.kind === 'file') out.push(child);
-    else collectFiles(child, out);
-  }
-}
-
 export default function TreeFolder(props: Props) {
   const isActive = () => activeRowId() === props.node.id;
   const isSynthPhaseRoot = () => props.node.fullPath.endsWith(':__root__');
   const collapsed = () => !!effectiveCollapsedFolders()[props.node.fullPath];
 
-  const descendants = createMemo(() => {
-    const out: FileNode[] = [];
-    collectFiles(props.node, out);
-    return out;
-  });
+  const descendants = createMemo(() => collectFiles(props.node));
 
   const total = () => descendants().length;
   const reviewedCount = () => descendants().filter((f) => reviewedFiles[f.file.path]).length;
