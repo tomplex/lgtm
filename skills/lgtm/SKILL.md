@@ -4,7 +4,7 @@ description: >
   Use when the user asks to register a project for review, start a code review,
   open LGTM, analyze changes, or mentions LGTM. Also use when the user says
   they're done with a task and explicitly asks for a review.
-allowed-tools: "mcp__lgtm__start,mcp__lgtm__add_document,mcp__lgtm__comment,mcp__lgtm__read_feedback,mcp__lgtm__stop,mcp__plugin_lgtm_lgtm__start,mcp__plugin_lgtm_lgtm__add_document,mcp__plugin_lgtm_lgtm__comment,mcp__plugin_lgtm_lgtm__read_feedback,mcp__plugin_lgtm_lgtm__stop,Skill(lgtm:analyze)"
+allowed-tools: "mcp__lgtm__claim_reviews,mcp__lgtm__add_document,mcp__lgtm__comment,mcp__lgtm__read_feedback,mcp__lgtm__stop,mcp__plugin_lgtm_lgtm__claim_reviews,mcp__plugin_lgtm_lgtm__add_document,mcp__plugin_lgtm_lgtm__comment,mcp__plugin_lgtm_lgtm__read_feedback,mcp__plugin_lgtm_lgtm__stop,Skill(lgtm:analyze)"
 ---
 
 # LGTM
@@ -15,14 +15,17 @@ is always running — you don't need to start it.
 
 ## Workflow
 
-### 1. Register the project
+### 1. Claim the review session
 
-Call the `start` MCP tool with the repo path. This registers the project with the
-server and returns the browser URL. The user can optionally provide a description
-(shown as a banner in the UI).
+Call the `claim_reviews` MCP tool with the repo path. This registers the project
+(if not already registered), claims diff-review notifications for this Claude
+session, and returns the browser URL. You can optionally pass a `description`
+(shown as a banner) or `baseBranch` override.
 
-If the project is already registered, `start` is idempotent — it returns the existing
-session info.
+`claim_reviews` is idempotent and safe to call repeatedly. Other tools
+(`comment`, `add_document`, `read_feedback`) auto-register on their own — you
+only need `claim_reviews` if you want to be notified when the user submits
+feedback, or to set/update the description banner.
 
 ### 2. Work phase
 
@@ -55,7 +58,7 @@ know you've responded. They can submit multiple rounds.
 
 | Tool | Purpose |
 |------|---------|
-| `start` | Register a project — returns the browser URL |
+| `claim_reviews` | Claim review notifications, set description, get URL — the typical entry point |
 | `add_document` | Add a document tab (spec, design doc, markdown file) |
 | `comment` | Seed inline comments on a diff or document |
 | `read_feedback` | Read submitted review feedback |
@@ -65,4 +68,4 @@ know you've responded. They can submit multiple rounds.
 ## The /lgtm command
 
 Users can type `/lgtm` to quickly register the current project. This is equivalent to
-calling `start` with the repo path.
+calling `claim_reviews` with the repo path.
