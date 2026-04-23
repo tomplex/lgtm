@@ -32,24 +32,6 @@ function createMcpServer(manager: SessionManager): McpServer {
   );
 
   server.tool(
-    'start',
-    'Start a review session for a git repository. Opens a browser-based UI where the user can review diffs and documents with inline commenting. Returns the URL. Must be called before any other LGTM tools for that repo.',
-    {
-      repoPath: z.string().describe('Absolute path to the git repository'),
-      description: z.string().optional().describe('Review context shown as a banner'),
-      baseBranch: z.string().optional().describe('Base branch (auto-detected if omitted)'),
-    },
-    async ({ repoPath, description, baseBranch }) => {
-      const result = manager.register(repoPath, { description, baseBranch });
-      associateMcpSession(server, result.slug);
-      claimDiffReviews(server, result.slug);
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(result) }],
-      };
-    },
-  );
-
-  server.tool(
     'add_document',
     'Add a document (spec, design doc, markdown file) as a reviewable tab alongside the diff. The user can comment on it in the review UI. Requires an active session.',
     {

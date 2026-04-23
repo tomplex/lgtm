@@ -44,6 +44,23 @@ describe('mcp', () => {
     expect(res.json).toBeDefined();
   });
 
+  it('start tool no longer exists', async () => {
+    const c = await createMcpClient(app);
+    try {
+      const res = await c.callTool('start', { repoPath: fixture.repoPath });
+      // MCP SDK returns a JSON-RPC error for unknown tools; some SDK versions
+      // return a result with an error field, others set isError on the result.
+      // Accept any of these forms.
+      const raw = res.raw as { result?: { isError?: boolean } } | null;
+      const hasError = Boolean(res.error)
+        || (res.json && typeof res.json === 'object' && 'error' in (res.json as object))
+        || Boolean(raw?.result?.isError);
+      expect(hasError).toBe(true);
+    } finally {
+      await c.close();
+    }
+  });
+
   describe('auto-init', () => {
     let autoInitFixture: GitFixture;
 
@@ -190,6 +207,20 @@ describe('mcp', () => {
         });
         const found = manager.findByRepoPath(freshFixture.repoPath)!;
         expect(found.session.description).toBe('updated');
+      } finally {
+        await c.close();
+        freshFixture.cleanup();
+      }
+    });
+  });
+
+  describe('stop', () => {
+    it('returns an error when the repo is not registered', async () => {
+      const c = await createMcpClient(app);
+      const freshFixture = createGitFixture();
+      try {
+        const res = await c.callTool('stop', { repoPath: freshFixture.repoPath });
+        expect(res.json).toMatchObject({ error: 'No active review session for this repo path.' });
       } finally {
         await c.close();
         freshFixture.cleanup();
