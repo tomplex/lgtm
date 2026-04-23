@@ -91,6 +91,26 @@ describe('SessionManager', () => {
     manager.deregister(r2.slug);
   });
 
+  it('register updates description on an existing session when passed', () => {
+    const manager = new SessionManager(9999);
+    const first = manager.register(fixture.repoPath, { description: 'first' });
+    const session = manager.get(first.slug)!;
+    expect(session.description).toBe('first');
+
+    manager.register(fixture.repoPath, { description: 'second' });
+    expect(session.description).toBe('second');
+    manager.deregister(first.slug);
+  });
+
+  it('register preserves description when not passed', () => {
+    const manager = new SessionManager(9999);
+    manager.register(fixture.repoPath, { description: 'initial' });
+    const session = manager.get(manager.findByRepoPath(fixture.repoPath)!.slug)!;
+    manager.register(fixture.repoPath); // no opts
+    expect(session.description).toBe('initial');
+    manager.deregister(manager.findByRepoPath(fixture.repoPath)!.slug);
+  });
+
   it('restores sessions from store on construction', () => {
     // Create a manager and register a project
     const manager1 = new SessionManager(9999);

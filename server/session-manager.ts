@@ -39,11 +39,16 @@ export class SessionManager {
     // Check if this path is already registered
     for (const [slug, session] of this._sessions) {
       if (session.repoPath === absPath) {
-        // Update base branch if explicitly provided
+        let changed = false;
         if (opts?.baseBranch && opts.baseBranch !== session.baseBranch) {
           session.baseBranch = opts.baseBranch;
-          session.persist();
+          changed = true;
         }
+        if (opts?.description !== undefined && opts.description !== session.description) {
+          session.description = opts.description;
+          changed = true;
+        }
+        if (changed) session.persist();
         return { slug, url: `http://127.0.0.1:${this._port}/project/${slug}/` };
       }
     }
