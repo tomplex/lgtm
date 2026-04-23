@@ -275,6 +275,17 @@ export function notifyChannel(content: string, meta: Record<string, string>): vo
   }
 }
 
+/**
+ * Test-only probe: returns the mcp-session-id that currently holds the diff-
+ * review claim for the given slug, or null if no session holds it.
+ */
+export function _testing_getDiffClaimHolder(slug: string): string | null {
+  for (const [sid, entry] of activeMcpSessions) {
+    if (entry.projectSlug === slug && entry.claimedDiff) return sid;
+  }
+  return null;
+}
+
 export function mountMcp(app: express.Express, manager: SessionManager): void {
   app.post('/mcp', async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
