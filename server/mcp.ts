@@ -33,7 +33,7 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'add_document',
-    'Add a document (spec, design doc, markdown file) as a reviewable tab alongside the diff. The user can comment on it in the review UI. Requires an active session.',
+    'Add a document (spec, design doc, markdown file) as a reviewable tab alongside the diff. The user can comment on it in the review UI. Auto-registers the project if needed.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
       path: z.string().describe('Absolute path to the document file'),
