@@ -6,6 +6,9 @@ import type express from 'express';
 import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 import { parseFileAnalysis, parseSynthesis } from './parse-analysis.js';
+import { parseWalkthrough } from './parse-walkthrough.js';
+import { sha256Hex } from './diff-hash.js';
+import { getBranchDiff } from './git-ops.js';
 
 function resolveProject(
   manager: SessionManager,
@@ -187,6 +190,40 @@ function createMcpServer(manager: SessionManager): McpServer {
             fileCount: Object.keys(files).length,
             groupCount: synthesis.groups.length,
             reviewGuide: !!reviewGuidePath,
+          }) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            error: err instanceof Error ? err.message : String(err),
+          }) }],
+        };
+      }
+    },
+  );
+
+  server.tool(
+    'set_walkthrough',
+    'Set the narrated walkthrough for a review session. Accepts a markdown file authored by the walkthrough-author agent. The review UI renders this as an ordered walkthrough of logical changes, separate from the diff view. Called by the walkthrough skill after the agent writes its output.',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+      walkthroughPath: z.string().describe('Absolute path to the walkthrough markdown output'),
+    },
+    async ({ repoPath, walkthroughPath }) => {
+      const { found } = resolveProject(manager, repoPath, server);
+      try {
+        const md = readFileSync(walkthroughPath, 'utf-8');
+        const parsed = parseWalkthrough(md);
+        const diff = getBranchDiff(found.session.repoPath, found.session.baseBranch);
+        parsed.diffHash = sha256Hex(diff);
+        parsed.generatedAt = new Date().toISOString();
+        found.session.setWalkthrough(parsed);
+        found.session.broadcast('walkthrough_changed', { stopCount: parsed.stops.length });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: true,
+            stopCount: parsed.stops.length,
+            diffHash: parsed.diffHash,
           }) }],
         };
       } catch (err) {

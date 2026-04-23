@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createGitFixture, type GitFixture } from './helpers/git-fixture.js';
@@ -211,6 +211,54 @@ describe('mcp', () => {
         await c.close();
         freshFixture.cleanup();
       }
+    });
+  });
+
+  describe('set_walkthrough', () => {
+    it('parses markdown and stores on session', async () => {
+      const mdPath = join(tmpDir, 'walkthrough.md');
+      writeFileSync(mdPath, `## Summary
+
+Test.
+
+## Stop 1
+
+- importance: primary
+- title: Test stop
+
+A short narrative.
+
+### Artifact: a.ts
+
+- hunk: 1-5
+`);
+
+      const res = await client.callTool('set_walkthrough', {
+        repoPath: fixture.repoPath,
+        walkthroughPath: mdPath,
+      });
+      expect(res.error).toBeUndefined();
+      const body = res.json as { ok?: boolean; stopCount?: number; diffHash?: string; error?: string };
+      expect(body.ok).toBe(true);
+      expect(body.stopCount).toBe(1);
+      expect(body.diffHash).toMatch(/^[a-f0-9]{64}$/);
+
+      const session = manager.findByRepoPath(fixture.repoPath)!.session;
+      expect(session.walkthrough).not.toBeNull();
+      expect(session.walkthrough!.stops[0].title).toBe('Test stop');
+      expect(session.walkthrough!.diffHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(session.walkthrough!.generatedAt).toMatch(/^\d{4}-/);
+    });
+
+    it('returns error on malformed input', async () => {
+      const mdPath = join(tmpDir, 'bad.md');
+      writeFileSync(mdPath, 'not valid');
+      const res = await client.callTool('set_walkthrough', {
+        repoPath: fixture.repoPath,
+        walkthroughPath: mdPath,
+      });
+      const body = res.json as { error?: string; ok?: boolean };
+      expect(body.error).toBeDefined();
     });
   });
 
