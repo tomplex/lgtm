@@ -33,6 +33,9 @@ import {
   setDismissedFoldersStore,
   symbolSearchOpen,
   setSymbolSearchOpen,
+  setWalkthrough,
+  setWalkthroughStale,
+  onWalkthroughReplaced,
 } from './state';
 import {
   fetchItems,
@@ -46,6 +49,7 @@ import {
   getProjectSlug,
 } from './api';
 import { fetchComments } from './comment-api';
+import { fetchWalkthrough } from './walkthrough-api';
 import { parseDiff } from './diff';
 import { formatAllComments } from './format-comments';
 import { loadState, clearPersistedState, watchAndSave } from './persistence';
@@ -106,6 +110,18 @@ export default function ProjectView() {
       replaceComments(allComments);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function loadWalkthrough(): Promise<void> {
+    try {
+      const r = await fetchWalkthrough();
+      setWalkthrough(r.walkthrough);
+      setWalkthroughStale(r.stale);
+      onWalkthroughReplaced();
+    } catch {
+      setWalkthrough(null);
+      setWalkthroughStale(false);
     }
   }
 
@@ -281,8 +297,12 @@ export default function ProjectView() {
     es.addEventListener('items_changed', () => {
       loadItems().then(() => showToast('Review items updated', 2000));
     });
+    es.addEventListener('walkthrough_changed', () => {
+      loadWalkthrough().then(() => showToast('Walkthrough updated', 2000));
+    });
     es.addEventListener('git_changed', async () => {
       handleRefresh();
+      loadWalkthrough();
       // Also reload commits since they may have changed
       try {
         const commits = await fetchCommits();
@@ -307,6 +327,8 @@ export default function ProjectView() {
 
     const analysisData = await fetchAnalysis();
     if (analysisData) setAnalysis(analysisData);
+
+    await loadWalkthrough();
 
     const savedItem = localStorage.getItem(activeItemKey);
     const validItem = savedItem && sessionItems().some((i) => i.id === savedItem);
