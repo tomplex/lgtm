@@ -43,4 +43,33 @@ describe('mcp', () => {
     expect(res.error).toBeUndefined();
     expect(res.json).toBeDefined();
   });
+
+  describe('auto-init', () => {
+    let autoInitFixture: GitFixture;
+
+    beforeAll(() => {
+      autoInitFixture = createGitFixture();
+    });
+
+    afterAll(() => {
+      autoInitFixture.cleanup();
+    });
+
+    it('comment on an unregistered repo auto-registers the project', async () => {
+      const local = await createMcpClient(app);
+      try {
+        expect(manager.findByRepoPath(autoInitFixture.repoPath)).toBeUndefined();
+
+        const res = await local.callTool('comment', {
+          repoPath: autoInitFixture.repoPath,
+          comments: [{ file: 'src/app.ts', line: 1, comment: 'hi' }],
+        });
+
+        expect(res.json).toMatchObject({ ok: true });
+        expect(manager.findByRepoPath(autoInitFixture.repoPath)).toBeDefined();
+      } finally {
+        await local.close();
+      }
+    });
+  });
 });

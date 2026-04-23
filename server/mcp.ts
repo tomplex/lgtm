@@ -7,12 +7,16 @@ import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 import { parseFileAnalysis, parseSynthesis } from './parse-analysis.js';
 
-type McpTextResult = { content: [{ type: 'text'; text: string }] };
-
-function resolveProject(manager: SessionManager, repoPath: string, mcpServer?: McpServer): { found: ReturnType<SessionManager['findByRepoPath']> & object } | { error: McpTextResult } {
-  const found = manager.findByRepoPath(repoPath);
+function resolveProject(
+  manager: SessionManager,
+  repoPath: string,
+  mcpServer?: McpServer,
+): { found: { slug: string; session: import('./session.js').Session } } {
+  let found = manager.findByRepoPath(repoPath);
   if (!found) {
-    return { error: { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Project not registered. Call start first.' }) }] } };
+    const { slug } = manager.register(repoPath);
+    const session = manager.get(slug)!;
+    found = { slug, session };
   }
   if (mcpServer) associateMcpSession(mcpServer, found.slug);
   return { found };
@@ -51,9 +55,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       title: z.string().optional().describe('Tab title (defaults to filename)'),
     },
     async ({ repoPath, path, title }) => {
-      const lookup = resolveProject(manager, repoPath, server);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
+      const { found } = resolveProject(manager, repoPath, server);
       const itemTitle = title || path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Untitled';
       const itemId = slugify(itemTitle);
       const result = found.session.addItem(itemId, itemTitle, path);
@@ -77,9 +79,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       })).describe('Array of comments to add'),
     },
     async ({ repoPath, item, comments }) => {
-      const lookup = resolveProject(manager, repoPath, server);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
+      const { found } = resolveProject(manager, repoPath, server);
       const itemId = item ?? 'diff';
       const count = found.session.addComments(itemId, comments);
       found.session.broadcast('comments_changed', { item: itemId, count: comments.length });
@@ -94,9 +94,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const lookup = resolveProject(manager, repoPath, server);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
+      const { found } = resolveProject(manager, repoPath, server);
       let feedback = '';
       try {
         feedback = readFileSync(found.session.outputPath, 'utf-8');
@@ -114,9 +112,10 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const lookup = resolveProject(manager, repoPath, server);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
+      const found = manager.findByRepoPath(repoPath);
+      if (!found) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No active review session for this repo path.' }) }] };
+      }
       manager.deregister(found.slug);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, slug: found.slug }) }] };
     },
@@ -129,9 +128,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       repoPath: z.string().describe('Absolute path to the git repository'),
     },
     async ({ repoPath }) => {
-      const lookup = resolveProject(manager, repoPath, server);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
+      const { found } = resolveProject(manager, repoPath, server);
       claimDiffReviews(server, found.slug);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, slug: found.slug }) }] };
     },
@@ -146,9 +143,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       text: z.string().describe('The reply text'),
     },
     async ({ repoPath, commentId, text }) => {
-      const lookup = resolveProject(manager, repoPath, server);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
+      const { found } = resolveProject(manager, repoPath, server);
       const parent = found.session.getComment(commentId);
       if (!parent) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Comment not found: ${commentId}` }) }] };
@@ -177,9 +172,7 @@ function createMcpServer(manager: SessionManager): McpServer {
       reviewGuidePath: z.string().optional().describe('Absolute path to a markdown review guide (overview, strategy, opinion) to add as a reviewable document'),
     },
     async ({ repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath }) => {
-      const lookup = resolveProject(manager, repoPath, server);
-      if ('error' in lookup) return lookup.error;
-      const { found } = lookup;
+      const { found } = resolveProject(manager, repoPath, server);
 
       try {
         const files = parseFileAnalysis(readFileSync(fileAnalysisPath, 'utf-8'));
