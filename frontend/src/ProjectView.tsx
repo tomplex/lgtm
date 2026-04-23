@@ -3,6 +3,8 @@ import {
   files,
   activeFile,
   setActiveRowId,
+  setActiveFilePath,
+  watchActiveRowId,
   activeItemId,
   setActiveItemId,
   appMode,
@@ -25,7 +27,8 @@ import {
   paletteOpen,
   setPaletteOpen,
   collapsedFolders,
-  setCollapsedFolders,
+  setSessionCollapsedFolders,
+  sessionCollapsedFolders,
   dismissedFolders,
   setDismissedFoldersStore,
   symbolSearchOpen,
@@ -120,9 +123,9 @@ export default function ProjectView() {
       const restoredPath = saved?.filePath;
       const f = restoredPath ? files().find((x) => x.path === restoredPath) : undefined;
       if (f) {
-        setActiveRowId(f.path);
+        setActiveFilePath(f.path);
       } else if (files().length > 0) {
-        setActiveRowId(files()[0].path);
+        setActiveFilePath(files()[0].path);
       } else {
         setActiveRowId(null);
       }
@@ -229,7 +232,7 @@ export default function ProjectView() {
       const data = await fetchItemData('diff', commits);
       if (data.mode !== 'diff') return;
       setFiles(parseDiff(data.diff));
-      if (!activeFile() && files().length > 0) setActiveRowId(files()[0].path);
+      if (!activeFile() && files().length > 0) setActiveFilePath(files()[0].path);
       showToast(`Showing ${shas.length} commit${shas.length !== 1 ? 's' : ''}`);
     } catch (e: any) {
       showToast('Failed to apply: ' + e.message);
@@ -299,6 +302,7 @@ export default function ProjectView() {
   onMount(async () => {
     await loadState();
     watchAndSave();
+    watchActiveRowId();
     await loadItems();
 
     const analysisData = await fetchAnalysis();
@@ -313,6 +317,8 @@ export default function ProjectView() {
     if (meta.repoName) {
       document.title = `${meta.repoName} — ${meta.branch || ''}`;
     }
+
+    navigateToHashFile();
 
     connectSSE();
 
@@ -351,16 +357,18 @@ export default function ProjectView() {
     const f = files().find((x) => x.path === path);
     if (!f) return;
 
-    // Force-expand every ancestor folder so the file is visible.
+    // Force-expand every ancestor folder so the file is visible (session-only, not persisted).
     const segments = path.split('/');
     for (let i = 1; i < segments.length; i++) {
       const ancestor = segments.slice(0, i).join('/') + '/';
-      if (collapsedFolders[ancestor]) setCollapsedFolders(ancestor, false);
+      if (collapsedFolders[ancestor] || sessionCollapsedFolders[ancestor] === true) {
+        setSessionCollapsedFolders(ancestor, 'force-open');
+      }
       if (dismissedFolders[ancestor]) setDismissedFoldersStore(ancestor, false);
     }
 
     if (activeFile()?.path !== path) {
-      setActiveRowId(path);
+      setActiveFilePath(path);
       setWholeFileView(false);
     }
   }

@@ -1,4 +1,4 @@
-import { createSignal, createMemo } from 'solid-js';
+import { createSignal, createMemo, createEffect, untrack } from 'solid-js';
 import { createStore, reconcile } from 'solid-js/store';
 import type { Comment } from './comment-types';
 import { buildTree, flattenVisible, type TreeNode } from './tree';
@@ -191,6 +191,9 @@ export const [selectedShas, setSelectedShas] = createStore<Record<string, boolea
 
 export const [collapsedFolders, setCollapsedFolders] = createStore<Record<string, boolean>>({});
 
+/** Session-only collapse overlays (auto-collapse-on-reviewed, hash-nav force-expand). Not persisted. */
+export const [sessionCollapsedFolders, setSessionCollapsedFolders] = createStore<Record<string, boolean | 'force-open'>>({});
+
 export function toggleFolderCollapsed(fullPath: string) {
   setCollapsedFolders(fullPath, (v) => !v);
 }
@@ -208,6 +211,18 @@ export function undismissAll() {
   for (const k of Object.keys(dismissedFiles)) setDismissedFilesStore(k, undefined!);
   for (const k of Object.keys(dismissedFolders)) setDismissedFoldersStore(k, undefined!);
 }
+
+// --- Effective collapse (persisted + session overlay) ---
+
+export const effectiveCollapsedFolders = createMemo(() => {
+  const out: Record<string, boolean> = { ...collapsedFolders };
+  for (const k of Object.keys(sessionCollapsedFolders)) {
+    const v = sessionCollapsedFolders[k];
+    if (v === 'force-open') out[k] = false;
+    else if (v === true) out[k] = true;
+  }
+  return out;
+});
 
 // --- Derived state ---
 
@@ -235,20 +250,20 @@ export const visibleRows = createMemo<TreeNode[]>(() => {
   const dfSet = new Set(Object.keys(dismissedFiles).filter((k) => dismissedFiles[k]));
   const dfoSet = new Set(Object.keys(dismissedFolders).filter((k) => dismissedFolders[k]));
   return flattenVisible(tree(), {
-    collapsedFolders: { ...collapsedFolders },
+    collapsedFolders: effectiveCollapsedFolders(),
     dismissedFolders: dfoSet,
     dismissedFiles: dfSet,
     filterQuery: filterQuery(),
   });
 });
 
-export const activeFile = createMemo(() => {
+export const activeFile = createMemo<DiffFile | null>(() => {
   const rowId = activeRowId();
-  if (!rowId) return undefined;
+  if (!rowId) return null;
   for (const row of visibleRows()) {
     if (row.kind === 'file' && row.id === rowId) return row.file;
   }
-  return undefined;
+  return null;
 });
 
 export const commentsByFile = createMemo(() => {
@@ -266,3 +281,27 @@ export const commentsByFile = createMemo(() => {
 export const userCommentCount = createMemo(
   () => comments.list.filter((c) => c?.author === 'user' && !c.parentId && c.status !== 'dismissed').length,
 );
+
+/** Resolves a file path to its current tree row id, then sets active row. */
+export function setActiveFilePath(path: string | null): void {
+  if (!path) {
+    setActiveRowId(null);
+    return;
+  }
+  const row = visibleRows().find((r) => r.kind === 'file' && r.file.path === path);
+  setActiveRowId(row?.id ?? path);
+}
+
+/** Keep activeRowId resolvable: snap to first visible file if the current id has no row. */
+export function watchActiveRowId(): void {
+  createEffect(() => {
+    const rows = visibleRows();
+    const id = untrack(() => activeRowId());
+    if (!id) return;
+    const exists = rows.some((r) => r.id === id);
+    if (!exists) {
+      const firstFile = rows.find((r) => r.kind === 'file');
+      setActiveRowId(firstFile?.id ?? null);
+    }
+  });
+}

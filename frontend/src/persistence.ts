@@ -123,6 +123,9 @@ export function watchAndSave(): void {
     // Access the store reactively by listing entries (triggers proxy tracking).
     Object.keys(collapsedFolders);
     Object.values(collapsedFolders);
+    // Subscribe to reviewed-file changes so toggling a file triggers a save.
+    Object.keys(reviewedFiles);
+    Object.values(reviewedFiles);
     saveState();
   });
 }
