@@ -3,9 +3,10 @@ import type { FolderNode, FileNode } from '../../tree';
 import {
   activeRowId,
   setActiveRowId,
-  collapsedFolders,
+  effectiveCollapsedFolders,
   setCollapsedFolders,
-  toggleFolderCollapsed,
+  setSessionCollapsedFolders,
+  sessionCollapsedFolders,
   dismissFolder,
   reviewedFiles,
 } from '../../state';
@@ -24,7 +25,7 @@ function collectFiles(node: FolderNode, out: FileNode[]): void {
 export default function TreeFolder(props: Props) {
   const isActive = () => activeRowId() === props.node.id;
   const isSynthPhaseRoot = () => props.node.fullPath.endsWith(':__root__');
-  const collapsed = () => !!collapsedFolders[props.node.fullPath];
+  const collapsed = () => !!effectiveCollapsedFolders()[props.node.fullPath];
 
   const descendants = createMemo(() => {
     const out: FileNode[] = [];
@@ -36,23 +37,28 @@ export default function TreeFolder(props: Props) {
   const reviewedCount = () => descendants().filter((f) => reviewedFiles[f.file.path]).length;
   const allReviewed = () => total() > 0 && reviewedCount() === total();
 
-  // One-shot auto-collapse: when this folder flips to "all reviewed", collapse it.
-  // If the user re-opens it, `wasAllReviewed` stays true so we don't keep re-collapsing.
+  // One-shot auto-collapse: when this folder flips to "all reviewed", collapse it via session overlay.
+  // Not persisted. Clears when folder is no longer all-reviewed (e.g. user un-reviews a file).
   let wasAllReviewed = false;
   createEffect(() => {
     const done = allReviewed();
     if (done && !wasAllReviewed) {
       wasAllReviewed = true;
-      if (!collapsedFolders[props.node.fullPath]) {
-        setCollapsedFolders(props.node.fullPath, true);
+      setSessionCollapsedFolders(props.node.fullPath, true);
+    }
+    if (!done) {
+      wasAllReviewed = false;
+      if (sessionCollapsedFolders[props.node.fullPath] === true) {
+        setSessionCollapsedFolders(props.node.fullPath, undefined!);
       }
     }
-    if (!done) wasAllReviewed = false;
   });
 
   function handleClick() {
     setActiveRowId(props.node.id);
-    toggleFolderCollapsed(props.node.fullPath);
+    // User-initiated: write to persisted store based on effective state, clear session overlay.
+    setCollapsedFolders(props.node.fullPath, !effectiveCollapsedFolders()[props.node.fullPath]);
+    setSessionCollapsedFolders(props.node.fullPath, undefined!);
   }
 
   function handleDismiss(e: MouseEvent) {
