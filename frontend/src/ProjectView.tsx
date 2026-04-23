@@ -1,4 +1,4 @@
-import { createSignal, Show, onMount } from 'solid-js';
+import { createSignal, Show, onMount, createEffect } from 'solid-js';
 import {
   files,
   activeFile,
@@ -37,6 +37,9 @@ import {
   setWalkthroughStale,
   onWalkthroughReplaced,
   walkthroughMode,
+  walkthrough,
+  activeStopIdx,
+  markStopVisited,
 } from './state';
 import {
   fetchItems,
@@ -282,6 +285,14 @@ export default function ProjectView() {
     onJumpComment: jumpToComment,
     onSymbolSearch: () => setSymbolSearchOpen(!symbolSearchOpen()),
     onOpenPalette: () => setPaletteOpen(!paletteOpen()),
+  });
+
+  // --- Walkthrough visited stops ---
+
+  createEffect(() => {
+    const w = walkthrough();
+    const i = activeStopIdx();
+    if (w && w.stops[i]) markStopVisited(w.stops[i].id);
   });
 
   // --- SSE ---
