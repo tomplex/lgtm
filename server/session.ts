@@ -10,6 +10,7 @@ import { CommentStore } from './comment-store.js';
 import { migrateBlob } from './comment-migration.js';
 import type { Comment, CreateComment, CommentFilter } from './comment-types.js';
 import { LspManager } from './lsp/index.js';
+import type { Walkthrough } from './walkthrough-types.js';
 
 // --- Types ---
 
@@ -47,6 +48,7 @@ export class Session {
   private _commentStore = new CommentStore();
   private _sseClients: SSEClient[] = [];
   private _analysis: Record<string, unknown> | null = null;
+  private _walkthrough: Walkthrough | null = null;
   private _reviewedFiles = new Set<string>();
   private _sortMode: 'path' | 'priority' = 'path';
   private _groupMode: 'none' | 'phase' = 'none';
@@ -89,6 +91,7 @@ export class Session {
       items: this._items,
       comments: this._commentStore.toJSON(),
       analysis: this._analysis,
+      walkthrough: this._walkthrough,
       rounds: this._rounds,
       reviewedFiles: Array.from(this._reviewedFiles),
       sortMode: this._sortMode,
@@ -115,6 +118,7 @@ export class Session {
     session._items = migrated.items as SessionItem[];
     session._commentStore = CommentStore.fromJSON(migrated.comments);
     session._analysis = migrated.analysis as Record<string, unknown> | null;
+    session._walkthrough = (migrated.walkthrough as Walkthrough | null) ?? null;
     // Migrate old single round to per-item rounds
     if (migrated.rounds && typeof migrated.rounds === 'object' && !Array.isArray(migrated.rounds)) {
       session._rounds = migrated.rounds as Record<string, number>;
@@ -148,6 +152,10 @@ export class Session {
 
   get analysis(): Record<string, unknown> | null {
     return this._analysis;
+  }
+
+  get walkthrough(): Walkthrough | null {
+    return this._walkthrough;
   }
 
   getItemData(itemId: string, commits?: string): Record<string, unknown> {
@@ -195,6 +203,16 @@ export class Session {
 
   setAnalysis(analysis: Record<string, unknown>): void {
     this._analysis = analysis;
+    this.persist();
+  }
+
+  setWalkthrough(walkthrough: Walkthrough): void {
+    this._walkthrough = walkthrough;
+    this.persist();
+  }
+
+  clearWalkthrough(): void {
+    this._walkthrough = null;
     this.persist();
   }
 

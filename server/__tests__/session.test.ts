@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { createGitFixture, type GitFixture } from './helpers/git-fixture.js';
 import { initStore, closeStore, storeGet } from '../store.js';
 import { Session, type SSEClient } from '../session.js';
+import type { Walkthrough } from '../walkthrough-types.js';
 
 describe('Session', () => {
   let fixture: GitFixture;
@@ -203,6 +204,28 @@ describe('Session', () => {
       expect(restored.items).toHaveLength(2);
       expect(restored.userReviewedFiles).toContain('src/app.ts');
       expect(restored.userSidebarPrefs.sortMode).toBe('priority');
+    });
+  });
+
+  describe('walkthrough', () => {
+    it('stores and returns a walkthrough', () => {
+      const session = new Session({ repoPath: '/tmp', baseBranch: 'main' });
+      const w: Walkthrough = {
+        summary: 's',
+        stops: [{
+          id: 'stop-1', order: 1, title: 't', narrative: 'n', importance: 'primary',
+          artifacts: [{ file: 'a.ts', hunks: [{ newStart: 1, newLines: 3 }] }],
+        }],
+        diffHash: 'abc',
+        generatedAt: '2026-04-23T00:00:00Z',
+      };
+      session.setWalkthrough(w);
+      expect(session.walkthrough).toEqual(w);
+    });
+
+    it('null by default', () => {
+      const session = new Session({ repoPath: '/tmp', baseBranch: 'main' });
+      expect(session.walkthrough).toBeNull();
     });
   });
 

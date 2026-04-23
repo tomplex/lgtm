@@ -11,6 +11,7 @@ export interface ProjectBlob {
   items: { id: string; type: 'diff' | 'document'; title: string; path?: string }[];
   comments: import('./comment-types.js').Comment[];
   analysis: Record<string, unknown> | null;
+  walkthrough: import('./walkthrough-types.js').Walkthrough | null;
   rounds: Record<string, number>;
   reviewedFiles: string[];
   sortMode: 'path' | 'priority';
