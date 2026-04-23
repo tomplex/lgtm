@@ -312,6 +312,44 @@ describe('routes', () => {
     });
   });
 
+  describe('GET /project/:slug/walkthrough', () => {
+    it('returns null when not generated', async () => {
+      const res = await request(app).get(`/project/${slug}/walkthrough`).expect(200);
+      expect(res.body.walkthrough).toBeNull();
+      expect(res.body.stale).toBe(false);
+    });
+
+    it('returns walkthrough with stale=false after generation', async () => {
+      const session = manager.get(slug)!;
+      const { getBranchDiff } = await import('../git-ops.js');
+      const { sha256Hex } = await import('../diff-hash.js');
+      const diff = getBranchDiff(session.repoPath, session.baseBranch);
+      session.setWalkthrough({
+        summary: 'x',
+        stops: [{ id: 'stop-1', order: 1, title: 't', narrative: 'n', importance: 'primary',
+          artifacts: [{ file: 'a.ts', hunks: [{ newStart: 1, newLines: 2 }] }] }],
+        diffHash: sha256Hex(diff),
+        generatedAt: new Date().toISOString(),
+      });
+      const res = await request(app).get(`/project/${slug}/walkthrough`).expect(200);
+      expect(res.body.walkthrough.stops).toHaveLength(1);
+      expect(res.body.stale).toBe(false);
+    });
+
+    it('returns stale=true when diffHash mismatches', async () => {
+      const session = manager.get(slug)!;
+      session.setWalkthrough({
+        summary: 'x',
+        stops: [{ id: 'stop-1', order: 1, title: 't', narrative: 'n', importance: 'primary',
+          artifacts: [{ file: 'a.ts', hunks: [{ newStart: 1, newLines: 2 }] }] }],
+        diffHash: 'deadbeef',
+        generatedAt: new Date().toISOString(),
+      });
+      const res = await request(app).get(`/project/${slug}/walkthrough`).expect(200);
+      expect(res.body.stale).toBe(true);
+    });
+  });
+
   describe('error handling', () => {
     it('returns 404 for unknown project slug', async () => {
       await request(app)

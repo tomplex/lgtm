@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, relative as pathRelative, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getFileLines, getBranchCommits, gitRun, getRepoMeta } from './git-ops.js';
+import { getFileLines, getBranchCommits, getBranchDiff, gitRun, getRepoMeta } from './git-ops.js';
+import { sha256Hex } from './diff-hash.js';
 import { type Session, type SSEClient, type SidebarPrefs } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
@@ -222,6 +223,18 @@ export function createApp(manager: SessionManager): express.Express {
 
   projectRouter.get('/analysis', (_req, res) => {
     res.json({ analysis: res.locals.session.analysis });
+  });
+
+  projectRouter.get('/walkthrough', (_req, res) => {
+    const session: Session = res.locals.session;
+    const wt = session.walkthrough;
+    if (!wt) {
+      res.json({ walkthrough: null, stale: false });
+      return;
+    }
+    const currentDiff = getBranchDiff(session.repoPath, session.baseBranch);
+    const currentHash = sha256Hex(currentDiff);
+    res.json({ walkthrough: wt, stale: currentHash !== wt.diffHash });
   });
 
   projectRouter.get('/symbol', (req, res) => {
