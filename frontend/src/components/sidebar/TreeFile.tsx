@@ -9,6 +9,10 @@ import {
   toggleReviewed,
   analysis,
   dismissFile,
+  walkthrough,
+  stopsByFile,
+  setActiveStopIdx,
+  setWalkthroughMode,
 } from '../../state';
 
 interface Props {
@@ -68,6 +72,25 @@ export default function TreeFile(props: Props) {
         <span class="badge comments-badge" title="Your comments">
           {userCount()}
         </span>
+      </Show>
+      <Show when={stopsByFile()[path()]?.length}>
+        {(count) => (
+          <span
+            class="wt-file-badge"
+            title={`Walkthrough stop${count() > 1 ? 's' : ''} ${stopsByFile()[path()].join(', ')}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              const ids = stopsByFile()[path()];
+              const w = walkthrough();
+              if (!w || !ids.length) return;
+              const idx = w.stops.findIndex(s => s.order === ids[0]);
+              if (idx >= 0) setActiveStopIdx(idx);
+              setWalkthroughMode(true);
+            }}
+          >
+            ◆{stopsByFile()[path()].join(',')}
+          </span>
+        )}
       </Show>
       <span class="file-stats">
         <span class="add">+{props.node.file.additions}</span>
