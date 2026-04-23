@@ -26,8 +26,13 @@ it returns the existing URL).
 
 Spawn the `file-classifier` agent. Pass the repo path, base branch, and output file path.
 
-To find the base branch, run `git rev-parse --abbrev-ref HEAD` to get the current branch,
-then use `main` as the base (or `master` if main doesn't exist).
+To find the base branch:
+
+1. First try `gh pr view --json baseRefName -q .baseRefName` to get the PR's actual base branch.
+   If that succeeds, fetch it with `git fetch origin <branch>` and use `origin/<branch>` as the base.
+2. Only fall back to `main` (or `master` if main doesn't exist) when there's no open PR.
+
+This matters for stacked PRs that target a parent branch instead of main.
 
 ```
 Prompt for the agent:
