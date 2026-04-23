@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 # Start the LGTM server if nothing is listening on port 9900.
 # During development, npm run dev:all occupies the port — this is a no-op.
+LOCKFILE="/tmp/lgtm-server-starting.lock"
+
+# Already running? Done.
+lsof -ti:9900 >/dev/null 2>&1 && exit 0
+
+# Atomic lock: mkdir is atomic on POSIX — only one process wins the race.
+if ! mkdir "$LOCKFILE" 2>/dev/null; then
+  # Another hook instance is already spawning the server. Wait for it.
+  sleep 2
+  exit 0
+fi
+trap 'rm -rf "$LOCKFILE"' EXIT
+
+# Re-check after acquiring lock (another instance may have started between
+# the first lsof check and acquiring the lock).
 lsof -ti:9900 >/dev/null 2>&1 && exit 0
 
 # Install production deps on first run (or when package.json changes).
