@@ -126,14 +126,17 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'claim_reviews',
-    'Claim code review notifications for a project. When the reviewer submits feedback on the diff, only the Claude session that claimed reviews will receive the channel notification. Calling this transfers the claim from any previous holder.',
+    'Claim code review notifications for a project. Auto-registers the project if needed. When the reviewer submits feedback on the diff, only the Claude session that called claim_reviews most recently will receive the notification. Optionally sets a description banner and base branch override. Returns the review URL.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
+      description: z.string().optional().describe('Review context shown as a banner in the UI'),
+      baseBranch: z.string().optional().describe('Base branch (auto-detected if omitted)'),
     },
-    async ({ repoPath }) => {
-      const { found } = resolveProject(manager, repoPath, server);
-      claimDiffReviews(server, found.slug);
-      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, slug: found.slug }) }] };
+    async ({ repoPath, description, baseBranch }) => {
+      const result = manager.register(repoPath, { description, baseBranch });
+      associateMcpSession(server, result.slug);
+      claimDiffReviews(server, result.slug);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
   );
 

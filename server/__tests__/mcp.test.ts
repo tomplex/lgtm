@@ -122,4 +122,78 @@ describe('mcp', () => {
       }
     });
   });
+
+  describe('claim_reviews', () => {
+    let crFixture: GitFixture;
+
+    beforeAll(() => {
+      crFixture = createGitFixture();
+    });
+
+    afterAll(() => {
+      crFixture.cleanup();
+    });
+
+    it('returns slug and url', async () => {
+      const c = await createMcpClient(app);
+      try {
+        const res = await c.callTool('claim_reviews', { repoPath: crFixture.repoPath });
+        expect(res.json).toMatchObject({ slug: expect.any(String), url: expect.stringContaining('/project/') });
+      } finally {
+        await c.close();
+      }
+    });
+
+    it('takes the claim unconditionally when another session holds it', async () => {
+      const clientA = await createMcpClient(app);
+      const clientB = await createMcpClient(app);
+      try {
+        await clientA.callTool('comment', {
+          repoPath: crFixture.repoPath,
+          comments: [{ file: 'src/app.ts', line: 1, comment: 'a' }],
+        });
+        const slug = manager.findByRepoPath(crFixture.repoPath)!.slug;
+        expect(_testing_getDiffClaimHolder(slug)).toBe(clientA.sessionId);
+
+        await clientB.callTool('claim_reviews', { repoPath: crFixture.repoPath });
+        expect(_testing_getDiffClaimHolder(slug)).toBe(clientB.sessionId);
+      } finally {
+        await clientA.close();
+        await clientB.close();
+      }
+    });
+
+    it('sets description on a fresh repo', async () => {
+      const c = await createMcpClient(app);
+      const freshFixture = createGitFixture();
+      try {
+        await c.callTool('claim_reviews', {
+          repoPath: freshFixture.repoPath,
+          description: 'review banner',
+        });
+        const found = manager.findByRepoPath(freshFixture.repoPath)!;
+        expect(found.session.description).toBe('review banner');
+      } finally {
+        await c.close();
+        freshFixture.cleanup();
+      }
+    });
+
+    it('updates description on an already-registered repo', async () => {
+      const c = await createMcpClient(app);
+      const freshFixture = createGitFixture();
+      try {
+        manager.register(freshFixture.repoPath, { description: 'original' });
+        await c.callTool('claim_reviews', {
+          repoPath: freshFixture.repoPath,
+          description: 'updated',
+        });
+        const found = manager.findByRepoPath(freshFixture.repoPath)!;
+        expect(found.session.description).toBe('updated');
+      } finally {
+        await c.close();
+        freshFixture.cleanup();
+      }
+    });
+  });
 });
