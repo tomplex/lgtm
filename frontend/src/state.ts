@@ -1,6 +1,7 @@
 import { createSignal, createMemo, createEffect, untrack } from 'solid-js';
 import { createStore, reconcile } from 'solid-js/store';
 import type { Comment } from './comment-types';
+import type { Walkthrough } from './walkthrough-types';
 import { buildTree, flattenVisible, type TreeNode } from './tree';
 
 // --- Types (re-exported for consumers) ---
@@ -305,3 +306,40 @@ export function watchActiveRowId(): void {
     }
   });
 }
+
+// --- Walkthrough ---
+
+export const [walkthrough, setWalkthrough] = createSignal<Walkthrough | null>(null);
+export const [walkthroughStale, setWalkthroughStale] = createSignal(false);
+export const [walkthroughMode, setWalkthroughMode] = createSignal(false);
+export const [activeStopIdx, setActiveStopIdx] = createSignal(0);
+
+export const [visitedStops, setVisitedStops] = createStore<Record<string, boolean>>({});
+
+export function markStopVisited(id: string): void {
+  setVisitedStops(id, true);
+}
+
+export function resetVisitedStops(): void {
+  for (const k of Object.keys(visitedStops)) setVisitedStops(k, undefined!);
+}
+
+/** Reset walkthrough-specific transient state when the walkthrough itself changes. */
+export function onWalkthroughReplaced(): void {
+  setActiveStopIdx(0);
+  resetVisitedStops();
+}
+
+/** Files → list of stop orders that include this file in any artifact. */
+export const stopsByFile = createMemo<Record<string, number[]>>(() => {
+  const out: Record<string, number[]> = {};
+  const w = walkthrough();
+  if (!w) return out;
+  for (const stop of w.stops) {
+    for (const a of stop.artifacts) {
+      if (!out[a.file]) out[a.file] = [];
+      out[a.file].push(stop.order);
+    }
+  }
+  return out;
+});
