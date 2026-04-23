@@ -36,6 +36,7 @@ import {
   setWalkthrough,
   setWalkthroughStale,
   onWalkthroughReplaced,
+  walkthroughMode,
 } from './state';
 import {
   fetchItems,
@@ -57,6 +58,7 @@ import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import SymbolSearch from './components/diff/SymbolSearch';
 import ProjectPalette from './components/palette/ProjectPalette';
+import { WalkthroughView } from './components/walkthrough/WalkthroughView';
 
 import Header from './components/header/Header';
 import type { GithubEvent } from './components/header/Header';
@@ -414,10 +416,14 @@ export default function ProjectView() {
           <div class="resize-handle" id="resize-handle" />
         </Show>
         <div class="diff-container" id="diff-container">
-          <Show when={appMode() === 'diff'} fallback={<DocumentView />}>
-            <Show when={files().length > 0} fallback={<div class="empty-state">No changes to review</div>}>
-              <DiffView />
+          <Show when={walkthroughMode()} fallback={
+            <Show when={appMode() === 'diff'} fallback={<DocumentView />}>
+              <Show when={files().length > 0} fallback={<div class="empty-state">No changes to review</div>}>
+                <DiffView />
+              </Show>
             </Show>
+          }>
+            <WalkthroughView />
           </Show>
         </div>
       </div>
