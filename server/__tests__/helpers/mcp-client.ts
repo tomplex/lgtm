@@ -56,9 +56,7 @@ export async function createMcpClient(app: express.Express): Promise<McpClient> 
     });
   const sessionId = init.headers['mcp-session-id'] as string | undefined;
   if (!sessionId) {
-    throw new Error(
-      `MCP initialize failed (status ${init.status}): ${init.text || JSON.stringify(init.body)}`,
-    );
+    throw new Error(`MCP initialize failed (status ${init.status}): ${init.text || JSON.stringify(init.body)}`);
   }
 
   await request(app)
@@ -80,7 +78,10 @@ export async function createMcpClient(app: express.Express): Promise<McpClient> 
         params: { name, arguments: args },
       });
     const raw = parseBody(res);
-    const rpc = raw as { result?: { content?: Array<{ type: string; text?: string }> }; error?: { message?: string } } | null;
+    const rpc = raw as {
+      result?: { content?: Array<{ type: string; text?: string }> };
+      error?: { message?: string };
+    } | null;
     if (rpc?.error?.message) return { raw, error: rpc.error.message };
     const text = rpc?.result?.content?.[0]?.text;
     if (typeof text !== 'string') return { raw };
@@ -92,9 +93,7 @@ export async function createMcpClient(app: express.Express): Promise<McpClient> 
   };
 
   const close = async () => {
-    await request(app)
-      .delete('/mcp')
-      .set('mcp-session-id', sessionId);
+    await request(app).delete('/mcp').set('mcp-session-id', sessionId);
   };
 
   return { sessionId, callTool, close };
