@@ -28,7 +28,7 @@ Walkthrough covers only substantive changes. Trivial hunks (formatting, pure ren
 
 1. User runs `/lgtm walkthrough` (or `/lgtm prepare` to chain analyze + walkthrough). Claude authors stops via the `set_walkthrough` MCP tool.
 2. User opens the review in the browser. A "Walkthrough" button appears in the header, alongside existing controls.
-3. User presses `w` (or clicks the button) to enter walkthrough mode. The main reading area becomes the walkthrough view.
+3. User presses `W` (shift-w, since `w` is already bound to whole-file view) or clicks the button to enter walkthrough mode. The main reading area becomes the walkthrough view.
 4. The walkthrough view shows: a stop list on the left (always visible), the current stop in the center (title, narrative, code artifacts), a header breadcrumb with progress, and keyboard-hint footer.
 5. User navigates with `↵` / `⇧↵` (next / prev stop), `j` / `k` (within stop), or clicks a stop in the left rail. Comments work as in the diff view; `c` opens a composer attached to the focused line.
 6. User presses `d` to return to the diff view. File rows in the sidebar carry a small badge indicating which stops cover files in that row, so the user can pivot from diff back into walkthrough at a specific stop.
@@ -87,7 +87,7 @@ Regeneration is explicit via the skill, never automatic on diff change.
 
 ## Empty state
 
-Pressing `w` or clicking the Walkthrough button when no walkthrough exists shows a placeholder in the main column: "No walkthrough generated yet. Run `/lgtm walkthrough` (or `/lgtm prepare` to also analyze) to build one." The sidebar tree and other UI remain as they are; the walkthrough mode simply has no content to show.
+Pressing `W` or clicking the Walkthrough button when no walkthrough exists shows a placeholder in the main column: "No walkthrough generated yet. Run `/lgtm walkthrough` (or `/lgtm prepare` to also analyze) to build one." The sidebar tree and other UI remain as they are; the walkthrough mode simply has no content to show.
 
 ## Out of scope for this spec
 
