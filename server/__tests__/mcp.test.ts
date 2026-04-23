@@ -6,7 +6,7 @@ import { createGitFixture, type GitFixture } from './helpers/git-fixture.js';
 import { initStore, closeStore } from '../store.js';
 import { SessionManager } from '../session-manager.js';
 import { createApp } from '../app.js';
-import { mountMcp } from '../mcp.js';
+import { mountMcp, _testing_getDiffClaimHolder } from '../mcp.js';
 import { createMcpClient, type McpClient } from './helpers/mcp-client.js';
 
 describe('mcp', () => {
@@ -69,6 +69,56 @@ describe('mcp', () => {
         expect(manager.findByRepoPath(autoInitFixture.repoPath)).toBeDefined();
       } finally {
         await local.close();
+      }
+    });
+  });
+
+  describe('auto-claim', () => {
+    let claimFixture: GitFixture;
+
+    beforeAll(() => {
+      claimFixture = createGitFixture();
+    });
+
+    afterAll(() => {
+      claimFixture.cleanup();
+    });
+
+    it('first comment auto-claims diff reviews for the calling session', async () => {
+      const clientA = await createMcpClient(app);
+      try {
+        await clientA.callTool('comment', {
+          repoPath: claimFixture.repoPath,
+          comments: [{ file: 'src/app.ts', line: 1, comment: 'x' }],
+        });
+        const slug = manager.findByRepoPath(claimFixture.repoPath)!.slug;
+        expect(_testing_getDiffClaimHolder(slug)).toBe(clientA.sessionId);
+      } finally {
+        await clientA.close();
+      }
+    });
+
+    it('second session does not steal the claim', async () => {
+      const clientA = await createMcpClient(app);
+      const clientB = await createMcpClient(app);
+      try {
+        await clientA.callTool('comment', {
+          repoPath: claimFixture.repoPath,
+          comments: [{ file: 'src/app.ts', line: 1, comment: 'a' }],
+        });
+        const slug = manager.findByRepoPath(claimFixture.repoPath)!.slug;
+        const firstHolder = _testing_getDiffClaimHolder(slug);
+
+        await clientB.callTool('comment', {
+          repoPath: claimFixture.repoPath,
+          comments: [{ file: 'src/app.ts', line: 2, comment: 'b' }],
+        });
+
+        expect(_testing_getDiffClaimHolder(slug)).toBe(firstHolder);
+        expect(firstHolder).toBe(clientA.sessionId);
+      } finally {
+        await clientA.close();
+        await clientB.close();
       }
     });
   });

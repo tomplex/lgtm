@@ -18,8 +18,23 @@ function resolveProject(
     const session = manager.get(slug)!;
     found = { slug, session };
   }
-  if (mcpServer) associateMcpSession(mcpServer, found.slug);
+  if (mcpServer) {
+    associateMcpSession(mcpServer, found.slug);
+    maybeAutoClaim(mcpServer, found.slug);
+  }
   return { found };
+}
+
+function maybeAutoClaim(server: McpServer, slug: string): void {
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.projectSlug === slug && entry.claimedDiff) return; // someone holds it
+  }
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.server === server) {
+      entry.claimedDiff = true;
+      return;
+    }
+  }
 }
 
 function createMcpServer(manager: SessionManager): McpServer {
