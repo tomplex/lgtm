@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -6,6 +6,19 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { createApp } from '../app.js';
 import { SessionManager } from '../session-manager.js';
+import { initStore, closeStore } from '../store.js';
+
+let testDbDir: string;
+
+beforeAll(() => {
+  testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lgtm-lsp-test-db-'));
+  initStore(path.join(testDbDir, 'test.db'));
+});
+
+afterAll(() => {
+  closeStore();
+  fs.rmSync(testDbDir, { recursive: true, force: true });
+});
 
 function makeRepo(files: Record<string, string>): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'routes-lsp-test-'));
@@ -24,7 +37,10 @@ let repoDir: string;
 let mgr: SessionManager;
 
 afterEach(async () => {
-  if (mgr) await mgr.shutdownAll();
+  if (mgr) {
+    for (const project of mgr.list()) mgr.deregister(project.slug);
+    await mgr.shutdownAll();
+  }
   if (repoDir && fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
 });
 
