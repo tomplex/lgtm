@@ -20,21 +20,9 @@ function resolveProject(
   }
   if (mcpServer) {
     associateMcpSession(mcpServer, found.slug);
-    maybeAutoClaim(mcpServer, found.slug);
+    autoClaimDiffReviewsIfUnheld(mcpServer, found.slug);
   }
   return { found };
-}
-
-function maybeAutoClaim(server: McpServer, slug: string): void {
-  for (const entry of activeMcpSessions.values()) {
-    if (entry.projectSlug === slug && entry.claimedDiff) return; // someone holds it
-  }
-  for (const entry of activeMcpSessions.values()) {
-    if (entry.server === server) {
-      entry.claimedDiff = true;
-      return;
-    }
-  }
 }
 
 function createMcpServer(manager: SessionManager): McpServer {
@@ -252,6 +240,21 @@ export function associateMcpItem(server: McpServer, itemId: string): void {
   for (const entry of activeMcpSessions.values()) {
     if (entry.server === server) {
       entry.itemIds.add(itemId);
+      return;
+    }
+  }
+}
+
+// Claim diff review notifications for this MCP session only if no session holds the claim yet.
+// Used by resolveProject so that the first tool caller against a slug gets review notifications
+// without silently stealing the claim from another session that already holds it.
+function autoClaimDiffReviewsIfUnheld(server: McpServer, slug: string): void {
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.projectSlug === slug && entry.claimedDiff) return; // someone holds it
+  }
+  for (const entry of activeMcpSessions.values()) {
+    if (entry.server === server) {
+      entry.claimedDiff = true;
       return;
     }
   }
