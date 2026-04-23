@@ -1,5 +1,5 @@
 import { Show, createSignal, createMemo } from 'solid-js';
-import { repoMeta, files, reviewedFiles, userCommentCount, activeItemId, sessionItems, setPaletteOpen } from '../../state';
+import { repoMeta, files, reviewedFiles, userCommentCount, activeItemId, sessionItems, setPaletteOpen, walkthrough, walkthroughMode, setWalkthroughMode, activeStopIdx } from '../../state';
 import LspStatusBadge from './LspStatusBadge';
 
 export type SubmitTarget = 'claude' | 'github';
@@ -89,6 +89,21 @@ export default function Header(props: Props) {
                 Commits
               </button>
             </div>
+          </Show>
+          <Show when={walkthrough()}>
+            <button
+              class="header-btn"
+              classList={{ 'header-btn-active': walkthroughMode() }}
+              onClick={() => setWalkthroughMode(!walkthroughMode())}
+              title="Walkthrough (W)"
+            >
+              Walkthrough
+              <Show when={walkthroughMode()}>
+                <span class="header-btn-progress">
+                  {' '}{activeStopIdx() + 1}/{walkthrough()!.stops.length}
+                </span>
+              </Show>
+            </button>
           </Show>
           <button class="header-btn" onClick={props.onRefresh}>
             Refresh
