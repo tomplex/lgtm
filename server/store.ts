@@ -48,6 +48,11 @@ export function closeStore(): void {
 
 function db(): Database.Database {
   if (!_db) {
+    if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+      throw new Error(
+        'store accessed before initStore(); tests must call initStore(tmpPath) in beforeAll to avoid polluting the production DB',
+      );
+    }
     initStore();
   }
   return _db!;
