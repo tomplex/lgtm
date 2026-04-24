@@ -28,43 +28,110 @@ The calling skill will tell you:
    - optional per-artifact `banner` to bridge between artifacts with a short connective sentence
 6. Tag each stop with `importance: primary | supporting | minor`. Use `primary` sparingly (~1–3 per walkthrough) for the core change(s). `supporting` for derived or related changes. `minor` for small but non-trivial edits that still benefit from narration.
 
-## Output format
+## Strict format rules
 
-Write to `OUTPUT_PATH` using this exact format:
+The server parses your file with a deliberately simple markdown parser. **It rejects any deviation from the rules below.** Past agents have tripped on these — read carefully.
+
+### Headings
+
+- `## Summary` — exactly this. One section, one paragraph.
+- `## Stop N` — exactly this, where N is a number. **No suffix. No em-dash. No title.**
+  - ✅ RIGHT: `## Stop 1`
+  - ❌ WRONG: `## Stop 1 — Cache eviction rule` (title in heading)
+  - ❌ WRONG: `## Stop 1: Cache eviction rule` (colon + title)
+  - ❌ WRONG: `## Stop One` (word, not digit)
+- `### Artifact: <path>` — the file path goes on this line, after `Artifact:`.
+  - ✅ RIGHT: `### Artifact: server/analyze.ts`
+  - ❌ WRONG: `### server/analyze.ts` (missing `Artifact:` prefix)
+  - ❌ WRONG: `### Artifact` (missing path)
+
+### Stop metadata
+
+Immediately after `## Stop N`, a metadata list with **both** fields:
+
+```
+- importance: primary
+- title: Cache eviction rule
+```
+
+- `importance` must be exactly one of: `primary`, `supporting`, `minor`. No other values.
+- `title` is required. Do NOT put the title in the `## Stop N` heading.
+- Both lines must use the `- key: value` shape. Any other structure fails.
+- Then a blank line, then the narrative paragraph(s).
+
+### Artifact contents
+
+Under each `### Artifact: <path>` heading, one or more hunk lines and an optional banner:
+
+```
+- hunk: 42-55
+- hunk: 120-130
+- banner: Short connecting sentence.
+```
+
+- `hunk: START-END` — two integers separated by a hyphen, inclusive of both endpoints. The parser computes `newLines = END - START + 1`. Lines refer to the **new-side** line numbers in the diff.
+  - ✅ RIGHT: `- hunk: 42-55`
+  - ❌ WRONG: `- hunk: 42` (no range)
+  - ❌ WRONG: `- hunk: 42,55` (comma)
+  - ❌ WRONG: `- hunks: 42-55` (plural)
+  - ❌ WRONG: `- 42-55` (missing `hunk:` prefix)
+- Multiple `- hunk:` lines per artifact are allowed and common when one logical change spans discontiguous ranges in the same file.
+- `banner:` is optional. If present, it's the connective sentence rendered above the artifact in the UI.
+- Every artifact needs **at least one** `- hunk:` line. Every stop needs **at least one** artifact.
+
+## Output format (canonical example)
 
 ```
 ## Summary
 
-<one-paragraph overview of what this PR is, 1–3 sentences>
+A one-paragraph overview of what this PR is. 1–3 sentences.
 
 ## Stop 1
 
 - importance: primary
-- title: <short title>
+- title: Cache eviction rule
 
-<narrative paragraph>
+The narrative paragraph explaining what changed and why. 30–100 words.
 
-### Artifact: <repo-relative file path>
+### Artifact: server/cache.ts
 
-- hunk: <newStart>-<newEnd>
+- hunk: 1-7
 
-### Artifact: <another file>
+### Artifact: server/session.ts
 
-- hunk: <newStart>-<newEnd>
-- banner: <optional bridging sentence>
+- hunk: 42-48
+- banner: Call site updated to use the new eviction helper.
 
 ## Stop 2
 
-...
+- importance: supporting
+- title: Priority scoring helper
+
+Another narrative paragraph.
+
+### Artifact: server/classifier.ts
+
+- hunk: 12-20
+- hunk: 55-58
 ```
 
-`hunk: 42-55` means new-side lines 42 through 55 inclusive. Multiple `- hunk:` lines per artifact are allowed when one logical change spans discontiguous ranges in the same file.
+## Sanity check before writing
 
-## Quality checks before finishing
+Run through this list before writing the file. Catch mistakes here, not after parser rejection.
 
-- Does every stop reference at least one artifact? (Required.)
-- Does every artifact have at least one `- hunk:` line? (Required.)
-- Are new-side line ranges within the actual diff? Don't invent lines.
+- [ ] `## Summary` section exists, with a non-empty paragraph.
+- [ ] At least one `## Stop N` section exists.
+- [ ] Every `## Stop N` heading is **exactly** `## Stop <number>` — no title, no suffix, no punctuation after the number.
+- [ ] Every stop has a `- importance:` line with one of: `primary`, `supporting`, `minor`.
+- [ ] Every stop has a `- title:` line with a non-empty title.
+- [ ] Metadata lines use the `- key: value` form.
+- [ ] Every stop has at least one `### Artifact: <path>` section.
+- [ ] Every artifact's heading line is `### Artifact: ` followed by a file path.
+- [ ] Every artifact has at least one `- hunk: START-END` line with two integers separated by a hyphen.
+- [ ] Hunk ranges are on the new-side and lie within lines that actually exist in the diff.
+
+## Quality checks (content, not format)
+
 - Is the overall story legible if a reader reads stops in order?
 - Did you avoid narrating trivial cosmetic changes? (Good — they belong in diff view, not here.)
 - Reality check on length: 3–8 stops is typical. A 1-stop walkthrough means you probably bundled too much; a 20-stop walkthrough means you probably narrated trivia.

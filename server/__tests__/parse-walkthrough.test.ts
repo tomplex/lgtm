@@ -90,4 +90,131 @@ describe('parseWalkthrough', () => {
   it('rejects missing stops', () => {
     expect(() => parseWalkthrough('## Summary\n\nhi')).toThrow(/stop/i);
   });
+
+  it('accepts title suffix in heading as fallback (em-dash)', () => {
+    const md = `## Summary
+
+Test.
+
+## Stop 1 — Cache eviction rule
+
+- importance: primary
+
+A short narrative.
+
+### Artifact: a.ts
+
+- hunk: 1-5
+`;
+    const w = parseWalkthrough(md);
+    expect(w.stops[0].title).toBe('Cache eviction rule');
+    expect(w.stops[0].order).toBe(1);
+  });
+
+  it('accepts title suffix in heading as fallback (colon)', () => {
+    const md = `## Summary
+
+Test.
+
+## Stop 1: Cache eviction rule
+
+- importance: primary
+
+A short narrative.
+
+### Artifact: a.ts
+
+- hunk: 1-5
+`;
+    const w = parseWalkthrough(md);
+    expect(w.stops[0].title).toBe('Cache eviction rule');
+  });
+
+  it('accepts title suffix in heading as fallback (hyphen)', () => {
+    const md = `## Summary
+
+Test.
+
+## Stop 1 - Cache eviction rule
+
+- importance: primary
+
+A short narrative.
+
+### Artifact: a.ts
+
+- hunk: 1-5
+`;
+    const w = parseWalkthrough(md);
+    expect(w.stops[0].title).toBe('Cache eviction rule');
+  });
+
+  it('explicit - title: metadata wins over heading suffix', () => {
+    const md = `## Summary
+
+Test.
+
+## Stop 1 — Heading title
+
+- importance: primary
+- title: Metadata title
+
+A short narrative.
+
+### Artifact: a.ts
+
+- hunk: 1-5
+`;
+    const w = parseWalkthrough(md);
+    expect(w.stops[0].title).toBe('Metadata title');
+  });
+
+  it('error messages name the specific stop', () => {
+    const md = `## Summary
+
+Test.
+
+## Stop 1
+
+- importance: primary
+- title: First
+
+Narrative.
+
+### Artifact: a.ts
+
+- hunk: 1-5
+
+## Stop 2
+
+- importance: bogus
+- title: Second
+
+Narrative.
+
+### Artifact: b.ts
+
+- hunk: 1-5
+`;
+    expect(() => parseWalkthrough(md)).toThrow(/Stop 2.*bogus/);
+  });
+
+  it('error message on missing hunks names the stop and file', () => {
+    const md = `## Summary
+
+Test.
+
+## Stop 1
+
+- importance: primary
+- title: First
+
+Narrative.
+
+### Artifact: a.ts
+
+- banner: no hunks here
+`;
+    expect(() => parseWalkthrough(md)).toThrow(/Stop 1.*a\.ts.*hunk/);
+  });
 });
