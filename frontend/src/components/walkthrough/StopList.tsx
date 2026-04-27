@@ -14,16 +14,17 @@ export function StopList() {
               'wt-stop-active': i() === activeStopIdx(),
               'wt-stop-visited': !!visitedStops[stop.id] && i() !== activeStopIdx(),
             }}
-            onClick={() => { setActiveStopIdx(i()); markStopVisited(stop.id); }}
+            onClick={() => {
+              setActiveStopIdx(i());
+              markStopVisited(stop.id);
+            }}
           >
-            <span class="wt-stop-bullet">
-              {visitedStops[stop.id] ? '✓' : i() === activeStopIdx() ? '●' : '○'}
-            </span>
+            <span class="wt-stop-bullet">{visitedStops[stop.id] ? '✓' : i() === activeStopIdx() ? '●' : '○'}</span>
             <div class="wt-stop-row-body">
-              <div class="wt-stop-row-title">{stop.order} · {stop.title}</div>
-              <div class="wt-stop-row-files">
-                {stop.artifacts.map(a => a.file.split('/').pop()).join(' · ')}
+              <div class="wt-stop-row-title">
+                {stop.order} · {stop.title}
               </div>
+              <div class="wt-stop-row-files">{stop.artifacts.map((a) => a.file.split('/').pop()).join(' · ')}</div>
             </div>
           </div>
         )}

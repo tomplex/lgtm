@@ -68,7 +68,14 @@ export default function TabBar(props: Props) {
       </div>
       <Show when={showPicker()}>
         <Portal>
-          <div style={{ position: 'fixed', top: `${pickerPos().top}px`, left: `${pickerPos().left}px`, 'z-index': '10000' }}>
+          <div
+            style={{
+              position: 'fixed',
+              top: `${pickerPos().top}px`,
+              left: `${pickerPos().left}px`,
+              'z-index': '10000',
+            }}
+          >
             <FilePicker onClose={() => setShowPicker(false)} onSelect={() => setShowPicker(false)} />
           </div>
         </Portal>

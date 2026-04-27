@@ -99,8 +99,9 @@ export default function SymbolSearch() {
   function handlePreviewClick(e: MouseEvent) {
     if (!(e.metaKey || e.ctrlKey)) return;
 
-    const sel = (document as any).caretPositionFromPoint?.(e.clientX, e.clientY)
-      ?? (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
+    const sel =
+      (document as any).caretPositionFromPoint?.(e.clientX, e.clientY) ??
+      (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
     if (!sel) return;
     const node = 'offsetNode' in sel ? sel.offsetNode : sel.startContainer;
     const offset = 'offset' in sel ? sel.offset : sel.startOffset;
@@ -144,13 +145,18 @@ export default function SymbolSearch() {
               onInput={(e) => handleInput(e.currentTarget.value)}
             />
             <Show when={previewResult()}>
-              <button class="symbol-search-back" onClick={() => {
-                setPreviewResult(null);
-                setPreviewResults([]);
-                setPreviewSymbol('');
-                setPreviewTab(0);
-                inputRef?.focus();
-              }}>Back</button>
+              <button
+                class="symbol-search-back"
+                onClick={() => {
+                  setPreviewResult(null);
+                  setPreviewResults([]);
+                  setPreviewSymbol('');
+                  setPreviewTab(0);
+                  inputRef?.focus();
+                }}
+              >
+                Back
+              </button>
             </Show>
           </div>
 
@@ -166,7 +172,9 @@ export default function SymbolSearch() {
                     >
                       <span class="symbol-search-result-name">{data()!.symbol}</span>
                       <span class="symbol-search-result-kind">{result.kind}</span>
-                      <span class="symbol-search-result-location">{result.file}:{result.line}</span>
+                      <span class="symbol-search-result-location">
+                        {result.file}:{result.line}
+                      </span>
                     </div>
                   )}
                 </For>
@@ -182,7 +190,9 @@ export default function SymbolSearch() {
               <div class="symbol-search-preview">
                 <div class="peek-header">
                   <strong class="peek-symbol">{previewSymbol()}</strong>
-                  <span class="peek-location">{result().file}:{result().line}</span>
+                  <span class="peek-location">
+                    {result().file}:{result().line}
+                  </span>
                   <Show when={previewResults().length > 1}>
                     <select
                       class="peek-select"
@@ -194,7 +204,11 @@ export default function SymbolSearch() {
                       }}
                     >
                       <For each={previewResults()}>
-                        {(r, i) => <option value={i()}>{r.file}:{r.line}</option>}
+                        {(r, i) => (
+                          <option value={i()}>
+                            {r.file}:{r.line}
+                          </option>
+                        )}
                       </For>
                     </select>
                   </Show>
@@ -202,13 +216,18 @@ export default function SymbolSearch() {
                 <Show when={result().docstring}>
                   <div class="peek-docstring">{result().docstring}</div>
                 </Show>
-                <pre class="peek-body" onClick={handlePreviewClick}><code innerHTML={highlightBody(result())} /></pre>
+                <pre class="peek-body" onClick={handlePreviewClick}>
+                  <code innerHTML={highlightBody(result())} />
+                </pre>
               </div>
             )}
           </Show>
 
           <div class="symbol-search-footer">
-            <Show when={!previewResult()} fallback={<>Backspace to go back &middot; Cmd+Click to follow &middot; Esc to close</>}>
+            <Show
+              when={!previewResult()}
+              fallback={<>Backspace to go back &middot; Cmd+Click to follow &middot; Esc to close</>}
+            >
               &uarr;&darr; navigate &middot; Enter to select &middot; Esc to close
             </Show>
           </div>

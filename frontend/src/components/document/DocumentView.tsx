@@ -8,15 +8,32 @@ import CommentTextarea from '../comments/CommentTextarea';
 export default function DocumentView() {
   const content = createMemo(() => mdMeta().content || '');
 
-  // Parse markdown into blocks (top-level HTML elements)
+  // Parse markdown into blocks (top-level HTML elements). Lists are split so
+  // each top-level <li> is its own commentable block, preserving ordered-list
+  // numbering via the `start` attribute on the single-item wrapper.
   const blocks = createMemo(() => {
     const rawHtml = renderMd(content());
     const temp = document.createElement('div');
     temp.innerHTML = rawHtml;
-    return Array.from(temp.children).map((child, idx) => ({
-      html: child.outerHTML,
-      idx,
-    }));
+    const result: { html: string; idx: number }[] = [];
+    let idx = 0;
+    for (const child of Array.from(temp.children)) {
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'ul' || tag === 'ol') {
+        const items = Array.from(child.children).filter((c) => c.tagName.toLowerCase() === 'li');
+        const startAttr = tag === 'ol' ? parseInt(child.getAttribute('start') || '1', 10) : 1;
+        for (let i = 0; i < items.length; i++) {
+          const wrapper = document.createElement(tag);
+          wrapper.classList.add('md-list-split');
+          if (tag === 'ol') wrapper.setAttribute('start', String(startAttr + i));
+          wrapper.appendChild(items[i].cloneNode(true));
+          result.push({ html: wrapper.outerHTML, idx: idx++ });
+        }
+      } else {
+        result.push({ html: child.outerHTML, idx: idx++ });
+      }
+    }
+    return result;
   });
 
   const totalComments = createMemo(

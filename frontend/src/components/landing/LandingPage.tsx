@@ -33,14 +33,16 @@ export default function LandingPage() {
           >
             <div class="landing-grid">
               <For each={list()}>
-                {(p) => <ProjectCard
-                  project={p}
-                  confirming={confirming() === p.slug}
-                  onOpen={() => open(p.slug)}
-                  onRequestRemove={() => setConfirming(p.slug)}
-                  onCancelRemove={() => setConfirming(null)}
-                  onConfirmRemove={() => remove(p.slug)}
-                />}
+                {(p) => (
+                  <ProjectCard
+                    project={p}
+                    confirming={confirming() === p.slug}
+                    onOpen={() => open(p.slug)}
+                    onRequestRemove={() => setConfirming(p.slug)}
+                    onCancelRemove={() => setConfirming(null)}
+                    onConfirmRemove={() => remove(p.slug)}
+                  />
+                )}
               </For>
             </div>
           </Show>
@@ -67,7 +69,9 @@ function ProjectCard(props: CardProps) {
     <div class="landing-card" classList={{ missing: missing() }}>
       <div
         class="landing-card-body"
-        onClick={() => { if (!missing()) props.onOpen(); }}
+        onClick={() => {
+          if (!missing()) props.onOpen();
+        }}
         role={missing() ? undefined : 'button'}
         tabindex={missing() ? undefined : 0}
         onKeyDown={(e) => {
@@ -81,11 +85,22 @@ function ProjectCard(props: CardProps) {
       >
         <div class="landing-card-title">{p().repoName}</div>
         <div class="landing-card-branch">
-          <Show when={missing()} fallback={<>{p().branch} → {p().baseBranch}</>}>
+          <Show
+            when={missing()}
+            fallback={
+              <>
+                {p().branch} → {p().baseBranch}
+              </>
+            }
+          >
             <em>(repo missing)</em>
           </Show>
           <Show when={p().pr}>
-            {(pr) => <a class="landing-card-pr" href={pr().url} target="_blank" onClick={(e) => e.stopPropagation()}>PR #{pr().number}</a>}
+            {(pr) => (
+              <a class="landing-card-pr" href={pr().url} target="_blank" onClick={(e) => e.stopPropagation()}>
+                PR #{pr().number}
+              </a>
+            )}
           </Show>
         </div>
         <div class="landing-card-counts">
@@ -105,19 +120,34 @@ function ProjectCard(props: CardProps) {
             <button
               class="landing-card-remove"
               aria-label="Remove project"
-              onClick={(e) => { e.stopPropagation(); props.onRequestRemove(); }}
-            >×</button>
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onRequestRemove();
+              }}
+            >
+              ×
+            </button>
           }
         >
           <span class="landing-card-confirm-text">Remove?</span>
           <button
             class="landing-card-confirm-yes"
-            onClick={(e) => { e.stopPropagation(); props.onConfirmRemove(); }}
-          >Yes</button>
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onConfirmRemove();
+            }}
+          >
+            Yes
+          </button>
           <button
             class="landing-card-confirm-no"
-            onClick={(e) => { e.stopPropagation(); props.onCancelRemove(); }}
-          >No</button>
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onCancelRemove();
+            }}
+          >
+            No
+          </button>
         </Show>
       </div>
     </div>

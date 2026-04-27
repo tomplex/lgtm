@@ -48,7 +48,7 @@ export default function DiffLine(props: Props) {
 
   // Use the absolute line number (newLine for adds/context, oldLine for deletes)
   const absLine = () => props.line.newLine ?? props.line.oldLine;
-  const absSide = (): 'RIGHT' | 'LEFT' => props.line.newLine != null ? 'RIGHT' : 'LEFT';
+  const absSide = (): 'RIGHT' | 'LEFT' => (props.line.newLine != null ? 'RIGHT' : 'LEFT');
 
   const lineComments = () =>
     comments.list.filter(
@@ -61,8 +61,9 @@ export default function DiffLine(props: Props) {
     );
 
   function getWordAtClick(e: MouseEvent): { word: string; character: number } | null {
-    const sel = document.caretPositionFromPoint?.(e.clientX, e.clientY)
-      ?? (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
+    const sel =
+      document.caretPositionFromPoint?.(e.clientX, e.clientY) ??
+      (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
     if (!sel) return null;
 
     const node = 'offsetNode' in sel ? sel.offsetNode : sel.startContainer;
@@ -211,7 +212,9 @@ export default function DiffLine(props: Props) {
         {(() => {
           // Click-outside to dismiss empty comment
           const handleClickOutside = (e: MouseEvent) => {
-            const overlay = document.querySelector(`#line-${CSS.escape(props.filePath)}-${props.lineIdx} ~ .comment-overlay-row .comment-overlay`);
+            const overlay = document.querySelector(
+              `#line-${CSS.escape(props.filePath)}-${props.lineIdx} ~ .comment-overlay-row .comment-overlay`,
+            );
             if (overlay && !overlay.contains(e.target as Node)) {
               setShowNewComment(false);
             }
@@ -222,7 +225,11 @@ export default function DiffLine(props: Props) {
             <tr class="comment-overlay-row">
               <td colspan="3">
                 <div class="comment-overlay">
-                  <CommentTextarea onSave={handleSaveNew} onAskClaude={handleAskClaude} onCancel={() => setShowNewComment(false)} />
+                  <CommentTextarea
+                    onSave={handleSaveNew}
+                    onAskClaude={handleAskClaude}
+                    onCancel={() => setShowNewComment(false)}
+                  />
                 </div>
               </td>
             </tr>

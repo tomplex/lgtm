@@ -1,5 +1,17 @@
 import { Show, createSignal, createMemo } from 'solid-js';
-import { repoMeta, files, reviewedFiles, userCommentCount, activeItemId, sessionItems, setPaletteOpen, walkthrough, walkthroughMode, setWalkthroughMode, activeStopIdx } from '../../state';
+import {
+  repoMeta,
+  files,
+  reviewedFiles,
+  userCommentCount,
+  activeItemId,
+  sessionItems,
+  setPaletteOpen,
+  walkthrough,
+  walkthroughMode,
+  setWalkthroughMode,
+  activeStopIdx,
+} from '../../state';
 import LspStatusBadge from './LspStatusBadge';
 
 export type SubmitTarget = 'claude' | 'github';
@@ -38,9 +50,9 @@ export default function Header(props: Props) {
 
   const githubLabel = () => {
     const labels: Record<GithubEvent, string> = {
-      'COMMENT': 'Comment on GitHub',
-      'APPROVE': 'Approve on GitHub',
-      'REQUEST_CHANGES': 'Request Changes on GitHub',
+      COMMENT: 'Comment on GitHub',
+      APPROVE: 'Approve on GitHub',
+      REQUEST_CHANGES: 'Request Changes on GitHub',
     };
     return labels[githubEvent()];
   };
@@ -100,7 +112,8 @@ export default function Header(props: Props) {
               Walkthrough
               <Show when={walkthroughMode()}>
                 <span class="header-btn-progress">
-                  {' '}{activeStopIdx() + 1}/{walkthrough()!.stops.length}
+                  {' '}
+                  {activeStopIdx() + 1}/{walkthrough()!.stops.length}
                 </span>
               </Show>
             </button>
@@ -124,7 +137,10 @@ export default function Header(props: Props) {
                 <button
                   class="submit-dropdown-item"
                   classList={{ active: submitTarget() === 'claude' }}
-                  onClick={() => { setSubmitTarget('claude'); setDropdownOpen(false); }}
+                  onClick={() => {
+                    setSubmitTarget('claude');
+                    setDropdownOpen(false);
+                  }}
                 >
                   Submit to Claude
                 </button>
@@ -132,7 +148,10 @@ export default function Header(props: Props) {
                   <button
                     class="submit-dropdown-item"
                     classList={{ active: submitTarget() === 'github' }}
-                    onClick={() => { setSubmitTarget('github'); setDropdownOpen(false); }}
+                    onClick={() => {
+                      setSubmitTarget('github');
+                      setDropdownOpen(false);
+                    }}
                   >
                     Submit to GitHub PR
                   </button>
@@ -141,21 +160,30 @@ export default function Header(props: Props) {
                     <button
                       class="submit-dropdown-item"
                       classList={{ active: githubEvent() === 'COMMENT' }}
-                      onClick={() => { setGithubEvent('COMMENT'); setDropdownOpen(false); }}
+                      onClick={() => {
+                        setGithubEvent('COMMENT');
+                        setDropdownOpen(false);
+                      }}
                     >
                       Comment
                     </button>
                     <button
                       class="submit-dropdown-item"
                       classList={{ active: githubEvent() === 'APPROVE' }}
-                      onClick={() => { setGithubEvent('APPROVE'); setDropdownOpen(false); }}
+                      onClick={() => {
+                        setGithubEvent('APPROVE');
+                        setDropdownOpen(false);
+                      }}
                     >
                       Approve
                     </button>
                     <button
                       class="submit-dropdown-item"
                       classList={{ active: githubEvent() === 'REQUEST_CHANGES' }}
-                      onClick={() => { setGithubEvent('REQUEST_CHANGES'); setDropdownOpen(false); }}
+                      onClick={() => {
+                        setGithubEvent('REQUEST_CHANGES');
+                        setDropdownOpen(false);
+                      }}
                     >
                       Request Changes
                     </button>

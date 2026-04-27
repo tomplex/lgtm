@@ -83,7 +83,7 @@ export default function TreeFile(props: Props) {
               const ids = stopsByFile()[path()];
               const w = walkthrough();
               if (!w || !ids.length) return;
-              const idx = w.stops.findIndex(s => s.order === ids[0]);
+              const idx = w.stops.findIndex((s) => s.order === ids[0]);
               if (idx >= 0) setActiveStopIdx(idx);
               setWalkthroughMode(true);
             }}

@@ -15,7 +15,9 @@ export function WalkthroughView() {
   return (
     <div class="wt-view">
       <div class="wt-topbar">
-        <button class="wt-back" onClick={() => setWalkthroughMode(false)}>← Back to diff</button>
+        <button class="wt-back" onClick={() => setWalkthroughMode(false)}>
+          ← Back to diff
+        </button>
         <div class="wt-title">{walkthrough()?.summary.split('.')[0] ?? 'Walkthrough'}</div>
         <div class="wt-progress">
           <Show when={total() > 0} fallback={<span>—</span>}>
@@ -23,7 +25,9 @@ export function WalkthroughView() {
           </Show>
         </div>
       </div>
-      <Show when={walkthroughStale()}><StaleBanner /></Show>
+      <Show when={walkthroughStale()}>
+        <StaleBanner />
+      </Show>
       <div class="wt-body">
         <Show when={walkthrough()} fallback={<EmptyState />}>
           <StopList />

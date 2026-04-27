@@ -19,7 +19,9 @@ export default function ProjectPalette() {
       setQuery('');
       setSelectedIdx(0);
       setConfirming(null);
-      fetchRegisteredProjects().then(setProjects).catch(() => setProjects([]));
+      fetchRegisteredProjects()
+        .then(setProjects)
+        .catch(() => setProjects([]));
       queueMicrotask(() => inputRef?.focus());
     }
   });
@@ -29,7 +31,10 @@ export default function ProjectPalette() {
   }
 
   function activate(p: ProjectSummary) {
-    if (p.slug === currentSlug()) { close(); return; }
+    if (p.slug === currentSlug()) {
+      close();
+      return;
+    }
     if (p.branch === null) return;
     window.location.href = `/project/${encodeURIComponent(p.slug)}/`;
   }
@@ -47,7 +52,11 @@ export default function ProjectPalette() {
   }
 
   function onKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+      return;
+    }
     const rows = matches();
     if (!rows.length) return;
     if (e.key === 'ArrowDown') {
@@ -77,11 +86,18 @@ export default function ProjectPalette() {
             class="project-palette-input"
             placeholder="Switch project…"
             value={query()}
-            onInput={(e) => { setQuery(e.currentTarget.value); setSelectedIdx(0); }}
+            onInput={(e) => {
+              setQuery(e.currentTarget.value);
+              setSelectedIdx(0);
+            }}
           />
           <Show
             when={matches().length > 0}
-            fallback={<div class="project-palette-empty">{projects().length === 0 ? 'No projects registered yet.' : 'No matches.'}</div>}
+            fallback={
+              <div class="project-palette-empty">
+                {projects().length === 0 ? 'No projects registered yet.' : 'No matches.'}
+              </div>
+            }
           >
             <div class="project-palette-results">
               <For each={matches()}>
@@ -102,10 +118,16 @@ export default function ProjectPalette() {
                         {p.branch}
                       </Show>
                       <Show when={p.pr}>
-                        {(pr) => <>{' '}<span class="project-palette-row-pr">PR #{pr().number}</span></>}
+                        {(pr) => (
+                          <>
+                            {' '}
+                            <span class="project-palette-row-pr">PR #{pr().number}</span>
+                          </>
+                        )}
                       </Show>
                       <Show when={p.slug === currentSlug()}>
-                        {' '}<span class="project-palette-row-current">(current)</span>
+                        {' '}
+                        <span class="project-palette-row-current">(current)</span>
                       </Show>
                     </span>
                     <span class="project-palette-row-counts">
@@ -119,12 +141,33 @@ export default function ProjectPalette() {
                           <button
                             class="project-palette-row-remove"
                             aria-label="Remove project"
-                            onClick={(e) => { e.stopPropagation(); setConfirming(p.slug); }}
-                          >×</button>
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirming(p.slug);
+                            }}
+                          >
+                            ×
+                          </button>
                         }
                       >
-                        <button class="project-palette-row-yes" onClick={(e) => { e.stopPropagation(); remove(p.slug); }}>Yes</button>
-                        <button class="project-palette-row-no" onClick={(e) => { e.stopPropagation(); setConfirming(null); }}>No</button>
+                        <button
+                          class="project-palette-row-yes"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            remove(p.slug);
+                          }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          class="project-palette-row-no"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirming(null);
+                          }}
+                        >
+                          No
+                        </button>
                       </Show>
                     </span>
                   </div>
@@ -132,9 +175,7 @@ export default function ProjectPalette() {
               </For>
             </div>
           </Show>
-          <div class="project-palette-footer">
-            &uarr;&darr; navigate &middot; Enter open &middot; Esc close
-          </div>
+          <div class="project-palette-footer">&uarr;&darr; navigate &middot; Enter open &middot; Esc close</div>
         </div>
       </div>
     </Show>
