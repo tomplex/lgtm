@@ -2179,6 +2179,15 @@ body.cmd-held .line-content .hljs-type {
   gap: 6px;
   align-items: center;
   font-size: 11px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+.lsp-status-badge:hover .lsp-chip {
+  border-color: var(--accent);
 }
 .lsp-chip {
   padding: 2px 6px;
@@ -2201,36 +2210,265 @@ body.cmd-held .line-content .hljs-type {
   color: var(--accent);
 }
 
+/* LSP bootstrap dialog */
+.lsp-bootstrap-dialog {
+  width: 90vw;
+  max-width: 640px;
+  max-height: 80vh;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.lsp-bootstrap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.lsp-bootstrap-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.lsp-bootstrap-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.lsp-bootstrap-close:hover {
+  color: var(--text);
+}
+.lsp-bootstrap-rows {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lsp-bootstrap-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.lsp-bootstrap-row.dimmed {
+  opacity: 0.6;
+}
+.lsp-bootstrap-row-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.lsp-bootstrap-lang {
+  font-weight: 600;
+  color: var(--text);
+  text-transform: capitalize;
+}
+.lsp-bootstrap-status {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.lsp-bootstrap-status-ok {
+  color: var(--add-text, #4ec9b0);
+}
+.lsp-bootstrap-status-indexing {
+  color: var(--hunk-text);
+}
+.lsp-bootstrap-status-crashed {
+  color: var(--del-text);
+}
+.lsp-bootstrap-tag {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.lsp-bootstrap-tag.warn {
+  color: var(--del-text);
+  border-color: var(--del-text);
+}
+.lsp-bootstrap-cmd {
+  grid-column: 1 / 2;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 4px 6px;
+  border-radius: 3px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.lsp-bootstrap-actions {
+  grid-column: 2 / 3;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+.lsp-bootstrap-install {
+  background: var(--bg-tertiary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.lsp-bootstrap-install:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.lsp-bootstrap-install:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lsp-bootstrap-install.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.lsp-bootstrap-install.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  color: var(--bg);
+}
+.lsp-bootstrap-output {
+  grid-column: 1 / 3;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+}
+.lsp-bootstrap-output.failed {
+  border: 1px solid var(--del-text);
+  color: var(--text);
+}
+.lsp-bootstrap-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.lsp-bootstrap-footer-msg {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.lsp-bootstrap-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.lsp-bootstrap-cancel:hover {
+  border-color: var(--text);
+}
+.lsp-bootstrap-error {
+  margin: 8px 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--del-text);
+  border-radius: 4px;
+  color: var(--del-text);
+  font-size: 12px;
+}
+.lsp-bootstrap-loading {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 /* Peek panel — hover fields + references list */
 .peek-hover {
-  padding: 8px 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-  font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 12px;
   background: var(--bg-tertiary);
   color: var(--text);
   flex-shrink: 0;
 }
 .peek-hover-signature {
+  font-family: 'SF Mono', 'Fira Code', monospace;
   font-weight: 600;
   color: var(--text);
   white-space: pre-wrap;
+  line-height: 1.5;
 }
 .peek-hover-docs {
   color: var(--text-muted);
-  margin-top: 4px;
-  font-family: inherit;
-  white-space: pre-wrap;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.peek-hover-docs > :first-child {
+  margin-top: 0;
+}
+.peek-hover-docs > :last-child {
+  margin-bottom: 0;
+}
+.peek-hover-docs p {
+  margin: 0 0 8px;
+}
+.peek-hover-docs code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.peek-hover-docs pre {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.peek-hover-docs pre code {
+  background: none;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.peek-hover-docs ul,
+.peek-hover-docs ol {
+  margin: 4px 0 8px;
+  padding-left: 20px;
 }
 
 .peek-refs {
-  padding: 8px 12px;
+  padding: 10px 16px;
   border-top: 1px solid var(--border);
   font-size: 12px;
   background: var(--bg-tertiary);
   color: var(--text);
   flex-shrink: 0;
-  max-height: 180px;
+  max-height: 200px;
   overflow: auto;
 }
 .peek-refs-header {
@@ -2239,17 +2477,18 @@ body.cmd-held .line-content .hljs-type {
   color: var(--text-muted);
   font-weight: 600;
   font-size: 11px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .peek-ref {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   font-family: 'SF Mono', 'Fira Code', monospace;
-  padding: 2px 0;
+  padding: 3px 0;
+  line-height: 1.5;
 }
 .peek-ref-loc {
   color: var(--accent);
-  min-width: 200px;
+  min-width: 280px;
   flex-shrink: 0;
 }
 .peek-ref-snippet {
@@ -2549,6 +2788,20 @@ body.cmd-held .line-content .hljs-type {
   font-size: 11px;
   color: var(--text-muted);
   font-family: monospace;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wt-artifact-toggle {
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.wt-artifact-toggle:hover {
+  text-decoration: underline;
 }
 /* The walkthrough artifact reuses the same .diff-table / .diff-add / .diff-del
    styles used by the main diff view. No artifact-specific line styles needed. */
