@@ -16,7 +16,14 @@ import {
   type SymbolResult,
 } from './symbol-lookup.js';
 import { extensionToLanguage, getLanguageConfig } from './lsp/index.js';
+import type { Language } from './lsp/index.js';
 import { fromFileUri } from './lsp/uri.js';
+import {
+  detectLanguagesInRepo,
+  getInstaller,
+  isInstallerAvailable,
+  runInstaller,
+} from './lsp/bootstrap.js';
 
 /**
  * LSP hover content comes back as markdown. For TS / Rust / Python, common shapes are:
@@ -397,6 +404,82 @@ export function createApp(manager: SessionManager): express.Express {
       console.log(`LSP_REFERENCES_FAIL language=${language} error=${(err as Error).message}`);
       res.json({ status: 'fallback', result: { references: [] } });
     }
+  });
+
+  projectRouter.get('/lsp/state', (_req, res) => {
+    const session = res.locals.session;
+    res.json({
+      python: session.lsp.status('python'),
+      typescript: session.lsp.status('typescript'),
+      rust: session.lsp.status('rust'),
+    });
+  });
+
+  projectRouter.post('/lsp/warm', (req, res) => {
+    const session = res.locals.session;
+    const requested = Array.isArray(req.body?.languages) ? (req.body.languages as unknown[]) : [];
+    const languages = requested.filter(
+      (l): l is Language => l === 'python' || l === 'typescript' || l === 'rust',
+    );
+    for (const lang of languages) {
+      session.lsp.get(lang).catch(() => {
+        // get() already records 'missing' state; nothing to do here
+      });
+    }
+    res.json({
+      warmed: languages,
+      state: {
+        python: session.lsp.status('python'),
+        typescript: session.lsp.status('typescript'),
+        rust: session.lsp.status('rust'),
+      },
+    });
+  });
+
+  projectRouter.get('/lsp/bootstrap', async (_req, res) => {
+    const session = res.locals.session;
+    const present = detectLanguagesInRepo(session.repoPath);
+    const langs: Language[] = ['python', 'typescript', 'rust'];
+    const plan = await Promise.all(
+      langs.map(async (language) => {
+        const inst = getInstaller(language);
+        return {
+          language,
+          presentInRepo: present.has(language),
+          status: session.lsp.status(language),
+          installer: inst.installer,
+          installCommand: inst.displayCommand,
+          installerAvailable: await isInstallerAvailable(inst.installer),
+        };
+      }),
+    );
+    res.json({ plan });
+  });
+
+  projectRouter.post('/lsp/bootstrap', async (req, res) => {
+    const session = res.locals.session;
+    const requested = Array.isArray(req.body?.languages) ? (req.body.languages as unknown[]) : [];
+    const languages = requested.filter(
+      (l): l is Language => l === 'python' || l === 'typescript' || l === 'rust',
+    );
+    if (languages.length === 0) {
+      res.status(400).json({ error: 'languages must be a non-empty list of python|typescript|rust' });
+      return;
+    }
+    const results = [];
+    for (const language of languages) {
+      console.log(`LSP_BOOTSTRAP_INSTALL language=${language}`);
+      const result = await runInstaller(language);
+      console.log(`LSP_BOOTSTRAP_DONE language=${language} ok=${result.ok} exit=${result.exitCode}`);
+      if (result.ok) {
+        // A successful install means a previously cached 'missing' verdict is stale.
+        session.lsp.resetKnown(language);
+        // Kick off startup so the badge transitions out of 'missing' on its own.
+        session.lsp.get(language).catch(() => {});
+      }
+      results.push(result);
+    }
+    res.json({ results });
   });
 
   projectRouter.get('/lsp/debug', async (_req, res) => {

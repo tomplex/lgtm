@@ -1,4 +1,4 @@
-import { createSignal, Show, onMount, createEffect } from 'solid-js';
+import { createSignal, Show, onMount, onCleanup, createEffect } from 'solid-js';
 import {
   files,
   activeFile,
@@ -40,6 +40,8 @@ import {
   walkthrough,
   activeStopIdx,
   markStopVisited,
+  setLspStatus,
+  type Language,
 } from './state';
 import {
   fetchItems,
@@ -51,6 +53,9 @@ import {
   removeItem,
   baseUrl,
   getProjectSlug,
+  fetchLspState,
+  warmLsp,
+  type LspWireStatus,
 } from './api';
 import { fetchComments } from './comment-api';
 import { fetchWalkthrough } from './walkthrough-api';
@@ -61,6 +66,7 @@ import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import SymbolSearch from './components/diff/SymbolSearch';
 import ProjectPalette from './components/palette/ProjectPalette';
+import LspBootstrap from './components/header/LspBootstrap';
 import { WalkthroughView } from './components/walkthrough/WalkthroughView';
 
 import Header from './components/header/Header';
@@ -319,6 +325,52 @@ export default function ProjectView() {
     if (walkthrough()) ensureDiffLoaded();
   });
 
+  // --- LSP status ---
+
+  function languagesFromFiles(): Language[] {
+    const present = new Set<Language>();
+    for (const f of files()) {
+      const p = f.path.toLowerCase();
+      if (p.endsWith('.py')) present.add('python');
+      else if (p.endsWith('.ts') || p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.jsx'))
+        present.add('typescript');
+      else if (p.endsWith('.rs')) present.add('rust');
+    }
+    return [...present];
+  }
+
+  function applyLspState(state: { python: LspWireStatus; typescript: LspWireStatus; rust: LspWireStatus }) {
+    for (const lang of ['python', 'typescript', 'rust'] as const) {
+      // 'partial' isn't in the frontend store union; treat it as 'ok' so the badge hides it.
+      const wire = state[lang];
+      const status = wire === 'partial' ? 'ok' : wire;
+      setLspStatus(lang, status);
+    }
+  }
+
+  let lspPollTimer: number | null = null;
+  let lastWarmKey = '';
+
+  async function refreshLspState() {
+    try {
+      const state = await fetchLspState();
+      applyLspState(state);
+    } catch {
+      /* server hiccup — keep last known state */
+    }
+  }
+
+  // Warm whenever the set of relevant languages changes (files() is loaded async).
+  createEffect(() => {
+    const langs = languagesFromFiles();
+    const key = langs.slice().sort().join(',');
+    if (key === lastWarmKey || langs.length === 0) return;
+    lastWarmKey = key;
+    warmLsp(langs)
+      .then(applyLspState)
+      .catch(() => {});
+  });
+
   // --- SSE ---
 
   function connectSSE() {
@@ -381,6 +433,11 @@ export default function ProjectView() {
 
     connectSSE();
 
+    // LSP status: prime the badge once on mount, then poll on a slow cadence so
+    // transitions (indexing → ok, missing → ok after bootstrap) get reflected.
+    refreshLspState();
+    lspPollTimer = window.setInterval(refreshLspState, 5000);
+
     // Resizable sidebar
     const handle = document.getElementById('resize-handle');
     const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
@@ -404,6 +461,13 @@ export default function ProjectView() {
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
       });
+    }
+  });
+
+  onCleanup(() => {
+    if (lspPollTimer != null) {
+      clearInterval(lspPollTimer);
+      lspPollTimer = null;
     }
   });
 
@@ -480,6 +544,7 @@ export default function ProjectView() {
       </Show>
       <SymbolSearch />
       <ProjectPalette />
+      <LspBootstrap />
     </>
   );
 }

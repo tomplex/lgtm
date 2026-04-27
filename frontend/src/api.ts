@@ -242,6 +242,63 @@ export async function cancelLspRequest(
   await fetch(`${baseUrl()}/lsp/request?method=${method}&${posQuery(file, line, character)}`, { method: 'DELETE' });
 }
 
+export type LspWireStatus = 'ok' | 'indexing' | 'missing' | 'crashed' | 'partial';
+
+export interface LspStateResponse {
+  python: LspWireStatus;
+  typescript: LspWireStatus;
+  rust: LspWireStatus;
+}
+
+export async function fetchLspState(): Promise<LspStateResponse> {
+  const resp = await fetch(`${baseUrl()}/lsp/state`);
+  return checkedJson<LspStateResponse>(resp);
+}
+
+export async function warmLsp(languages: ('python' | 'typescript' | 'rust')[]): Promise<LspStateResponse> {
+  const resp = await fetch(`${baseUrl()}/lsp/warm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ languages }),
+  });
+  const data = await checkedJson<{ warmed: string[]; state: LspStateResponse }>(resp);
+  return data.state;
+}
+
+export interface BootstrapPlanEntry {
+  language: 'python' | 'typescript' | 'rust';
+  presentInRepo: boolean;
+  status: LspWireStatus;
+  installer: string;
+  installCommand: string;
+  installerAvailable: boolean;
+}
+
+export async function fetchBootstrapPlan(): Promise<BootstrapPlanEntry[]> {
+  const resp = await fetch(`${baseUrl()}/lsp/bootstrap`);
+  const data = await checkedJson<{ plan: BootstrapPlanEntry[] }>(resp);
+  return data.plan;
+}
+
+export interface InstallResult {
+  language: 'python' | 'typescript' | 'rust';
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  command: string;
+}
+
+export async function runBootstrap(languages: ('python' | 'typescript' | 'rust')[]): Promise<InstallResult[]> {
+  const resp = await fetch(`${baseUrl()}/lsp/bootstrap`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ languages }),
+  });
+  const data = await checkedJson<{ results: InstallResult[] }>(resp);
+  return data.results;
+}
+
 export async function fetchRegisteredProjects(): Promise<ProjectSummary[]> {
   const resp = await fetch('/projects');
   const data = await checkedJson<{ projects?: ProjectSummary[] }>(resp);

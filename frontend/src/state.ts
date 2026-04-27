@@ -161,6 +161,8 @@ export const [symbolSearchOpen, setSymbolSearchOpen] = createSignal(false);
 
 export const [paletteOpen, setPaletteOpen] = createSignal(false);
 
+export const [lspBootstrapOpen, setLspBootstrapOpen] = createSignal(false);
+
 // --- Stores (partial updates) ---
 
 export const [comments, setComments] = createStore<{ list: Comment[] }>({ list: [] });
@@ -193,7 +195,9 @@ export const [selectedShas, setSelectedShas] = createStore<Record<string, boolea
 export const [collapsedFolders, setCollapsedFolders] = createStore<Record<string, boolean>>({});
 
 /** Session-only collapse overlays (auto-collapse-on-reviewed, hash-nav force-expand). Not persisted. */
-export const [sessionCollapsedFolders, setSessionCollapsedFolders] = createStore<Record<string, boolean | 'force-open'>>({});
+export const [sessionCollapsedFolders, setSessionCollapsedFolders] = createStore<
+  Record<string, boolean | 'force-open'>
+>({});
 
 export function toggleFolderCollapsed(fullPath: string) {
   setCollapsedFolders(fullPath, (v) => !v);

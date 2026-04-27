@@ -1,5 +1,5 @@
 import { For, Show, createSignal, onCleanup, onMount, createEffect, createMemo, untrack } from 'solid-js';
-import { lspStatus, type Language, type LspStatus } from '../../state';
+import { lspStatus, setLspBootstrapOpen, type Language, type LspStatus } from '../../state';
 
 const LABEL: Record<Language, string> = { python: 'py', typescript: 'ts', rust: 'rs' };
 
@@ -55,15 +55,21 @@ export default function LspStatusBadge() {
 
   return (
     <Show when={entries().length > 0}>
-      <span class="lsp-status-badge">
+      <button
+        type="button"
+        class="lsp-status-badge"
+        onClick={() => setLspBootstrapOpen(true)}
+        title="Set up language servers"
+      >
         <For each={entries()}>
           {(e) => (
             <span class={`lsp-chip lsp-chip-${e.status}`} title={`${e.language} LSP: ${e.status}`}>
-              {LABEL[e.language]}: {e.status}{e.elapsedSec != null ? ` ${e.elapsedSec}s` : ''}
+              {LABEL[e.language]}: {e.status}
+              {e.elapsedSec != null ? ` ${e.elapsedSec}s` : ''}
             </span>
           )}
         </For>
-      </span>
+      </button>
     </Show>
   );
 }

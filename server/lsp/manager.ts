@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node.js';
 import { LspClient } from './client.js';
 import { getLanguageConfig } from './languages.js';
+import { spawnEnv } from './bootstrap.js';
 import type { Language, LspStatus } from './types.js';
 
 type ClientFactory = (language: Language, projectPath: string) => Promise<LspClient>;
@@ -17,6 +18,7 @@ async function defaultClientFactory(language: Language, projectPath: string): Pr
   const child: ChildProcess = spawn(cfg.command, cfg.args, {
     cwd: projectPath,
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: spawnEnv(),
   });
   const connection = createMessageConnection(
     new StreamMessageReader(child.stdout!),
@@ -93,6 +95,11 @@ export class LspManager {
     if (s === 'indexing' || s === 'initializing') return 'indexing';
     if (s === 'crashed') return 'crashed';
     return 'missing';
+  }
+
+  /** Forget a prior 'missing' verdict so the next get() retries spawning. */
+  resetKnown(language: Language): void {
+    this._known.delete(language);
   }
 
   async shutdown(): Promise<void> {
