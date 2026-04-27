@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setFiles } from '../state';
-import { linesForArtifact } from '../components/walkthrough/StopArtifact';
+import { linesForArtifact } from '../components/walkthrough/lines-for-artifact';
 import { parseDiff } from '../diff';
 import type { StopArtifact } from '../walkthrough-types';
 
@@ -34,11 +34,13 @@ describe('linesForArtifact', () => {
       file: 'a.ts',
       hunks: [{ newStart: 10, newLines: 7 }],
     };
-    const lines = linesForArtifact(a);
-    expect(lines.some((l) => l.type === 'hunk')).toBe(true);
-    expect(lines.some((l) => l.type === 'add' && l.content === 'line12new')).toBe(true);
-    expect(lines.some((l) => l.type === 'del' && l.content === 'line12')).toBe(true);
-    expect(lines.some((l) => l.type === 'add' && l.content === 'line101new')).toBe(false);
+    const indexed = linesForArtifact(a);
+    const types = indexed.map((x) => x.line.type);
+    const contents = indexed.map((x) => x.line.content);
+    expect(types).toContain('hunk');
+    expect(contents).toContain('line12new');
+    expect(contents).toContain('line12');
+    expect(contents).not.toContain('line101new');
   });
 
   it('includes deletions and hunk headers from matched hunks', () => {
@@ -46,11 +48,9 @@ describe('linesForArtifact', () => {
       file: 'a.ts',
       hunks: [{ newStart: 10, newLines: 7 }],
     };
-    const lines = linesForArtifact(a);
-    const hunkHeaders = lines.filter((l) => l.type === 'hunk');
-    const dels = lines.filter((l) => l.type === 'del');
-    expect(hunkHeaders).toHaveLength(1);
-    expect(dels.length).toBeGreaterThan(0);
+    const indexed = linesForArtifact(a);
+    expect(indexed.filter((x) => x.line.type === 'hunk')).toHaveLength(1);
+    expect(indexed.filter((x) => x.line.type === 'del').length).toBeGreaterThan(0);
   });
 
   it('matches multiple hunks when artifact spans them', () => {
@@ -61,18 +61,18 @@ describe('linesForArtifact', () => {
         { newStart: 100, newLines: 6 },
       ],
     };
-    const lines = linesForArtifact(a);
-    expect(lines.filter((l) => l.type === 'hunk')).toHaveLength(2);
-    expect(lines.some((l) => l.type === 'add' && l.content === 'line101new')).toBe(true);
+    const indexed = linesForArtifact(a);
+    expect(indexed.filter((x) => x.line.type === 'hunk')).toHaveLength(2);
+    expect(indexed.some((x) => x.line.content === 'line101new')).toBe(true);
   });
 
   it('forgives a range slightly past the actual hunk edges', () => {
     const a: StopArtifact = {
       file: 'a.ts',
-      hunks: [{ newStart: 5, newLines: 30 }], // wider than the actual hunk
+      hunks: [{ newStart: 5, newLines: 30 }],
     };
-    const lines = linesForArtifact(a);
-    expect(lines.some((l) => l.type === 'add' && l.content === 'line12new')).toBe(true);
+    const indexed = linesForArtifact(a);
+    expect(indexed.some((x) => x.line.content === 'line12new')).toBe(true);
   });
 
   it('falls back to all hunks when range matches nothing', () => {
@@ -80,9 +80,9 @@ describe('linesForArtifact', () => {
       file: 'a.ts',
       hunks: [{ newStart: 1000, newLines: 5 }],
     };
-    const lines = linesForArtifact(a);
-    expect(lines.some((l) => l.type === 'hunk')).toBe(true);
-    expect(lines.length).toBeGreaterThan(0);
+    const indexed = linesForArtifact(a);
+    expect(indexed.some((x) => x.line.type === 'hunk')).toBe(true);
+    expect(indexed.length).toBeGreaterThan(0);
   });
 
   it('returns empty array when file is not in the diff', () => {
@@ -91,5 +91,17 @@ describe('linesForArtifact', () => {
       hunks: [{ newStart: 1, newLines: 5 }],
     };
     expect(linesForArtifact(a)).toEqual([]);
+  });
+
+  it('lineIdx values are absolute indices into the file lines array', () => {
+    const a: StopArtifact = {
+      file: 'a.ts',
+      hunks: [{ newStart: 10, newLines: 7 }],
+    };
+    const indexed = linesForArtifact(a);
+    expect(indexed[0].lineIdx).toBe(0);
+    for (let i = 1; i < indexed.length; i++) {
+      expect(indexed[i].lineIdx).toBeGreaterThan(indexed[i - 1].lineIdx);
+    }
   });
 });

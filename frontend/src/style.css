@@ -1312,6 +1312,12 @@ tr.expand-row:hover td {
 .md-content li {
   margin: 0.25em 0;
 }
+/* Lists are split so each <li> is its own commentable block. Drop the
+   outer list margins on the single-item wrappers; the inner <li> margin
+   keeps visual spacing close to a regular (unsplit) list. */
+.md-content .md-list-split {
+  margin: 0;
+}
 
 .md-content hr {
   border: none;
@@ -2544,35 +2550,8 @@ body.cmd-held .line-content .hljs-type {
   color: var(--text-muted);
   font-family: monospace;
 }
-.wt-artifact-lines {
-  padding: 6px 0;
-  font-family: monospace;
-  font-size: 11px;
-}
-.wt-line {
-  display: flex;
-  gap: 10px;
-  padding: 0 12px;
-  line-height: 1.55;
-}
-.wt-line-add {
-  color: var(--add-text);
-}
-.wt-line-del {
-  color: var(--del-text);
-}
-.wt-line-context {
-  color: var(--text-muted);
-}
-.wt-line-hunk {
-  color: var(--hunk-text);
-}
-.wt-line-num {
-  width: 40px;
-  text-align: right;
-  color: var(--text-muted);
-  opacity: 0.5;
-}
+/* The walkthrough artifact reuses the same .diff-table / .diff-add / .diff-del
+   styles used by the main diff view. No artifact-specific line styles needed. */
 
 .wt-banner {
   background: rgba(88, 166, 255, 0.08);
