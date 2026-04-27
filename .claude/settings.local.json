@@ -41,7 +41,28 @@
       "Bash(rm -rf ~/.claude/plugins/cache/local/claude-review)",
       "Bash(mkdir -p ~/.claude/plugins/cache/local/lgtm)",
       "Bash(ln -sfn /Users/tom/dev/claude-review ~/.claude/plugins/cache/local/lgtm/0.2.0)",
-      "Bash(claude plugin:*)"
+      "Bash(claude plugin:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh --project-dir /Users/tom/dev/claude-review)",
+      "Bash(npx vite:*)",
+      "Bash(python3 -c \"import sys,json; print\\(''''server running'''' if json.load\\(sys.stdin\\) else ''''no''''\\)\")",
+      "mcp__lgtm__reply",
+      "Bash(npx esbuild:*)",
+      "Read(//Users/tom/.claude/tools/**)",
+      "Read(//Users/tom/.claude/**)",
+      "WebFetch(domain:spec.modelcontextprotocol.io)",
+      "Bash(xargs ls:*)",
+      "Bash(xargs cat:*)",
+      "Bash(lsof -iTCP -sTCP:LISTEN -P)",
+      "Bash(lsof -iTCP:9900 -sTCP:LISTEN -P)",
+      "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/stop-server.sh /Users/tom/dev/claude-review/.superpowers/brainstorm/83385-1776804156)",
+      "Bash(LSP_INTEGRATION=1 npx vitest run --config vitest.config.server.ts server/__tests__/lsp/integration-ty.test.ts)",
+      "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/stop-server.sh /Users/tom/dev/claude-review/.superpowers/brainstorm/77438-1776809370)",
+      "Bash(git show *)",
+      "Read(//tmp/**)",
+      "mcp__private-journal__search_journal",
+      "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/stop-server.sh /Users/tom/dev/claude-review/.superpowers/brainstorm/25848-1776961709)",
+      "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/stop-server.sh /Users/tom/dev/claude-review/.superpowers/brainstorm/78806-1776976057)"
     ]
   }
 }
