@@ -1,17 +1,22 @@
 import { createSignal, createResource, Show, For, onMount, onCleanup } from 'solid-js';
 import { peekState, setPeekState, setLspStatus } from '../../state';
 import {
-  fetchSymbol, fetchDefinition, fetchHover, fetchReferences, cancelLspRequest,
+  fetchSymbol,
+  fetchDefinition,
+  fetchHover,
+  fetchReferences,
+  cancelLspRequest,
   type SymbolResult,
 } from '../../api';
-import { highlightLine, detectLang, escapeHtml } from '../../utils';
+import { highlightLine, detectLang, escapeHtml, renderMd } from '../../utils';
 import { showToast } from '../shared/Toast';
 import type { Language } from '../../state';
 
 function languageFromFile(file: string): Language | null {
   const lower = file.toLowerCase();
   if (lower.endsWith('.py')) return 'python';
-  if (lower.endsWith('.ts') || lower.endsWith('.tsx') || lower.endsWith('.js') || lower.endsWith('.jsx')) return 'typescript';
+  if (lower.endsWith('.ts') || lower.endsWith('.tsx') || lower.endsWith('.js') || lower.endsWith('.jsx'))
+    return 'typescript';
   if (lower.endsWith('.rs')) return 'rust';
   return null;
 }
@@ -22,7 +27,9 @@ export default function PeekPanel() {
   let panelRef: HTMLDivElement | undefined;
 
   // A LSP-resolvable peek has both `line` (0-based file line) and `character` (UTF-16 offset).
-  const hasLspPos = (s: ReturnType<typeof peekState>): s is NonNullable<ReturnType<typeof peekState>> & { line: number; character: number } =>
+  const hasLspPos = (
+    s: ReturnType<typeof peekState>,
+  ): s is NonNullable<ReturnType<typeof peekState>> & { line: number; character: number } =>
     s != null && s.line != null && s.character != null;
 
   // Definition — LSP when position is present, else name-search fallback
@@ -36,10 +43,13 @@ export default function PeekPanel() {
           const lang = languageFromFile(state.filePath);
           if (lang) {
             const status =
-              resp.status === 'ok' ? 'ok' :
-              resp.status === 'indexing' ? 'indexing' :
-              resp.status === 'fallback' ? 'ok' :
-              'missing';
+              resp.status === 'ok'
+                ? 'ok'
+                : resp.status === 'indexing'
+                  ? 'indexing'
+                  : resp.status === 'fallback'
+                    ? 'ok'
+                    : 'missing';
             setLspStatus(lang, status);
           }
           if (resp.result.results.length === 0) {
@@ -129,8 +139,9 @@ export default function PeekPanel() {
   function handleBodyClick(e: MouseEvent) {
     if (!(e.metaKey || e.ctrlKey)) return;
 
-    const sel = (document as any).caretPositionFromPoint?.(e.clientX, e.clientY)
-      ?? (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
+    const sel =
+      (document as any).caretPositionFromPoint?.(e.clientX, e.clientY) ??
+      (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
     if (!sel) return;
     const node = 'offsetNode' in sel ? sel.offsetNode : sel.startContainer;
     const offset = 'offset' in sel ? sel.offset : sel.startOffset;
@@ -175,7 +186,7 @@ export default function PeekPanel() {
   });
 
   const VISIBLE_REFS = 50;
-  const visibleRefs = () => showAllRefs() ? refs() ?? [] : (refs() ?? []).slice(0, VISIBLE_REFS);
+  const visibleRefs = () => (showAllRefs() ? (refs() ?? []) : (refs() ?? []).slice(0, VISIBLE_REFS));
 
   return (
     <Show when={peekState() && data()?.results?.length}>
@@ -183,10 +194,16 @@ export default function PeekPanel() {
         <td colspan="3">
           <div class="peek-panel" ref={panelRef} onKeyDown={handleKeyDown} tabIndex={-1}>
             <div class="peek-header">
-              <button class="peek-close" onClick={handleClose} title="Close (Esc)">✕</button>
+              <button class="peek-close" onClick={handleClose} title="Close (Esc)">
+                ✕
+              </button>
               <strong class="peek-symbol">{data()!.symbol}</strong>
               <Show when={activeResult()}>
-                {(r) => <span class="peek-location">{r().file}:{r().line}</span>}
+                {(r) => (
+                  <span class="peek-location">
+                    {r().file}:{r().line}
+                  </span>
+                )}
               </Show>
               <Show when={(data()?.results.length ?? 0) > 1}>
                 <select
@@ -196,7 +213,9 @@ export default function PeekPanel() {
                 >
                   <For each={data()!.results}>
                     {(result, i) => (
-                      <option value={i()}>{result.file} :{result.line}</option>
+                      <option value={i()}>
+                        {result.file} :{result.line}
+                      </option>
                     )}
                   </For>
                 </select>
@@ -207,7 +226,7 @@ export default function PeekPanel() {
               <div class="peek-hover">
                 <div class="peek-hover-signature">{hover()!.signature}</div>
                 <Show when={hover()?.docs}>
-                  <div class="peek-hover-docs">{hover()!.docs}</div>
+                  <div class="peek-hover-docs" innerHTML={renderMd(hover()!.docs!)} />
                 </Show>
               </div>
             </Show>
@@ -218,7 +237,9 @@ export default function PeekPanel() {
                   <Show when={r().docstring && !hover()?.signature}>
                     <div class="peek-docstring">{r().docstring}</div>
                   </Show>
-                  <pre class="peek-body" onClick={handleBodyClick}><code innerHTML={highlightBody(r())} /></pre>
+                  <pre class="peek-body" onClick={handleBodyClick}>
+                    <code innerHTML={highlightBody(r())} />
+                  </pre>
                 </>
               )}
             </Show>
@@ -229,7 +250,9 @@ export default function PeekPanel() {
                 <For each={visibleRefs()}>
                   {(ref) => (
                     <div class="peek-ref">
-                      <span class="peek-ref-loc">{ref.file}:{ref.line}</span>
+                      <span class="peek-ref-loc">
+                        {ref.file}:{ref.line}
+                      </span>
                       <span class="peek-ref-snippet">{ref.snippet}</span>
                     </div>
                   )}
