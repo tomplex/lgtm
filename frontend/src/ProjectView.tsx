@@ -130,6 +130,24 @@ export default function ProjectView() {
     }
   }
 
+  /**
+   * Walkthrough renders against `files()` — the parsed diff. When the user is
+   * on a document tab, `switchToItem` only fetches that item, leaving `files()`
+   * empty. Fetch the diff out-of-band so walkthrough has data to render.
+   */
+  async function ensureDiffLoaded(): Promise<void> {
+    if (files().length > 0) return;
+    try {
+      const data = await fetchItemData('diff');
+      if (data.mode === 'diff') {
+        setFiles(parseDiff(data.diff));
+        if (!repoMeta().repoPath) setRepoMeta(data.meta || {});
+      }
+    } catch {
+      /* ignore — walkthrough will fall back to empty artifacts */
+    }
+  }
+
   async function switchToItem(itemId: string) {
     saveCurrentItemState();
     setActiveItemId(itemId);
@@ -295,6 +313,12 @@ export default function ProjectView() {
     if (w && w.stops[i]) markStopVisited(w.stops[i].id);
   });
 
+  // When a walkthrough exists but the diff hasn't been loaded (user is on a
+  // document tab), fetch it so artifacts have something to render against.
+  createEffect(() => {
+    if (walkthrough()) ensureDiffLoaded();
+  });
+
   // --- SSE ---
 
   function connectSSE() {
@@ -427,13 +451,16 @@ export default function ProjectView() {
           <div class="resize-handle" id="resize-handle" />
         </Show>
         <div class="diff-container" id="diff-container">
-          <Show when={walkthroughMode()} fallback={
-            <Show when={appMode() === 'diff'} fallback={<DocumentView />}>
-              <Show when={files().length > 0} fallback={<div class="empty-state">No changes to review</div>}>
-                <DiffView />
+          <Show
+            when={walkthroughMode()}
+            fallback={
+              <Show when={appMode() === 'diff'} fallback={<DocumentView />}>
+                <Show when={files().length > 0} fallback={<div class="empty-state">No changes to review</div>}>
+                  <DiffView />
+                </Show>
               </Show>
-            </Show>
-          }>
+            }
+          >
             <WalkthroughView />
           </Show>
         </div>
