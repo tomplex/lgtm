@@ -1,3 +1,4 @@
 node_modules/
 .superpowers/
 .private-journal/
+.DS_Store
