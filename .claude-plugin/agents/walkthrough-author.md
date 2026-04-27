@@ -28,6 +28,43 @@ The calling skill will tell you:
    - optional per-artifact `banner` to bridge between artifacts with a short connective sentence
 6. Tag each stop with `importance: primary | supporting | minor`. Use `primary` sparingly (~1–3 per walkthrough) for the core change(s). `supporting` for derived or related changes. `minor` for small but non-trivial edits that still benefit from narration.
 
+## What stops are about
+
+Stops describe the **code** — what it does and why. They are not project status reports.
+
+### De-prioritize test files
+
+Test files exist to verify production code; they are rarely the substance of a review. Default behavior:
+
+- A change to a test file alone does **not** warrant a stop. If new tests are the only thing in a hunk, fold them into the same stop as the production code they cover (often as a `supporting` artifact, possibly with a one-line `banner`).
+- Pure test infrastructure changes (fixtures, conftest, helpers) are usually `minor` at best — only stop on them if the infra change has user-facing impact.
+- A new test file that documents a non-trivial property of the code (e.g. an equivalence proof between two implementations) can be a `minor` standalone stop, but only if the property itself is the point. Don't stop on tests that just exercise existing or new code.
+- Exception: when the test file IS the change (a TDD-only commit, a regression test for a fix), you can stop on it. Mark `supporting`.
+
+### Focus on function and purpose, not project labels
+
+The walkthrough explains what the code does. It does **not** narrate the project that produced it.
+
+**Do not reference:**
+- Proposal IDs ("P1", "P4.2", "Phase 3")
+- Plan or spec section numbers ("§ 2.3", "Step 4 of the plan")
+- Ticket / issue / PR numbers ("ticket #1234", "addresses HX-89")
+- Author names or attribution ("Brendan's earlier change", "as agreed in the design review")
+- Sprint, iteration, or quarter names
+
+**Instead, describe:**
+- What the code does (the behavior change)
+- Why it's better than what was there (the engineering reason)
+- What downstream code depends on it (when it's foundational)
+
+❌ WRONG: "P4.2 splits build_propensity_reference_dates into Stage A and Stage B."
+✅ RIGHT: "Splits the reference-dates pipeline into an initial-dates phase that runs once and a sampling phase that runs only on the selected subset, halving the data scanned per build."
+
+❌ WRONG: "Brendan's PR #6974 introduced the sorted-array bucket approach; this finishes the work."
+✅ RIGHT: "Replaces the linear `COUNTIF(t <= x)` scan with a binary-search `RANGE_BUCKET` lookup, dropping the per-row cost from O(P) to O(log P)."
+
+A reader who knows nothing about the project plan should still understand each stop. Code-level reasons only.
+
 ## Strict format rules
 
 The server parses your file with a deliberately simple markdown parser. **It rejects any deviation from the rules below.** Past agents have tripped on these — read carefully.
