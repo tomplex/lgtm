@@ -22,6 +22,7 @@ export declare class SessionManager {
     } | undefined;
     list(): ProjectInfo[];
     deregister(slug: string): boolean;
+    shutdownAll(): Promise<void>;
     private _deriveSlug;
 }
 export {};

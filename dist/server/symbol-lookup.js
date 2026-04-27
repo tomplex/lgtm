@@ -68,7 +68,7 @@ function runRipgrep(repoPath, symbol) {
     }
     return matches;
 }
-function detectKind(lineText) {
+export function detectKind(lineText) {
     // Python
     const pyMatch = lineText.match(/^\s*(def|class)\s+/);
     if (pyMatch) {
@@ -102,7 +102,7 @@ function detectKind(lineText) {
 function isPython(file) {
     return file.endsWith('.py');
 }
-function extractPythonBody(lines, startIndex) {
+export function extractPythonBody(lines, startIndex) {
     const defLine = lines[startIndex];
     const defIndentMatch = defLine.match(/^(\s*)/);
     const defIndent = defIndentMatch ? defIndentMatch[1].length : 0;
@@ -141,7 +141,7 @@ function extractPythonBody(lines, startIndex) {
     }
     return bodyLines.join('\n');
 }
-function extractTypeScriptBody(lines, startIndex) {
+export function extractTypeScriptBody(lines, startIndex) {
     const bodyLines = [];
     let depth = 0;
     let foundOpen = false;
@@ -169,7 +169,7 @@ function extractTypeScriptBody(lines, startIndex) {
     }
     return bodyLines.join('\n');
 }
-function extractPythonDocstring(lines, startIndex) {
+export function extractPythonDocstring(lines, startIndex) {
     // Look for a triple-quoted string on the line after the def/class
     let i = startIndex + 1;
     // Skip the def line continuation lines (with parens) if any
@@ -209,7 +209,7 @@ function extractPythonDocstring(lines, startIndex) {
     }
     return docLines.join(' ').trim();
 }
-function extractJsDocstring(lines, startIndex) {
+export function extractJsDocstring(lines, startIndex) {
     // Look backwards from startIndex for a /** ... */ block
     if (startIndex === 0)
         return null;

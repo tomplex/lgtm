@@ -11,9 +11,13 @@ export interface ProjectBlob {
     }[];
     comments: import('./comment-types.js').Comment[];
     analysis: Record<string, unknown> | null;
+    walkthrough: import('./walkthrough-types.js').Walkthrough | null;
     rounds: Record<string, number>;
     reviewedFiles: string[];
-    sidebarView: string;
+    sortMode: 'path' | 'priority';
+    groupMode: 'none' | 'phase';
+    groupModeUserTouched: boolean;
+    collapsedFolders: Record<string, boolean>;
 }
 export declare function initStore(dbPath?: string): void;
 export declare function closeStore(): void;

@@ -24,6 +24,17 @@ export class SessionManager {
         // Check if this path is already registered
         for (const [slug, session] of this._sessions) {
             if (session.repoPath === absPath) {
+                let changed = false;
+                if (opts?.baseBranch && opts.baseBranch !== session.baseBranch) {
+                    session.baseBranch = opts.baseBranch;
+                    changed = true;
+                }
+                if (opts?.description !== undefined && opts.description !== session.description) {
+                    session.description = opts.description;
+                    changed = true;
+                }
+                if (changed)
+                    session.persist();
                 return { slug, url: `http://127.0.0.1:${this._port}/project/${slug}/` };
             }
         }
@@ -68,12 +79,23 @@ export class SessionManager {
     }
     deregister(slug) {
         const session = this._sessions.get(slug);
-        if (session)
+        if (session) {
             session.unwatchRepo();
+            void session.destroy();
+        }
         const removed = this._sessions.delete(slug);
         if (removed)
             storeDelete(slug);
         return removed;
+    }
+    async shutdownAll() {
+        const promises = [];
+        for (const session of this._sessions.values()) {
+            session.unwatchRepo();
+            promises.push(session.destroy().catch(() => { }));
+        }
+        await Promise.all(promises);
+        this._sessions.clear();
     }
     _deriveSlug(absPath) {
         let base = basename(absPath).toLowerCase().replace(/[^a-z0-9-]/g, '-');

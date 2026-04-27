@@ -42,5 +42,15 @@ function main() {
             }
         }
     });
+    const shutdown = async (signal) => {
+        console.log(`SHUTDOWN signal=${signal}`);
+        try {
+            await manager.shutdownAll();
+        }
+        catch { /* ignore */ }
+        process.exit(0);
+    };
+    process.on('SIGINT', () => { void shutdown('SIGINT'); });
+    process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
 }
 main();

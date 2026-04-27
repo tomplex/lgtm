@@ -9,6 +9,10 @@ interface Commit {
     date: string;
 }
 export declare function getBranchCommits(repoPath: string, baseBranch: string): Commit[];
+export declare function parseOwnerRepo(url: string): {
+    owner: string;
+    repo: string;
+} | undefined;
 export interface RepoMeta {
     branch: string;
     baseBranch: string;
@@ -18,9 +22,12 @@ export interface RepoMeta {
         url: string;
         number: number;
         title: string;
+        owner: string;
+        repo: string;
     };
 }
 export declare function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta;
+export declare function getRepoMetaAsync(repoPath: string, baseBranch: string): Promise<RepoMeta>;
 export interface FileLine {
     num: number;
     content: string;

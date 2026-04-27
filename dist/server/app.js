@@ -1,11 +1,63 @@
 import express, { Router } from 'express';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, relative as pathRelative, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getFileLines, getBranchCommits, gitRun } from './git-ops.js';
+import { getFileLines, getBranchCommits, getBranchDiff, gitRun, getRepoMeta } from './git-ops.js';
+import { sha256Hex } from './diff-hash.js';
 import { slugify } from './slugify.js';
 import { notifyChannel } from './mcp.js';
-import { findSymbol, sortResults } from './symbol-lookup.js';
+import { findSymbol, sortResults, extractPythonBody, extractTypeScriptBody, extractPythonDocstring, extractJsDocstring, detectKind, } from './symbol-lookup.js';
+import { extensionToLanguage, getLanguageConfig } from './lsp/index.js';
+import { fromFileUri } from './lsp/uri.js';
+import { detectLanguagesInRepo, getInstaller, isInstallerAvailable, runInstaller, } from './lsp/bootstrap.js';
+/**
+ * LSP hover content comes back as markdown. For TS / Rust / Python, common shapes are:
+ *   1. Single fenced block (typescript-language-server): ```ts\nsig\n```
+ *   2. Fenced block + docs:                              ```ts\nsig\n```\n\ndocs...
+ *   3. Fenced block + --- + docs (ty / some TS setups)
+ *   4. Multiple fenced blocks (rust-analyzer)
+ *   5. Plain text
+ *
+ * The goal here is to return a clean `signature` (no fences) and optional `docs`,
+ * without relying on a fragile single-shot regex.
+ */
+function parseHover(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed)
+        return {};
+    const signatureLines = [];
+    const docsLines = [];
+    let stage = 'before-fence';
+    for (const line of trimmed.split('\n')) {
+        if (stage === 'before-fence') {
+            if (line.startsWith('```')) {
+                stage = 'in-fence';
+            }
+            else {
+                signatureLines.push(line);
+            }
+        }
+        else if (stage === 'in-fence') {
+            if (line.startsWith('```')) {
+                stage = 'after-fence';
+            }
+            else {
+                signatureLines.push(line);
+            }
+        }
+        else {
+            if (line.startsWith('```'))
+                continue; // drop further fences
+            if (/^-{3,}\s*$/.test(line))
+                continue; // drop --- separators
+            docsLines.push(line);
+        }
+    }
+    const signature = signatureLines.join('\n').trim() || undefined;
+    const docs = docsLines.join('\n').trim() || undefined;
+    return { signature, docs };
+}
 export function createApp(manager) {
     const app = express();
     app.use(express.json());
@@ -20,8 +72,32 @@ export function createApp(manager) {
         console.log(`PROJECT_REGISTERED=${result.slug} path=${repoPath}`);
         res.json({ ok: true, ...result });
     });
-    app.get('/projects', (_req, res) => {
-        res.json({ projects: manager.list() });
+    app.get('/projects', async (_req, res) => {
+        const projects = await Promise.all(manager.list().map(async (p) => {
+            const session = manager.get(p.slug);
+            let branch = null;
+            let baseBranch = session.baseBranch;
+            let pr = null;
+            let repoName = basename(p.repoPath);
+            try {
+                const meta = await session.getCachedMeta();
+                branch = meta.branch;
+                baseBranch = meta.baseBranch;
+                repoName = meta.repoName;
+                if (meta.pr)
+                    pr = { number: meta.pr.number, url: meta.pr.url };
+            }
+            catch {
+                // repo missing or git failed — branch stays null
+            }
+            const topLevel = session
+                .listComments()
+                .filter((c) => c.parentId == null && c.status !== 'dismissed');
+            const claudeCommentCount = topLevel.filter((c) => c.author === 'claude').length;
+            const userCommentCount = topLevel.filter((c) => c.author === 'user').length;
+            return { ...p, repoName, branch, baseBranch, pr, claudeCommentCount, userCommentCount };
+        }));
+        res.json({ projects });
     });
     app.delete('/projects/:slug', (req, res) => {
         const removed = manager.deregister(req.params.slug);
@@ -116,6 +192,17 @@ export function createApp(manager) {
     projectRouter.get('/analysis', (_req, res) => {
         res.json({ analysis: res.locals.session.analysis });
     });
+    projectRouter.get('/walkthrough', (_req, res) => {
+        const session = res.locals.session;
+        const wt = session.walkthrough;
+        if (!wt) {
+            res.json({ walkthrough: null, stale: false });
+            return;
+        }
+        const currentDiff = getBranchDiff(session.repoPath, session.baseBranch);
+        const currentHash = sha256Hex(currentDiff);
+        res.json({ walkthrough: wt, stale: currentHash !== wt.diffHash });
+    });
     projectRouter.get('/symbol', (req, res) => {
         const session = res.locals.session;
         const name = req.query.name ?? '';
@@ -127,12 +214,279 @@ export function createApp(manager) {
         const sorted = sortResults(results, new Set());
         res.json({ symbol: name, results: sorted });
     });
+    projectRouter.get('/definition', async (req, res) => {
+        const session = res.locals.session;
+        const file = req.query.file ?? '';
+        const line = parseInt(req.query.line ?? '-1', 10);
+        const character = parseInt(req.query.character ?? '-1', 10);
+        if (!file || line < 0 || character < 0) {
+            res.status(400).json({ error: 'file, line, character required' });
+            return;
+        }
+        const language = extensionToLanguage(file);
+        const absPath = pathResolve(session.repoPath, file);
+        const fallback = () => {
+            let name = '';
+            try {
+                const content = readFileSync(absPath, 'utf8');
+                const lines = content.split('\n');
+                const l = lines[line] ?? '';
+                let s = character;
+                let e = character;
+                while (s > 0 && /[\w]/.test(l[s - 1]))
+                    s--;
+                while (e < l.length && /[\w]/.test(l[e]))
+                    e++;
+                name = l.slice(s, e);
+            }
+            catch { /* ignore */ }
+            if (!name)
+                return { symbol: '', results: [] };
+            const results = findSymbol(session.repoPath, name);
+            return { symbol: name, results: sortResults(results, new Set([file])) };
+        };
+        if (!language) {
+            res.json({ status: 'fallback', result: fallback() });
+            return;
+        }
+        const client = await session.lsp.get(language);
+        if (!client) {
+            res.json({ status: 'missing', result: fallback() });
+            return;
+        }
+        const cfg = getLanguageConfig(language);
+        if (cfg.requiresOpen)
+            await client.openFile(absPath);
+        try {
+            const locs = await client.definition(absPath, { line, character });
+            if (locs.length === 0) {
+                res.json({ status: 'ok', result: { symbol: '', results: [] } });
+                return;
+            }
+            const results = [];
+            for (const loc of locs) {
+                const targetPath = fromFileUri(loc.uri);
+                let content;
+                try {
+                    content = readFileSync(targetPath, 'utf8');
+                }
+                catch {
+                    continue;
+                }
+                const lines = content.split('\n');
+                const startLine = loc.range.start.line;
+                const lineText = lines[startLine] ?? '';
+                const kind = detectKind(lineText);
+                const body = targetPath.endsWith('.py')
+                    ? extractPythonBody(lines, startLine)
+                    : extractTypeScriptBody(lines, startLine);
+                const docstring = targetPath.endsWith('.py')
+                    ? extractPythonDocstring(lines, startLine)
+                    : extractJsDocstring(lines, startLine);
+                const relative = pathRelative(session.repoPath, targetPath) || targetPath;
+                results.push({ file: relative, line: startLine + 1, kind, body, docstring });
+            }
+            res.json({ status: 'ok', result: { symbol: '', results } });
+        }
+        catch (err) {
+            console.log(`LSP_DEFINITION_FAIL language=${language} error=${err.message}`);
+            res.json({ status: 'fallback', result: fallback() });
+        }
+    });
+    projectRouter.get('/hover', async (req, res) => {
+        const session = res.locals.session;
+        const file = req.query.file ?? '';
+        const line = parseInt(req.query.line ?? '-1', 10);
+        const character = parseInt(req.query.character ?? '-1', 10);
+        if (!file || line < 0 || character < 0) {
+            res.status(400).json({ error: 'file, line, character required' });
+            return;
+        }
+        const language = extensionToLanguage(file);
+        if (!language) {
+            res.json({ status: 'missing', result: {} });
+            return;
+        }
+        const client = await session.lsp.get(language);
+        if (!client) {
+            res.json({ status: 'missing', result: {} });
+            return;
+        }
+        const absPath = pathResolve(session.repoPath, file);
+        const cfg = getLanguageConfig(language);
+        if (cfg.requiresOpen)
+            await client.openFile(absPath);
+        try {
+            const raw = await client.hover(absPath, { line, character });
+            if (!raw) {
+                res.json({ status: 'ok', result: {} });
+                return;
+            }
+            res.json({ status: 'ok', result: parseHover(raw) });
+        }
+        catch (err) {
+            console.log(`LSP_HOVER_FAIL language=${language} error=${err.message}`);
+            res.json({ status: 'fallback', result: {} });
+        }
+    });
+    projectRouter.get('/references', async (req, res) => {
+        const session = res.locals.session;
+        const file = req.query.file ?? '';
+        const line = parseInt(req.query.line ?? '-1', 10);
+        const character = parseInt(req.query.character ?? '-1', 10);
+        if (!file || line < 0 || character < 0) {
+            res.status(400).json({ error: 'file, line, character required' });
+            return;
+        }
+        const language = extensionToLanguage(file);
+        if (!language) {
+            res.json({ status: 'missing', result: { references: [] } });
+            return;
+        }
+        const client = await session.lsp.get(language);
+        if (!client) {
+            res.json({ status: 'missing', result: { references: [] } });
+            return;
+        }
+        const absPath = pathResolve(session.repoPath, file);
+        const cfg = getLanguageConfig(language);
+        if (cfg.requiresOpen)
+            await client.openFile(absPath);
+        try {
+            const locs = await client.references(absPath, { line, character });
+            const references = locs.map((loc) => {
+                const target = fromFileUri(loc.uri);
+                let snippet = '';
+                try {
+                    const lines = readFileSync(target, 'utf8').split('\n');
+                    snippet = (lines[loc.range.start.line] ?? '').trim();
+                }
+                catch { /* ignore */ }
+                const rel = pathRelative(session.repoPath, target) || target;
+                return { file: rel, line: loc.range.start.line + 1, snippet };
+            });
+            res.json({ status: 'ok', result: { references } });
+        }
+        catch (err) {
+            console.log(`LSP_REFERENCES_FAIL language=${language} error=${err.message}`);
+            res.json({ status: 'fallback', result: { references: [] } });
+        }
+    });
+    projectRouter.get('/lsp/state', (_req, res) => {
+        const session = res.locals.session;
+        res.json({
+            python: session.lsp.status('python'),
+            typescript: session.lsp.status('typescript'),
+            rust: session.lsp.status('rust'),
+        });
+    });
+    projectRouter.post('/lsp/warm', (req, res) => {
+        const session = res.locals.session;
+        const requested = Array.isArray(req.body?.languages) ? req.body.languages : [];
+        const languages = requested.filter((l) => l === 'python' || l === 'typescript' || l === 'rust');
+        for (const lang of languages) {
+            session.lsp.get(lang).catch(() => {
+                // get() already records 'missing' state; nothing to do here
+            });
+        }
+        res.json({
+            warmed: languages,
+            state: {
+                python: session.lsp.status('python'),
+                typescript: session.lsp.status('typescript'),
+                rust: session.lsp.status('rust'),
+            },
+        });
+    });
+    projectRouter.get('/lsp/bootstrap', async (_req, res) => {
+        const session = res.locals.session;
+        const present = detectLanguagesInRepo(session.repoPath);
+        const langs = ['python', 'typescript', 'rust'];
+        const plan = await Promise.all(langs.map(async (language) => {
+            const inst = getInstaller(language);
+            return {
+                language,
+                presentInRepo: present.has(language),
+                status: session.lsp.status(language),
+                installer: inst.installer,
+                installCommand: inst.displayCommand,
+                installerAvailable: await isInstallerAvailable(inst.installer),
+            };
+        }));
+        res.json({ plan });
+    });
+    projectRouter.post('/lsp/bootstrap', async (req, res) => {
+        const session = res.locals.session;
+        const requested = Array.isArray(req.body?.languages) ? req.body.languages : [];
+        const languages = requested.filter((l) => l === 'python' || l === 'typescript' || l === 'rust');
+        if (languages.length === 0) {
+            res.status(400).json({ error: 'languages must be a non-empty list of python|typescript|rust' });
+            return;
+        }
+        const results = [];
+        for (const language of languages) {
+            console.log(`LSP_BOOTSTRAP_INSTALL language=${language}`);
+            const result = await runInstaller(language);
+            console.log(`LSP_BOOTSTRAP_DONE language=${language} ok=${result.ok} exit=${result.exitCode}`);
+            if (result.ok) {
+                // A successful install means a previously cached 'missing' verdict is stale.
+                session.lsp.resetKnown(language);
+                // Kick off startup so the badge transitions out of 'missing' on its own.
+                session.lsp.get(language).catch(() => { });
+            }
+            results.push(result);
+        }
+        res.json({ results });
+    });
+    projectRouter.get('/lsp/debug', async (_req, res) => {
+        const session = res.locals.session;
+        const result = {};
+        for (const lang of ['python', 'typescript', 'rust']) {
+            const client = await session.lsp.get(lang).catch(() => null);
+            if (!client) {
+                result[lang] = { state: 'missing' };
+            }
+            else {
+                result[lang] = {
+                    state: client.state ?? 'unknown',
+                    stderr: client.stderrRing ?? [],
+                    openFiles: client.openFiles?.() ?? [],
+                };
+            }
+        }
+        res.json(result);
+    });
+    projectRouter.delete('/lsp/request', async (req, res) => {
+        const session = res.locals.session;
+        const method = req.query.method;
+        const file = req.query.file ?? '';
+        const line = parseInt(req.query.line ?? '-1', 10);
+        const character = parseInt(req.query.character ?? '-1', 10);
+        if (!['definition', 'hover', 'references'].includes(method) || !file || line < 0 || character < 0) {
+            res.status(400).json({ error: 'method, file, line, character required' });
+            return;
+        }
+        const language = extensionToLanguage(file);
+        if (!language) {
+            res.json({ ok: true });
+            return;
+        }
+        const client = await session.lsp.get(language);
+        if (!client) {
+            res.json({ ok: true });
+            return;
+        }
+        const absPath = pathResolve(session.repoPath, file);
+        client
+            .cancel(method, absPath, { line, character });
+        res.json({ ok: true });
+    });
     // --- User state routes ---
     projectRouter.get('/user-state', (_req, res) => {
         const session = res.locals.session;
         res.json({
             reviewedFiles: session.userReviewedFiles,
-            sidebarView: session.userSidebarView,
+            ...session.userSidebarPrefs,
         });
     });
     projectRouter.put('/user-state/reviewed', (req, res) => {
@@ -145,14 +499,45 @@ export function createApp(manager) {
         const reviewed = session.toggleUserReviewedFile(path);
         res.json({ ok: true, reviewed });
     });
-    projectRouter.put('/user-state/sidebar-view', (req, res) => {
+    projectRouter.put('/user-state/sidebar-prefs', (req, res) => {
         const session = res.locals.session;
-        const { view } = req.body;
-        if (!view || !['flat', 'grouped', 'phased'].includes(view)) {
-            res.status(400).json({ error: 'view must be flat, grouped, or phased' });
-            return;
+        const prefs = {};
+        const { sortMode, groupMode, groupModeUserTouched, collapsedFolders } = req.body ?? {};
+        if (sortMode !== undefined) {
+            if (sortMode !== 'path' && sortMode !== 'priority') {
+                res.status(400).json({ error: 'sortMode must be path or priority' });
+                return;
+            }
+            prefs.sortMode = sortMode;
         }
-        session.setUserSidebarView(view);
+        if (groupMode !== undefined) {
+            if (groupMode !== 'none' && groupMode !== 'phase') {
+                res.status(400).json({ error: 'groupMode must be none or phase' });
+                return;
+            }
+            prefs.groupMode = groupMode;
+        }
+        if (groupModeUserTouched !== undefined) {
+            if (typeof groupModeUserTouched !== 'boolean') {
+                res.status(400).json({ error: 'groupModeUserTouched must be boolean' });
+                return;
+            }
+            prefs.groupModeUserTouched = groupModeUserTouched;
+        }
+        if (collapsedFolders !== undefined) {
+            if (typeof collapsedFolders !== 'object' || collapsedFolders === null || Array.isArray(collapsedFolders)) {
+                res.status(400).json({ error: 'collapsedFolders must be an object' });
+                return;
+            }
+            for (const [key, value] of Object.entries(collapsedFolders)) {
+                if (typeof value !== 'boolean') {
+                    res.status(400).json({ error: `collapsedFolders values must be boolean, got ${typeof value} for key "${key}"` });
+                    return;
+                }
+            }
+            prefs.collapsedFolders = collapsedFolders;
+        }
+        session.setUserSidebarPrefs(prefs);
         res.json({ ok: true });
     });
     projectRouter.post('/user-state/clear', (_req, res) => {
@@ -186,12 +571,12 @@ export function createApp(manager) {
     });
     projectRouter.post('/comments', (req, res) => {
         const session = res.locals.session;
-        const { author, text, item, file, line, block, parentId, mode } = req.body;
+        const { author, text, item, file, line, side, block, parentId, mode } = req.body;
         if (!author || !text || !item) {
             res.status(400).json({ error: 'author, text, and item are required' });
             return;
         }
-        const comment = session.addComment({ author, text, item, file, line, block, parentId, mode });
+        const comment = session.addComment({ author, text, item, file, line, side, block, parentId, mode });
         session.broadcast('comments_changed', { item, comment });
         // Push direct questions to Claude via channel notification
         if (mode === 'direct' && !parentId) {
@@ -252,6 +637,67 @@ export function createApp(manager) {
             meta.item = item;
         notifyChannel(commentsText, meta);
         res.json({ ok: true, round: currentRound });
+    });
+    projectRouter.post('/submit-github', (req, res) => {
+        const session = res.locals.session;
+        const meta = getRepoMeta(session.repoPath, session.baseBranch);
+        if (!meta.pr) {
+            res.status(400).json({ error: 'No PR detected for this project' });
+            return;
+        }
+        const { event = 'COMMENT', body = '' } = req.body;
+        if (!['COMMENT', 'APPROVE', 'REQUEST_CHANGES'].includes(event)) {
+            res.status(400).json({ error: 'event must be COMMENT, APPROVE, or REQUEST_CHANGES' });
+            return;
+        }
+        // Collect active diff review comments (top-level only)
+        const topComments = session.listComments({
+            item: 'diff',
+            author: 'user',
+            mode: 'review',
+            status: 'active',
+        }).filter(c => !c.parentId && c.file && c.line != null);
+        // Flatten reply threads into parent comment body
+        const allComments = session.listComments({ item: 'diff' });
+        const ghComments = topComments.map(c => {
+            const replies = allComments
+                .filter(r => r.parentId === c.id)
+                .map(r => r.text);
+            const fullText = replies.length > 0
+                ? c.text + '\n\n' + replies.join('\n\n')
+                : c.text;
+            return {
+                path: c.file,
+                line: c.line,
+                side: c.side ?? 'RIGHT',
+                body: fullText,
+            };
+        });
+        const payload = JSON.stringify({
+            event,
+            body: body || 'Review submitted via LGTM',
+            comments: ghComments,
+        });
+        try {
+            const result = execFileSync('gh', [
+                'api',
+                `repos/${meta.pr.owner}/${meta.pr.repo}/pulls/${meta.pr.number}/reviews`,
+                '--method', 'POST',
+                '--input', '-',
+            ], {
+                cwd: session.repoPath,
+                encoding: 'utf-8',
+                input: payload,
+                timeout: 15000,
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            const review = JSON.parse(result);
+            res.json({ ok: true, reviewUrl: review.html_url });
+        }
+        catch (e) {
+            const msg = e.stderr?.trim() || e.message || 'GitHub API call failed';
+            res.status(502).json({ error: msg });
+        }
     });
     projectRouter.post('/analysis', (req, res) => {
         const session = res.locals.session;

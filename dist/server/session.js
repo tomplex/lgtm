@@ -1,10 +1,11 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { getBranchDiff, getSelectedCommitsDiff, getRepoMeta, } from './git-ops.js';
+import { getBranchDiff, getSelectedCommitsDiff, getRepoMeta, getRepoMetaAsync, } from './git-ops.js';
 import { storePut } from './store.js';
 import { CommentStore } from './comment-store.js';
 import { migrateBlob } from './comment-migration.js';
+import { LspManager } from './lsp/index.js';
 // --- Session ---
 export class Session {
     repoPath;
@@ -19,14 +20,27 @@ export class Session {
     _commentStore = new CommentStore();
     _sseClients = [];
     _analysis = null;
+    _walkthrough = null;
     _reviewedFiles = new Set();
-    _sidebarView = 'flat';
+    _sortMode = 'path';
+    _groupMode = 'none';
+    _groupModeUserTouched = false;
+    _collapsedFolders = {};
+    _metaCache = null;
+    _lsp;
     constructor(opts) {
         this.repoPath = opts.repoPath;
         this.baseBranch = opts.baseBranch;
         this.description = opts.description ?? '';
         this.outputPath = opts.outputPath ?? '';
         this._slug = opts.slug ?? '';
+        this._lsp = new LspManager({ projectPath: this.repoPath });
+    }
+    get lsp() {
+        return this._lsp;
+    }
+    async destroy() {
+        await this._lsp.shutdown();
     }
     // --- Persistence ---
     toBlob() {
@@ -38,9 +52,13 @@ export class Session {
             items: this._items,
             comments: this._commentStore.toJSON(),
             analysis: this._analysis,
+            walkthrough: this._walkthrough,
             rounds: this._rounds,
             reviewedFiles: Array.from(this._reviewedFiles),
-            sidebarView: this._sidebarView,
+            sortMode: this._sortMode,
+            groupMode: this._groupMode,
+            groupModeUserTouched: this._groupModeUserTouched,
+            collapsedFolders: this._collapsedFolders,
         };
     }
     persist() {
@@ -60,6 +78,7 @@ export class Session {
         session._items = migrated.items;
         session._commentStore = CommentStore.fromJSON(migrated.comments);
         session._analysis = migrated.analysis;
+        session._walkthrough = migrated.walkthrough ?? null;
         // Migrate old single round to per-item rounds
         if (migrated.rounds && typeof migrated.rounds === 'object' && !Array.isArray(migrated.rounds)) {
             session._rounds = migrated.rounds;
@@ -68,15 +87,31 @@ export class Session {
             session._rounds = { diff: migrated.round };
         }
         session._reviewedFiles = new Set(migrated.reviewedFiles);
-        session._sidebarView = migrated.sidebarView ?? 'flat';
+        session._sortMode = migrated.sortMode ?? 'path';
+        session._groupMode = migrated.groupMode ?? 'none';
+        session._groupModeUserTouched = migrated.groupModeUserTouched ?? false;
+        session._collapsedFolders = migrated.collapsedFolders ?? {};
+        // Legacy `sidebarView` field is read and discarded; persisted blobs will no longer include it.
         return session;
     }
     // --- Queries ---
     get items() {
         return this._items;
     }
+    async getCachedMeta(ttlMs = 30_000) {
+        const now = Date.now();
+        if (this._metaCache && now - this._metaCache.at < ttlMs) {
+            return this._metaCache.meta;
+        }
+        const meta = await getRepoMetaAsync(this.repoPath, this.baseBranch);
+        this._metaCache = { meta, at: now };
+        return meta;
+    }
     get analysis() {
         return this._analysis;
+    }
+    get walkthrough() {
+        return this._walkthrough;
     }
     getItemData(itemId, commits) {
         const comments = this._commentStore.list({ item: itemId });
@@ -118,6 +153,14 @@ export class Session {
     // --- Mutations ---
     setAnalysis(analysis) {
         this._analysis = analysis;
+        this.persist();
+    }
+    setWalkthrough(walkthrough) {
+        this._walkthrough = walkthrough;
+        this.persist();
+    }
+    clearWalkthrough() {
+        this._walkthrough = null;
         this.persist();
     }
     addItem(itemId, title, filepath) {
@@ -209,8 +252,13 @@ export class Session {
     get userReviewedFiles() {
         return Array.from(this._reviewedFiles);
     }
-    get userSidebarView() {
-        return this._sidebarView;
+    get userSidebarPrefs() {
+        return {
+            sortMode: this._sortMode,
+            groupMode: this._groupMode,
+            groupModeUserTouched: this._groupModeUserTouched,
+            collapsedFolders: { ...this._collapsedFolders },
+        };
     }
     setUserReviewedFiles(files) {
         this._reviewedFiles = new Set(files);
@@ -225,8 +273,15 @@ export class Session {
         this.persist();
         return nowReviewed;
     }
-    setUserSidebarView(view) {
-        this._sidebarView = view;
+    setUserSidebarPrefs(prefs) {
+        if (prefs.sortMode !== undefined)
+            this._sortMode = prefs.sortMode;
+        if (prefs.groupMode !== undefined)
+            this._groupMode = prefs.groupMode;
+        if (prefs.groupModeUserTouched !== undefined)
+            this._groupModeUserTouched = prefs.groupModeUserTouched;
+        if (prefs.collapsedFolders !== undefined)
+            this._collapsedFolders = prefs.collapsedFolders;
         this.persist();
     }
     // --- SSE ---

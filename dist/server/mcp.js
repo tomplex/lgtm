@@ -4,38 +4,30 @@ import { z } from 'zod';
 import { readFileSync } from 'node:fs';
 import { slugify } from './slugify.js';
 import { parseFileAnalysis, parseSynthesis } from './parse-analysis.js';
-function requireProject(manager, repoPath, mcpServer) {
-    const found = manager.findByRepoPath(repoPath);
+import { parseWalkthrough } from './parse-walkthrough.js';
+import { sha256Hex } from './diff-hash.js';
+import { getBranchDiff } from './git-ops.js';
+function resolveProject(manager, repoPath, mcpServer) {
+    let found = manager.findByRepoPath(repoPath);
     if (!found) {
-        return { error: { content: [{ type: 'text', text: JSON.stringify({ error: 'Project not registered. Call start first.' }) }] } };
+        const { slug } = manager.register(repoPath);
+        const session = manager.get(slug);
+        found = { slug, session };
     }
-    if (mcpServer)
+    if (mcpServer) {
         associateMcpSession(mcpServer, found.slug);
+        autoClaimDiffReviewsIfUnheld(mcpServer, found.slug);
+    }
     return { found };
 }
 function createMcpServer(manager) {
     const server = new McpServer({ name: 'lgtm', version: '0.1.0' }, { capabilities: { experimental: { 'claude/channel': {} } } });
-    server.tool('start', 'Start a review session for a git repository. Opens a browser-based UI where the user can review diffs and documents with inline commenting. Returns the URL. Must be called before any other LGTM tools for that repo.', {
-        repoPath: z.string().describe('Absolute path to the git repository'),
-        description: z.string().optional().describe('Review context shown as a banner'),
-        baseBranch: z.string().optional().describe('Base branch (auto-detected if omitted)'),
-    }, async ({ repoPath, description, baseBranch }) => {
-        const result = manager.register(repoPath, { description, baseBranch });
-        associateMcpSession(server, result.slug);
-        claimDiffReviews(server, result.slug);
-        return {
-            content: [{ type: 'text', text: JSON.stringify(result) }],
-        };
-    });
-    server.tool('add_document', 'Add a document (spec, design doc, markdown file) as a reviewable tab alongside the diff. The user can comment on it in the review UI. Requires an active session.', {
+    server.tool('add_document', 'Add a document (spec, design doc, markdown file) as a reviewable tab alongside the diff. The user can comment on it in the review UI. Auto-registers the project if needed.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
         path: z.string().describe('Absolute path to the document file'),
         title: z.string().optional().describe('Tab title (defaults to filename)'),
     }, async ({ repoPath, path, title }) => {
-        const lookup = requireProject(manager, repoPath, server);
-        if ('error' in lookup)
-            return lookup.error;
-        const { found } = lookup;
+        const { found } = resolveProject(manager, repoPath, server);
         const itemTitle = title || path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Untitled';
         const itemId = slugify(itemTitle);
         const result = found.session.addItem(itemId, itemTitle, path);
@@ -53,10 +45,7 @@ function createMcpServer(manager) {
             comment: z.string().describe('The comment text'),
         })).describe('Array of comments to add'),
     }, async ({ repoPath, item, comments }) => {
-        const lookup = requireProject(manager, repoPath, server);
-        if ('error' in lookup)
-            return lookup.error;
-        const { found } = lookup;
+        const { found } = resolveProject(manager, repoPath, server);
         const itemId = item ?? 'diff';
         const count = found.session.addComments(itemId, comments);
         found.session.broadcast('comments_changed', { item: itemId, count: comments.length });
@@ -65,10 +54,7 @@ function createMcpServer(manager) {
     server.tool('read_feedback', 'Read the review feedback the user submitted via the review UI. Returns markdown-formatted comments with file paths, line numbers, and the user\'s notes. Call this after the user says they submitted a review.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
     }, async ({ repoPath }) => {
-        const lookup = requireProject(manager, repoPath, server);
-        if ('error' in lookup)
-            return lookup.error;
-        const { found } = lookup;
+        const { found } = resolveProject(manager, repoPath, server);
         let feedback = '';
         try {
             feedback = readFileSync(found.session.outputPath, 'utf-8');
@@ -81,32 +67,29 @@ function createMcpServer(manager) {
     server.tool('stop', 'Stop a review session and close it. The review UI will no longer be accessible for this repo.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
     }, async ({ repoPath }) => {
-        const lookup = requireProject(manager, repoPath, server);
-        if ('error' in lookup)
-            return lookup.error;
-        const { found } = lookup;
+        const found = manager.findByRepoPath(repoPath);
+        if (!found) {
+            return { content: [{ type: 'text', text: JSON.stringify({ error: 'No active review session for this repo path.' }) }] };
+        }
         manager.deregister(found.slug);
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, slug: found.slug }) }] };
     });
-    server.tool('claim_reviews', 'Claim code review notifications for a project. When the reviewer submits feedback on the diff, only the Claude session that claimed reviews will receive the channel notification. Calling this transfers the claim from any previous holder.', {
+    server.tool('claim_reviews', 'Claim code review notifications for a project. Auto-registers the project if needed. When the reviewer submits feedback on the diff, only the Claude session that called claim_reviews most recently will receive the notification. Optionally sets a description banner and base branch override. Returns the review URL.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
-    }, async ({ repoPath }) => {
-        const lookup = requireProject(manager, repoPath, server);
-        if ('error' in lookup)
-            return lookup.error;
-        const { found } = lookup;
-        claimDiffReviews(server, found.slug);
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, slug: found.slug }) }] };
+        description: z.string().optional().describe('Review context shown as a banner in the UI'),
+        baseBranch: z.string().optional().describe('Base branch (auto-detected if omitted)'),
+    }, async ({ repoPath, description, baseBranch }) => {
+        const result = manager.register(repoPath, { description, baseBranch });
+        associateMcpSession(server, result.slug);
+        claimDiffReviews(server, result.slug);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     });
     server.tool('reply', 'Reply to a user comment in the review UI. Use this to answer direct questions from the reviewer. The reply appears inline beneath the original comment.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
         commentId: z.string().describe('The ID of the comment to reply to'),
         text: z.string().describe('The reply text'),
     }, async ({ repoPath, commentId, text }) => {
-        const lookup = requireProject(manager, repoPath, server);
-        if ('error' in lookup)
-            return lookup.error;
-        const { found } = lookup;
+        const { found } = resolveProject(manager, repoPath, server);
         const parent = found.session.getComment(commentId);
         if (!parent) {
             return { content: [{ type: 'text', text: JSON.stringify({ error: `Comment not found: ${commentId}` }) }] };
@@ -129,10 +112,7 @@ function createMcpServer(manager) {
         synthesisPath: z.string().describe('Absolute path to the synthesis agent markdown output'),
         reviewGuidePath: z.string().optional().describe('Absolute path to a markdown review guide (overview, strategy, opinion) to add as a reviewable document'),
     }, async ({ repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath }) => {
-        const lookup = requireProject(manager, repoPath, server);
-        if ('error' in lookup)
-            return lookup.error;
-        const { found } = lookup;
+        const { found } = resolveProject(manager, repoPath, server);
         try {
             const files = parseFileAnalysis(readFileSync(fileAnalysisPath, 'utf-8'));
             const synthesis = parseSynthesis(readFileSync(synthesisPath, 'utf-8'));
@@ -165,6 +145,35 @@ function createMcpServer(manager) {
             };
         }
     });
+    server.tool('set_walkthrough', 'Set the narrated walkthrough for a review session. Accepts a markdown file authored by the walkthrough-author agent. The review UI renders this as an ordered walkthrough of logical changes, separate from the diff view. Called by the walkthrough skill after the agent writes its output.', {
+        repoPath: z.string().describe('Absolute path to the git repository'),
+        walkthroughPath: z.string().describe('Absolute path to the walkthrough markdown output'),
+    }, async ({ repoPath, walkthroughPath }) => {
+        const { found } = resolveProject(manager, repoPath, server);
+        try {
+            const md = readFileSync(walkthroughPath, 'utf-8');
+            const parsed = parseWalkthrough(md);
+            const diff = getBranchDiff(found.session.repoPath, found.session.baseBranch);
+            parsed.diffHash = sha256Hex(diff);
+            parsed.generatedAt = new Date().toISOString();
+            found.session.setWalkthrough(parsed);
+            found.session.broadcast('walkthrough_changed', { stopCount: parsed.stops.length });
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            ok: true,
+                            stopCount: parsed.stops.length,
+                            diffHash: parsed.diffHash,
+                        }) }],
+            };
+        }
+        catch (err) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            error: err instanceof Error ? err.message : String(err),
+                        }) }],
+            };
+        }
+    });
     return server;
 }
 const activeMcpSessions = new Map();
@@ -182,6 +191,21 @@ export function associateMcpItem(server, itemId) {
     for (const entry of activeMcpSessions.values()) {
         if (entry.server === server) {
             entry.itemIds.add(itemId);
+            return;
+        }
+    }
+}
+// Claim diff review notifications for this MCP session only if no session holds the claim yet.
+// Used by resolveProject so that the first tool caller against a slug gets review notifications
+// without silently stealing the claim from another session that already holds it.
+function autoClaimDiffReviewsIfUnheld(server, slug) {
+    for (const entry of activeMcpSessions.values()) {
+        if (entry.projectSlug === slug && entry.claimedDiff)
+            return; // someone holds it
+    }
+    for (const entry of activeMcpSessions.values()) {
+        if (entry.server === server) {
+            entry.claimedDiff = true;
             return;
         }
     }
@@ -221,6 +245,17 @@ export function notifyChannel(content, meta) {
             params: { content, meta },
         });
     }
+}
+/**
+ * Test-only probe: returns the mcp-session-id that currently holds the diff-
+ * review claim for the given slug, or null if no session holds it.
+ */
+export function _testing_getDiffClaimHolder(slug) {
+    for (const [sid, entry] of activeMcpSessions) {
+        if (entry.projectSlug === slug && entry.claimedDiff)
+            return sid;
+    }
+    return null;
 }
 export function mountMcp(app, manager) {
     app.post('/mcp', async (req, res) => {

@@ -1,6 +1,8 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { promisify } from 'node:util';
+const execFileAsync = promisify(execFile);
 export function gitRun(repoPath, ...args) {
     return execFileSync('git', args, {
         cwd: repoPath,
@@ -9,7 +11,28 @@ export function gitRun(repoPath, ...args) {
     }).trim();
 }
 export function detectBaseBranch(repoPath) {
-    for (const candidate of ['master', 'main']) {
+    // Try the PR's actual base branch first (handles stacked PRs correctly)
+    try {
+        const base = execFileSync('gh', ['pr', 'view', '--json', 'baseRefName', '-q', '.baseRefName'], {
+            cwd: repoPath,
+            encoding: 'utf-8',
+            timeout: 5000,
+            stdio: ['pipe', 'pipe', 'pipe'],
+        }).trim();
+        if (base) {
+            // Fetch the base branch so we have origin/<base> available
+            try {
+                gitRun(repoPath, 'fetch', 'origin', base);
+            }
+            catch { /* best effort */ }
+            return `origin/${base}`;
+        }
+    }
+    catch {
+        // gh not installed or no open PR — fall back
+    }
+    // Fall back to main/master if they exist locally
+    for (const candidate of ['main', 'master']) {
         try {
             gitRun(repoPath, 'rev-parse', '--verify', candidate);
             return candidate;
@@ -18,7 +41,8 @@ export function detectBaseBranch(repoPath) {
             continue;
         }
     }
-    return 'main';
+    // Last resort: use HEAD (e.g. detached head, no main/master)
+    return 'HEAD';
 }
 // Intentionally includes working-tree and staged changes alongside committed
 // branch changes, so the review UI reflects the live state of the checkout.
@@ -72,6 +96,12 @@ export function getBranchCommits(repoPath, baseBranch) {
     }
     return commits;
 }
+export function parseOwnerRepo(url) {
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (!match)
+        return undefined;
+    return { owner: match[1], repo: match[2] };
+}
 export function getRepoMeta(repoPath, baseBranch) {
     const branch = gitRun(repoPath, 'rev-parse', '--abbrev-ref', 'HEAD');
     const meta = {
@@ -88,7 +118,37 @@ export function getRepoMeta(repoPath, baseBranch) {
             timeout: 5000,
             stdio: ['pipe', 'pipe', 'pipe'],
         });
-        meta.pr = JSON.parse(result);
+        const pr = JSON.parse(result);
+        const ownerRepo = parseOwnerRepo(pr.url);
+        if (ownerRepo) {
+            meta.pr = { ...pr, ...ownerRepo };
+        }
+    }
+    catch {
+        // gh not installed or no PR
+    }
+    return meta;
+}
+export async function getRepoMetaAsync(repoPath, baseBranch) {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: repoPath,
+    });
+    const meta = {
+        branch: stdout.trim(),
+        baseBranch,
+        repoPath,
+        repoName: basename(repoPath),
+    };
+    try {
+        const { stdout: ghOut } = await execFileAsync('gh', ['pr', 'view', '--json', 'url,number,title'], {
+            cwd: repoPath,
+            timeout: 5000,
+        });
+        const pr = JSON.parse(ghOut);
+        const ownerRepo = parseOwnerRepo(pr.url);
+        if (ownerRepo) {
+            meta.pr = { ...pr, ...ownerRepo };
+        }
     }
     catch {
         // gh not installed or no PR
