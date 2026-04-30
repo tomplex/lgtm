@@ -1,4 +1,4 @@
-import { createSignal, createResource, Show, For, onMount, onCleanup } from 'solid-js';
+import { createSignal, createResource, createEffect, Show, For, onMount, onCleanup } from 'solid-js';
 import { peekState, setPeekState, setLspStatus } from '../../state';
 import {
   fetchSymbol,
@@ -24,7 +24,18 @@ function languageFromFile(file: string): Language | null {
 export default function PeekPanel() {
   const [activeTab, setActiveTab] = createSignal(0);
   const [showAllRefs, setShowAllRefs] = createSignal(false);
+  const [hoverDocsOpen, setHoverDocsOpen] = createSignal(true);
+  const [refsOpen, setRefsOpen] = createSignal(false);
   let panelRef: HTMLDivElement | undefined;
+
+  // Reset section toggles whenever the peek target changes — a fresh peek
+  // shouldn't inherit "I expanded refs on the previous symbol".
+  createEffect(() => {
+    peekState();
+    setHoverDocsOpen(true);
+    setRefsOpen(false);
+    setShowAllRefs(false);
+  });
 
   // A LSP-resolvable peek has both `line` (0-based file line) and `character` (UTF-16 offset).
   const hasLspPos = (
@@ -226,7 +237,19 @@ export default function PeekPanel() {
               <div class="peek-hover">
                 <div class="peek-hover-signature">{hover()!.signature}</div>
                 <Show when={hover()?.docs}>
-                  <div class="peek-hover-docs" innerHTML={renderMd(hover()!.docs!)} />
+                  <button
+                    class="peek-section-toggle"
+                    onClick={() => setHoverDocsOpen(!hoverDocsOpen())}
+                    aria-expanded={hoverDocsOpen()}
+                  >
+                    <span class="peek-chevron" classList={{ open: hoverDocsOpen() }}>
+                      ▸
+                    </span>
+                    Docs
+                  </button>
+                  <Show when={hoverDocsOpen()}>
+                    <div class="peek-hover-docs" innerHTML={renderMd(hover()!.docs!)} />
+                  </Show>
                 </Show>
               </div>
             </Show>
@@ -245,22 +268,35 @@ export default function PeekPanel() {
             </Show>
 
             <Show when={(refs() ?? []).length > 0}>
-              <div class="peek-refs">
-                <div class="peek-refs-header">References · {(refs() ?? []).length}</div>
-                <For each={visibleRefs()}>
-                  {(ref) => (
-                    <div class="peek-ref">
-                      <span class="peek-ref-loc">
-                        {ref.file}:{ref.line}
-                      </span>
-                      <span class="peek-ref-snippet">{ref.snippet}</span>
-                    </div>
-                  )}
-                </For>
-                <Show when={(refs() ?? []).length > VISIBLE_REFS && !showAllRefs()}>
-                  <button class="peek-refs-more" onClick={() => setShowAllRefs(true)}>
-                    Show {(refs() ?? []).length - VISIBLE_REFS} more
-                  </button>
+              <div class="peek-refs" classList={{ collapsed: !refsOpen() }}>
+                <button
+                  class="peek-section-toggle peek-refs-toggle"
+                  onClick={() => setRefsOpen(!refsOpen())}
+                  aria-expanded={refsOpen()}
+                >
+                  <span class="peek-chevron" classList={{ open: refsOpen() }}>
+                    ▸
+                  </span>
+                  References · {(refs() ?? []).length}
+                </button>
+                <Show when={refsOpen()}>
+                  <div class="peek-refs-list">
+                    <For each={visibleRefs()}>
+                      {(ref) => (
+                        <div class="peek-ref">
+                          <span class="peek-ref-loc">
+                            {ref.file}:{ref.line}
+                          </span>
+                          <span class="peek-ref-snippet">{ref.snippet}</span>
+                        </div>
+                      )}
+                    </For>
+                    <Show when={(refs() ?? []).length > VISIBLE_REFS && !showAllRefs()}>
+                      <button class="peek-refs-more" onClick={() => setShowAllRefs(true)}>
+                        Show {(refs() ?? []).length - VISIBLE_REFS} more
+                      </button>
+                    </Show>
+                  </div>
                 </Show>
               </div>
             </Show>

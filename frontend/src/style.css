@@ -1642,7 +1642,8 @@ tr.expand-row:hover td {
   background: var(--bg-secondary);
   overflow: hidden;
   outline: none;
-  max-height: 400px;
+  /* Generous on tall windows but never tiny: 400px → up to 75vh. */
+  max-height: min(75vh, 720px);
   display: flex;
   flex-direction: column;
 }
@@ -1716,8 +1717,9 @@ tr.expand-row:hover td {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 12px;
   line-height: 20px;
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 160px;
+  /* Guarantee the definition body is visible even when hover/refs are large. */
+  min-height: 120px;
 }
 .peek-body code {
   background: none;
@@ -2411,6 +2413,9 @@ body.cmd-held .line-content .hljs-type {
   background: var(--bg-tertiary);
   color: var(--text);
   flex-shrink: 0;
+  /* Long docstrings shouldn't dominate the panel — scroll within this section. */
+  max-height: 200px;
+  overflow-y: auto;
 }
 .peek-hover-signature {
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -2471,13 +2476,48 @@ body.cmd-held .line-content .hljs-type {
   max-height: 200px;
   overflow: auto;
 }
-.peek-refs-header {
+.peek-refs.collapsed {
+  /* When collapsed, only the toggle is visible — drop the scroll cap. */
+  max-height: none;
+  overflow: visible;
+}
+.peek-refs-list {
+  margin-top: 8px;
+}
+
+/* Section disclosure toggle (used by hover docs and references). */
+.peek-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+.peek-section-toggle:hover {
+  color: var(--text);
+}
+.peek-refs-toggle {
+  margin-top: 0;
+}
+.peek-chevron {
+  display: inline-block;
+  font-size: 9px;
+  width: 10px;
+  text-align: center;
+  transition: transform 0.12s ease;
   color: var(--text-muted);
-  font-weight: 600;
-  font-size: 11px;
-  margin-bottom: 8px;
+}
+.peek-chevron.open {
+  transform: rotate(90deg);
 }
 .peek-ref {
   display: flex;
