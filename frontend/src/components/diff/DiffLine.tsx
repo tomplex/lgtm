@@ -56,6 +56,11 @@ export default function DiffLine(props: Props) {
         c.item === 'diff' &&
         c.file === props.filePath &&
         c.line === absLine() &&
+        // When a `+` and `-` share the same line number, both rows have absLine()==N.
+        // Match on side so the comment lands on the row the user clicked. Comments without
+        // a side (Claude/MCP, migrated, replies) default to RIGHT — same default the server
+        // applies when submitting to GitHub.
+        (c.side ?? 'RIGHT') === absSide() &&
         !c.parentId &&
         c.status !== 'dismissed',
     );
