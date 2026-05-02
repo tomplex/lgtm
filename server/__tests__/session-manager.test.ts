@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createGitFixture, type GitFixture } from './helpers/git-fixture.js';
@@ -47,7 +47,7 @@ describe('SessionManager', () => {
     const { slug } = manager.register(fixture.repoPath);
     const session = manager.get(slug);
     expect(session).toBeDefined();
-    expect(session?.repoPath).toBe(fixture.repoPath);
+    expect(session?.repoPath).toBe(realpathSync(fixture.repoPath));
     manager.deregister(slug);
   });
 
@@ -56,7 +56,7 @@ describe('SessionManager', () => {
     manager.register(fixture.repoPath);
     const result = manager.findByRepoPath(fixture.repoPath);
     expect(result).toBeDefined();
-    expect(result?.session.repoPath).toBe(fixture.repoPath);
+    expect(result?.session.repoPath).toBe(realpathSync(fixture.repoPath));
     if (result) manager.deregister(result.slug);
   });
 
@@ -120,7 +120,7 @@ describe('SessionManager', () => {
     const manager2 = new SessionManager(9999);
     const session = manager2.get(slug);
     expect(session).toBeDefined();
-    expect(session?.repoPath).toBe(fixture.repoPath);
+    expect(session?.repoPath).toBe(realpathSync(fixture.repoPath));
 
     // Clean up both managers' watchers
     manager1.deregister(slug);
