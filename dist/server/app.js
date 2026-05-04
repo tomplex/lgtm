@@ -730,8 +730,14 @@ export function createApp(manager) {
         res.status(500).json({ error: err.message });
     });
     // --- Static files ---
-    const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend', 'dist');
-    if (existsSync(distDir)) {
+    // Resolve frontend/dist relative to this module. The two candidates handle
+    // both run modes: compiled (this file is at <repo>/dist/server/app.js) and
+    // dev via tsx (this file is at <repo>/server/app.ts).
+    const here = dirname(fileURLToPath(import.meta.url));
+    const distDir = ['../..', '..']
+        .map((rel) => join(here, rel, 'frontend', 'dist'))
+        .find((candidate) => existsSync(candidate));
+    if (distDir) {
         app.use(express.static(distDir));
         // SPA fallback for project URLs
         app.get('/project/{*path}', (_req, res) => {
