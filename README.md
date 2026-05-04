@@ -36,8 +36,9 @@ Without this flag, everything still works - Claude just needs to call `read_feed
 
 - [Node.js](https://nodejs.org/) 20+
 - Claude Code CLI
+- [ripgrep](https://github.com/BurntSushi/ripgrep) on `PATH` — required for symbol lookup. Install with `brew install ripgrep` (macOS), `apt install ripgrep` (Debian/Ubuntu), or `apk add ripgrep` (Alpine). The server logs a prominent warning at startup if `rg` is missing, and symbol-lookup requests throw a clear error rather than returning empty results.
 
-Dependencies are installed automatically on first session start. No manual build step needed.
+Node dependencies are installed automatically on first session start. No manual build step needed.
 
 ## How it works
 
