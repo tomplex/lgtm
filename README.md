@@ -2,7 +2,7 @@
 
 A browser-based code review UI for collaborating with Claude Code. Claude registers a project, seeds inline comments on the diff, adds documents for review, and runs analysis to prioritize files. You review everything in the browser and submit feedback that Claude reads and acts on.
 
-![LGTM screenshot](images/Screenshot%202026-04-01%20at%203.53.15%20PM.png)
+![LGTM — sidebar in phased view, diff with an inline comment, and the analysis layer surfacing review priority](images/hero.png)
 
 ## Install as a Claude Code plugin
 
@@ -28,9 +28,11 @@ Without this flag, everything still works - Claude just needs to call `read_feed
 
 - **`/lgtm` command** - registers the current project and opens the review UI
 - **`/lgtm analyze` skill** - dispatches agents to classify files by priority and generate a review strategy
-- **MCP tools** - Claude can start reviews, post comments, add documents, read your feedback
+- **`/lgtm walkthrough` skill** - generates a narrated tour of the diff as ordered "stops" you step through in the UI
+- **`/lgtm prepare` skill** - chains analyze + walkthrough so a review session opens fully primed
+- **MCP tools** - Claude can claim reviews, post comments, add documents, set analysis and walkthroughs, read your feedback
 - **SessionStart hook** - auto-starts the LGTM server on port 9900 if it isn't already running
-- **Sub-agents** - file-classifier and synthesizer agents for AI-powered analysis
+- **Sub-agents** - file-classifier, synthesizer, and walkthrough-author agents power the analysis and walkthrough pipelines
 
 ### Requirements
 
@@ -51,76 +53,78 @@ The review loop is iterative. Claude addresses feedback, you refresh the diff, p
 
 Claude can also run an analysis pass that classifies every file in the diff by priority (critical / important / normal / low) and review phase (review / skim / rubber-stamp), then groups files thematically with a suggested review strategy. The sidebar switches between flat, grouped and phased views based on this analysis.
 
+![Sidebar in phased view: Review Carefully / Skim / Rubber Stamp groups with per-file priority chips and tree-view directory hierarchy](images/analysis-sidebar.png)
+
+### Walkthrough
+
+For larger or more architectural changes, Claude can generate a *narrated walkthrough* — an ordered sequence of "stops" through the diff, each with a title, narrative, and references to the specific lines and files it covers. You step through it in the UI like a guided tour. Stops are tracked as visited, the sidebar shows stop-coverage badges per file, and you can still leave comments and use peek-definition while inside walkthrough mode.
+
+Press `W` from the diff to enter walkthrough mode. `Enter` and `Shift+Enter` step forward and back; `g` followed by a digit jumps directly to a stop; `d` exits back to the diff.
+
+![Walkthrough mode: ordered stops on the left, active stop with narrative + multi-file artifacts on the right](images/walkthrough.png)
+
+## Features
+
+### Diff review
+
+Syntax-highlighted unified diffs with word-level change detection — added and removed words light up inside changed lines, so you see *what* changed, not just *that* something changed. Click any line number to comment. Expand context above or below any hunk. Toggle whole-file view (`w`) to see the change in surrounding context.
+
+For multi-commit branches, open the commit picker (`c`) and select any subset of commits to scope the diff. Useful when a branch has setup commits you want to skim and a single commit with the real change you want to focus on.
+
+### Peek definition, hover docs, and references
+
+Cmd+click any identifier in the diff to peek at its definition without leaving the review. For Python, TypeScript / JavaScript, and Rust, peek is backed by real language servers (`pyright`, `typescript-language-server`, `rust-analyzer`) — so you get accurate definitions, hover documentation rendered as markdown, and a list of references in a collapsible section. The plugin offers to install missing language servers from the header on first use.
+
+For other languages (and for top-level Go decls), peek falls back to ripgrep heuristics — fast, no setup, works across the whole repo. Double-tap `Shift` to open symbol search and jump to any symbol by name.
+
+![Peek panel: LSP-resolved type alias, definition snippet, and a collapsible references section](images/peek-panel.png)
+
+### Document review
+
+Claude can attach markdown docs — design specs, planning notes, ADRs, anything textual — as separate review tabs alongside the diff. Markdown renders with proper formatting; you can leave block-level comments on any paragraph, code block, or heading. Useful when the design context lives outside the diff itself.
+
+![Document review tab with rendered markdown and a block-level Claude comment](images/document-review.png)
+
+### Inline comments and threads
+
+Threaded comments with replies. Claude's comments are visually distinct from yours, so you can tell at a glance who said what. Reply, resolve, or dismiss inline. Every comment, reply, and resolution is included in the structured review output Claude reads when you submit.
+
+Jump between comments with `n` / `p`. Save with `Cmd+Enter`, cancel with `Esc`.
+
+![Inline comment thread on a diff line: Claude's seeded comment with a user reply](images/comment-thread.png)
+
+### Analysis-driven prioritization
+
+For larger diffs, Claude can run an analysis pass that classifies every file by priority (critical / important / normal / low) and review phase (review / skim / rubber-stamp), groups files thematically, and writes a review strategy overview. The sidebar switches between flat, grouped, and phased views, so you can work through a 40-file branch in priority order rather than alphabetically.
+
+### Real-time updates
+
+Server-sent events push comment and item changes to the browser as they happen. When Claude posts a new comment, attaches a document, or updates analysis, the UI updates without a refresh. Same the other way: when you submit a review, Claude sees it immediately (with the development channels flag enabled).
+
+### Persistence
+
+Sessions live in a SQLite database at `~/.lgtm/data.db`. Comment history, file review state, analysis data, and document attachments survive server restarts and Claude session changes. Open the same project later and pick up where you left off.
+
+### Multi-project and command palette
+
+Multiple projects can be registered at once, each scoped under its own URL path (`/project/:slug/`). `Cmd+K` opens a project palette to switch between repositories without restarting the server or losing your place.
+
+### Keyboard-driven
+
+Navigate files with `j`/`k` or arrows. Move into and out of folders with `h`/`l`, jump folder-to-folder with `[`/`]`, collapse with `o`. Mark files reviewed with `e`. Search files with `f`. Double-tap `Shift` for symbol search. Refresh with `r`. Full shortcut list at the bottom of this README.
+
 ## MCP tools
 
 | Tool | What it does |
 |------|-------------|
-| `start` | Register a project for review (idempotent), returns browser URL |
-| `add_document` | Add a markdown/text doc as a review tab |
-| `comment` | Post inline comments on the diff or a document |
-| `set_analysis` | Set file priorities, review strategy, groupings |
-| `claim_reviews` | Claim files for review (marks as in-progress) |
-| `read_feedback` | Read the user's submitted review |
-| `reply` | Reply to a specific comment |
-| `stop` | Deregister a project |
-
-## Architecture
-
-One TypeScript/Express server handles everything: the web UI, the review API, and the MCP endpoint. Multiple projects can be registered simultaneously, each scoped under `/project/:slug/`.
-
-The frontend is SolidJS. It extracts the project slug from the URL path and prefixes all API calls accordingly. SSE keeps the UI live when Claude posts comments or adds documents.
-
-Sessions persist to a SQLite database at `~/.lgtm/data.db`, so review state survives server restarts.
-
-```
-server/
-  server.ts            -- entry point, CLI args, Express on port 9900
-  app.ts               -- routes, project-scoped router, static file serving
-  mcp.ts               -- MCP server, tool definitions, Streamable HTTP transport
-  session.ts           -- Session class (items, comments, SSE, file review state)
-  session-manager.ts   -- manages Sessions keyed by repo path
-  store.ts             -- SQLite persistence
-  git-ops.ts           -- shells out to git for diffs, commits, file content
-  parse-analysis.ts    -- parses analysis markdown into structured data
-  symbol-lookup.ts     -- peek-definition via ripgrep heuristics
-  comment-store.ts     -- comment CRUD and filtering
-
-frontend/src/
-  App.tsx              -- main app component, item loading, keyboard shortcuts
-  state.ts             -- SolidJS signals, shared state, types
-  api.ts               -- HTTP client (auto-prefixes project slug)
-  diff.ts              -- unified diff parsing, context expansion
-  components/
-    diff/              -- DiffView, DiffLine, PeekPanel, WholeFileView
-    document/          -- DocumentView (markdown with block-level comments)
-    comments/          -- CommentRow, CommentTextarea, ReplyTextarea
-    sidebar/           -- FileList (flat/grouped/phased), FileSearch
-    header/            -- Header with repo info and branch name
-    tabs/              -- TabBar, FilePicker
-    commits/           -- CommitPanel (multi-commit selection)
-    overview/          -- OverviewBanner (analysis summary)
-
-skills/lgtm/           -- /lgtm skill (review workflow)
-skills/analyze/        -- /lgtm analyze skill (analysis pipeline)
-agents/file-classifier/ -- classifies files by priority/phase/category
-agents/synthesizer/    -- synthesizes per-file analysis into overview
-commands/lgtm.md       -- /lgtm slash command
-hooks/                 -- SessionStart hook to auto-start server
-```
-
-## Features
-
-**Diff review** - syntax-highlighted unified diffs with word-level change highlighting, context expansion, whole-file view toggle, and commit picker. Click any line to comment. Cmd+click identifiers to peek at their definitions.
-
-**Document review** - rendered markdown with per-block commenting. Claude can add design docs, specs, or any text as review tabs.
-
-**Inline comments** - threaded comments with replies. Claude's comments are visually distinct. Reply, resolve, or dismiss inline. All interactions included in the submitted review output.
-
-**Analysis** - file priorities, review phases, thematic groupings, and a review strategy overview. The sidebar switches between flat, grouped and phased views.
-
-**Real-time updates** - SSE pushes comment and item changes to the browser as they happen. No manual refresh needed.
-
-**Persistence** - sessions stored in SQLite. Comment history, file review state, and analysis data survive restarts.
+| `claim_reviews` | Auto-registers the project (if needed), claims review-feedback notifications for the calling Claude session, and returns the browser URL. The primary entry point. |
+| `add_document` | Attach a markdown/text doc as a review tab. Auto-registers the project. |
+| `comment` | Post inline comments on the diff or a document. |
+| `reply` | Reply to a specific user comment. |
+| `set_analysis` | Set file priorities, review strategy, and thematic groupings (called by the analyze skill). |
+| `set_walkthrough` | Set the narrated walkthrough for a session (called by the walkthrough skill). |
+| `read_feedback` | Read the user's submitted review as structured markdown. |
+| `stop` | Deregister a project session. |
 
 ## How it compares
 
@@ -134,11 +138,13 @@ There are a lot of AI code review tools. Most of them solve a different problem 
 
 LGTM's specific niche is the iterative loop: Claude posts inline comments on the diff before you even start reading, you review and respond in the browser, Claude reads your structured feedback and acts on it in the same session, you refresh and go again.
 
-The review UI itself is more full-featured than most diff viewers in this space. Syntax-highlighted diffs with word-level change detection, context expansion, whole-file view, commit picker for multi-commit branches, Cmd+click peek-definition (resolves identifiers to their definitions via ripgrep heuristics), threaded inline comments with replies, and rendered markdown document tabs for specs or design docs that Claude can attach alongside the diff. SSE keeps everything live - comments and items update in real time as Claude works.
+The review UI itself is more full-featured than most diff viewers in this space. Syntax-highlighted diffs with word-level change detection, context expansion, whole-file view, commit picker for multi-commit branches, Cmd+click peek-definition (LSP-backed for Python / TypeScript / Rust with hover docs and references, ripgrep fallback for everything else), threaded inline comments with replies, and rendered markdown document tabs for specs or design docs that Claude can attach alongside the diff. SSE keeps everything live - comments and items update in real time as Claude works.
 
 The analysis layer is where it gets opinionated. Claude classifies every file in the diff by priority (critical / important / normal / low) and review phase (review / skim / rubber-stamp), groups files thematically, and writes a review strategy overview. The sidebar switches between flat, grouped and phased views based on this analysis, so you can work through a large diff in order of importance rather than alphabetically. For a 40-file branch, the difference between "here are 40 files" and "here are the 6 files that matter, skim these 12, rubber-stamp the rest" is significant.
 
-As far as I can tell, nothing else combines a browser review UI, bidirectional feedback with a live agent session, and guided review prioritization.
+The walkthrough layer goes a step further: Claude can author a narrated tour through the diff — ordered "stops" that walk you through the logical changes in a sensible reading order, each pointing at the specific lines and files involved. Useful for big architectural changes where the diff alone doesn't tell the story.
+
+As far as I can tell, nothing else combines a browser review UI, bidirectional feedback with a live agent session, guided review prioritization, and authored walkthroughs.
 
 ## Development
 
@@ -153,14 +159,32 @@ npm test             # run all tests
 
 ## Keyboard shortcuts
 
+### Diff view
+
 | Key | Action |
 |-----|--------|
-| `j`/`k` or arrows | Navigate files |
+| `j`/`k` or `↓`/`↑` | Navigate rows in the sidebar |
+| `h`/`l` or `←`/`→` | Collapse / expand folder, or move out / into |
+| `[`/`]` | Jump to previous / next folder |
+| `o` | Toggle the active folder collapsed |
 | `f` | Focus file search |
-| `e` | Toggle current file as reviewed |
+| `e` | Toggle current file (or folder) as reviewed |
 | `c` | Toggle commit picker |
-| `n`/`p` | Jump to next/prev comment |
-| `w` | Toggle whole file view |
+| `n`/`p` | Jump to next / previous comment |
+| `w` | Toggle whole-file view |
+| `W` | Enter walkthrough mode (when a walkthrough is loaded) |
 | `r` | Refresh |
+| `Shift Shift` | Open symbol search (double-tap Shift) |
+| `Cmd+K` | Open project palette |
+| `?` | Open keyboard shortcut help |
 | `Cmd+Enter` | Save comment |
-| `Esc` | Cancel comment / clear search |
+| `Esc` | Cancel comment / close panel / clear search |
+
+### Walkthrough mode
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Next stop |
+| `Shift+Enter` | Previous stop |
+| `g` then `1`–`9` | Jump to stop by number |
+| `d` | Exit walkthrough mode |

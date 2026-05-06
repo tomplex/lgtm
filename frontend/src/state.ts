@@ -162,6 +162,8 @@ export const [symbolSearchOpen, setSymbolSearchOpen] = createSignal(false);
 
 export const [paletteOpen, setPaletteOpen] = createSignal(false);
 
+export const [helpModalOpen, setHelpModalOpen] = createSignal(false);
+
 export const [lspBootstrapOpen, setLspBootstrapOpen] = createSignal(false);
 
 // --- Stores (partial updates) ---

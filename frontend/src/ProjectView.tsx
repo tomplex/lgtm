@@ -26,6 +26,8 @@ import {
   allCommits,
   paletteOpen,
   setPaletteOpen,
+  helpModalOpen,
+  setHelpModalOpen,
   collapsedFolders,
   setSessionCollapsedFolders,
   sessionCollapsedFolders,
@@ -66,6 +68,7 @@ import { showToast } from './components/shared/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import SymbolSearch from './components/diff/SymbolSearch';
 import ProjectPalette from './components/palette/ProjectPalette';
+import HelpModal from './components/help/HelpModal';
 import LspBootstrap from './components/header/LspBootstrap';
 import { WalkthroughView } from './components/walkthrough/WalkthroughView';
 
@@ -309,6 +312,7 @@ export default function ProjectView() {
     onJumpComment: jumpToComment,
     onSymbolSearch: () => setSymbolSearchOpen(!symbolSearchOpen()),
     onOpenPalette: () => setPaletteOpen(!paletteOpen()),
+    onOpenHelp: () => setHelpModalOpen(!helpModalOpen()),
   });
 
   // --- Walkthrough visited stops ---
@@ -544,6 +548,7 @@ export default function ProjectView() {
       </Show>
       <SymbolSearch />
       <ProjectPalette />
+      <HelpModal />
       <LspBootstrap />
     </>
   );
