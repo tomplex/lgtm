@@ -54,7 +54,26 @@ npm run lint
 
 Either failure → stop, surface the output, do not proceed.
 
-### 3. Pick the bump level
+### 3. Marketplace install smoke test
+
+Verifies the github-source install path coworkers actually use: clean
+container, SessionStart hook fires, server boots, routes serve. Catches
+bugs that pass unit tests but break a fresh `/plugin update` install — the
+class of bug behind issues #1 and #2.
+
+```bash
+./scripts/test-marketplace-install.sh
+```
+
+Requires Docker. Expected runtime ~60s. Look for `ALL CHECKS PASSED` at the
+end; anything else is a fail — surface output and stop, no version bump.
+
+If Docker isn't running: do **not** silently skip. Tell the maintainer
+Docker is required for this gate and abort. Skipping has cost coworkers
+time twice already (#1 and #2 were install-path bugs unit tests didn't
+catch).
+
+### 4. Pick the bump level
 
 ```bash
 PREV_TAG=$(git describe --tags --abbrev=0)
@@ -77,13 +96,13 @@ Semver policy:
 - **Minor** — new MCP tools, new UI features, new analysis modes, additive REST endpoints, new skills, new SSE events
 - **Major** — removed or renamed MCP tools, breaking on-disk DB schema (`~/.lgtm/data.db`), changed REST contract shape
 
-### 4. Bump versions
+### 5. Bump versions
 
 Edit both files to the new `X.Y.Z`:
 - `package.json` → `"version": "X.Y.Z"`
 - `.claude-plugin/plugin.json` → `"version": "X.Y.Z"`
 
-### 5. Compose the CHANGELOG entry
+### 6. Compose the CHANGELOG entry
 
 Read `CHANGELOG.md`. Prepend a new entry under the top heading section using
 [Keep a Changelog](https://keepachangelog.com/) format:
@@ -108,7 +127,7 @@ Source the entries from `git log "${PREV_TAG}..HEAD"`. Group by intent
 (features → Added, fixes → Fixed, etc.). Reference issue numbers (`#1`,
 `#2`) where commits cite them. Drop empty subsections.
 
-### 6. Commit
+### 7. Commit
 
 ```bash
 git add package.json .claude-plugin/plugin.json CHANGELOG.md
@@ -117,7 +136,7 @@ git commit -m "release: vX.Y.Z"
 
 Single-line commit message per repo convention.
 
-### 7. Tag
+### 8. Tag
 
 Read the new CHANGELOG entry (everything between `## [X.Y.Z]` and the next
 `## [` heading or EOF). Use that as the tag message body:
@@ -130,7 +149,7 @@ git tag -a --cleanup=verbatim "vX.Y.Z" -m "<changelog entry body>"
 with `#`, which would eat `### Fixed` / `### Changed` markdown headers from
 the message.
 
-### 8. Push
+### 9. Push
 
 ```bash
 git push origin main --follow-tags
@@ -146,7 +165,7 @@ Delete the local tag immediately so the next release's `git log v_prev..HEAD`
 math doesn't drift. Then abort and tell the maintainer to resolve the
 divergence first.
 
-### 9. GitHub Release
+### 10. GitHub Release
 
 ```bash
 gh release create "vX.Y.Z" \
@@ -158,7 +177,7 @@ If this fails: the release commit + tag are already on `origin/main`, so
 `/plugin update` consumers will get the change. Surface the error and tell
 the maintainer to retry just the `gh` step manually.
 
-### 10. Announce on Slack
+### 11. Announce on Slack
 
 Compose this message:
 
@@ -192,5 +211,7 @@ of truth). Nothing to sync there.
 | Tests / lint / build fail | Stop, surface output, no version bump |
 | `npm run build` dirties dist | Stop, ask maintainer to commit `build:` separately |
 | Working tree dirty pre-flight | Stop, ask maintainer to commit or stash |
+| Marketplace install smoke test fails | Stop, surface output, no version bump |
+| Docker not available for smoke test | Stop, do not skip silently — abort and ask maintainer to start Docker |
 | Push rejected | `git tag -d vX.Y.Z`, abort |
 | `gh release create` fails after push | Release is live; retry `gh` step manually |
