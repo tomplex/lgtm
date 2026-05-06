@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-06
+
+### Added
+
+- Keyboard shortcuts overlay: press `?` from anywhere in the UI to see all shortcuts grouped by category (Navigation, Review, Search, Help).
+
+### Fixed
+
+- Cmd-click symbol lookup ("peek") now resolves correctly when clicking on a usage of a symbol, not just on the declaration. The click offset was being computed inside the highlight.js token rather than across the whole line, so `ShortcutSection` (and any other identifier rendered as its own highlighted span) only resolved when the line happened to contain a declaration TS could navigate to from column 0.
+- `/lgtm` slash command no longer references the removed `start` MCP tool; uses `claim_reviews` instead.
+
 ## [0.2.1] - 2026-05-06
 
 ### Fixed
