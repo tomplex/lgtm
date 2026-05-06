@@ -11,12 +11,15 @@ describe('SessionManager', () => {
   let fixture2: GitFixture;
   let tmpDir: string;
 
+  // 30s timeout: this hook spawns ~28 git subprocesses (two createGitFixture
+  // calls × ~14 git commands each). Under vitest's parallel workers the default
+  // 10s hookTimeout is occasionally exceeded due to process-spawn contention.
   beforeAll(() => {
     fixture = createGitFixture();
     fixture2 = createGitFixture();
     tmpDir = mkdtempSync(join(tmpdir(), 'lgtm-manager-test-'));
     initStore(join(tmpDir, 'test.db'));
-  });
+  }, 30000);
 
   afterAll(() => {
     closeStore();
