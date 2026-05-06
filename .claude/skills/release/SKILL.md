@@ -158,14 +158,28 @@ If this fails: the release commit + tag are already on `origin/main`, so
 `/plugin update` consumers will get the change. Surface the error and tell
 the maintainer to retry just the `gh` step manually.
 
-### 10. Announce
+### 10. Announce on Slack
 
-Emit this template for the maintainer to paste into Slack:
+Compose this message:
 
 ```
 lgtm vX.Y.Z is out — <one-line summary of the most user-visible change>.
 Run /plugin update to pull. Notes: <github release URL>
 ```
+
+The "user-visible change" should match what coworkers actually notice when
+they update — favor the headline `feat:` or user-facing `fix:` from the
+CHANGELOG, not internal refactors.
+
+**Default channel:** `#claude-code-users` (private, channel ID
+`C09LPD70FJ6`). Confirm with the maintainer before posting — Slack posts are
+visible to others and need explicit go-ahead per global rules. If the
+maintainer wants a different channel, find the ID with
+`slack_search_channels` (include `private_channel` in `channel_types`).
+
+**Posting:** use the Slack MCP `slack_send_message` tool with the channel ID
+and the composed message. If the Slack MCP is unavailable in this session,
+emit the template for the maintainer to paste manually instead.
 
 `fdy-skills/marketplace.json` has no `version` field for lgtm — Claude Code
 falls back to `plugin.json`'s version on the upstream repo (the only source
