@@ -218,14 +218,24 @@ export function createApp(manager: SessionManager): express.Express {
 
     session.subscribe(client);
 
-    const keepalive = setInterval(() => {
-      res.write(': keepalive\n\n');
-    }, 30_000);
-
-    req.on('close', () => {
+    const cleanup = () => {
       clearInterval(keepalive);
       session.unsubscribe(client);
-    });
+    };
+
+    // A half-closed socket emits 'error' on the response; without a listener,
+    // Node turns that into an uncaughtException and kills the process.
+    res.on('error', cleanup);
+
+    const keepalive = setInterval(() => {
+      try {
+        res.write(': keepalive\n\n');
+      } catch {
+        cleanup();
+      }
+    }, 30_000);
+
+    req.on('close', cleanup);
   });
 
   projectRouter.get('/analysis', (_req, res) => {

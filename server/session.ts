@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
   getBranchDiff, getSelectedCommitsDiff, getRepoMeta, getRepoMetaAsync,
   type RepoMeta,
@@ -246,6 +246,10 @@ export class Session {
     this.persist();
 
     const label = key === 'diff' ? '' : ` [${key}]`;
+    // outputPath lives under /tmp on macOS, which the OS prunes periodically.
+    // Re-create the directory before each write so a session that outlives
+    // the cleanup doesn't silently lose its review.
+    mkdirSync(dirname(this.outputPath), { recursive: true });
     await appendFile(this.outputPath, `\n---\n# Review Round ${currentRound}${label}\n\n${commentsText}\n`);
     await writeFile(this.outputPath + '.signal', `${key}:${currentRound}`);
 
