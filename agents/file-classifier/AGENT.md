@@ -45,6 +45,21 @@ A short freeform label. Examples: "core logic", "test", "migration", "config", "
 
 1-2 sentences. Answer: what changed and why a reviewer should care (or not). Focus on intent and risk, not diff narration — the reviewer can read the diff themselves.
 
+## Delta mode
+
+Your task prompt may include:
+- A path to the **previous analysis markdown** (file-classifier output from the last run).
+- A list of **files to (re-)classify**.
+
+When given these:
+
+1. Read the previous analysis to inform your terminology and category choices — strive for consistency with prior classifications of related files (don't churn the category for `auth-middleware.ts` from "core logic" to "auth middleware" if the previous run called it "core logic" and nothing about it changed).
+2. Classify **only the listed files** using the diff-reading rules above.
+3. Output **only entries for the listed files** in the standard markdown format. Do NOT copy unchanged entries from the previous analysis into your output — the server merges them in. Including them in your output would still work, but it wastes tokens and risks paraphrasing summaries you weren't asked to change.
+4. Removed files (paths in the previous analysis but no longer in the diff) are handled by the calling skill via a separate `removedFiles` argument to `set_analysis`. You don't need to mention them in your output.
+
+When the previous analysis path is absent (full run), behave as documented above — classify every file in the diff.
+
 ## Output format
 
 Your task prompt will provide an output file path. Write your analysis to that file using the Write tool.
