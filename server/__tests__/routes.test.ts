@@ -407,4 +407,20 @@ describe('routes', () => {
         .expect(404);
     });
   });
+
+  describe('connection state', () => {
+    it('GET /connection-state reports claimed=false for an unclaimed project', async () => {
+      const f = createGitFixture();
+      try {
+        const reg = manager.register(f.repoPath);
+        const res = await request(app).get(`/project/${reg.slug}/connection-state`);
+        expect(res.status).toBe(200);
+        expect(res.body.claimed).toBe(false);
+        expect(res.body.alive).toBe(false);
+        expect(res.body.claimedAt).toBeNull();
+      } finally {
+        f.cleanup();
+      }
+    });
+  });
 });

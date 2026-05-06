@@ -8,7 +8,7 @@ import { sha256Hex } from './diff-hash.js';
 import { type Session, type SSEClient, type SidebarPrefs } from './session.js';
 import { type SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
-import { notifyChannel } from './mcp.js';
+import { notifyChannel, getProjectClaim, isClaimAlive } from './mcp.js';
 import {
   findSymbol, sortResults,
   extractPythonBody, extractTypeScriptBody,
@@ -236,6 +236,16 @@ export function createApp(manager: SessionManager): express.Express {
     }, 30_000);
 
     req.on('close', cleanup);
+  });
+
+  projectRouter.get('/connection-state', (req, res) => {
+    const slug = (req.params as Record<string, string>).slug;
+    const claim = getProjectClaim(slug);
+    res.json({
+      claimed: !!claim,
+      alive: claim ? isClaimAlive(slug) : false,
+      claimedAt: claim?.claimedAt ?? null,
+    });
   });
 
   projectRouter.get('/analysis/freshness', (_req, res) => {
