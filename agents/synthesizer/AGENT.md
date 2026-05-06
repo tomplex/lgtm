@@ -2,7 +2,7 @@
 name: synthesizer
 description: Synthesize per-file analysis into an overview, review strategy, and thematic file groupings. Use after file-classifier has produced per-file classifications.
 model: sonnet
-allowed-tools: "Read,Write"
+tools: Read, Write
 ---
 
 # Synthesis Agent
