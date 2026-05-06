@@ -181,13 +181,22 @@ export function createApp(manager) {
             },
         };
         session.subscribe(client);
-        const keepalive = setInterval(() => {
-            res.write(': keepalive\n\n');
-        }, 30_000);
-        req.on('close', () => {
+        const cleanup = () => {
             clearInterval(keepalive);
             session.unsubscribe(client);
-        });
+        };
+        // A half-closed socket emits 'error' on the response; without a listener,
+        // Node turns that into an uncaughtException and kills the process.
+        res.on('error', cleanup);
+        const keepalive = setInterval(() => {
+            try {
+                res.write(': keepalive\n\n');
+            }
+            catch {
+                cleanup();
+            }
+        }, 30_000);
+        req.on('close', cleanup);
     });
     projectRouter.get('/analysis', (_req, res) => {
         res.json({ analysis: res.locals.session.analysis });
@@ -730,12 +739,15 @@ export function createApp(manager) {
         res.status(500).json({ error: err.message });
     });
     // --- Static files ---
-    const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend', 'dist');
+    // dist/server/app.js → ../.. → repo root → frontend/dist (vite root='frontend', outDir='dist').
+    // dotfiles: 'allow' is needed because plugin installs live under ~/.claude/plugins/...,
+    // and `send` rejects any path containing a dot-segment ('.claude') by default.
+    const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'frontend', 'dist');
     if (existsSync(distDir)) {
-        app.use(express.static(distDir));
+        app.use(express.static(distDir, { dotfiles: 'allow' }));
         // SPA fallback for project URLs
         app.get('/project/{*path}', (_req, res) => {
-            res.sendFile(join(distDir, 'index.html'));
+            res.sendFile(join(distDir, 'index.html'), { dotfiles: 'allow' });
         });
     }
     return app;

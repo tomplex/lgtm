@@ -18,6 +18,17 @@ function parseArgs(argv) {
 }
 function main() {
     const args = parseArgs(process.argv);
+    // Keep the process alive on stray rejections / exceptions and leave a stack
+    // trace in the log. Without these, a single unawaited promise rejection
+    // anywhere (background timers, LSP child-process error events, SSE socket
+    // writes after close) tears the server down mid-session and the user only
+    // notices when their next POST silently fails.
+    process.on('unhandledRejection', (reason) => {
+        console.error('UNHANDLED_REJECTION', reason);
+    });
+    process.on('uncaughtException', (err) => {
+        console.error('UNCAUGHT_EXCEPTION', err);
+    });
     const port = args.port ? parseInt(args.port) : 9900;
     const manager = new SessionManager(port);
     const app = createApp(manager);
