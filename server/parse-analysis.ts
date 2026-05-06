@@ -3,6 +3,10 @@ export interface FileAnalysis {
   phase: 'review' | 'skim' | 'rubber-stamp';
   summary: string;
   category: string;
+  // Freshness metadata, written by the server on every set_analysis entry.
+  // Optional because the parser doesn't see them — they're stamped server-side.
+  analyzedAtBaseBlob?: string;
+  analyzedAtHeadBlob?: string;
 }
 
 export interface AnalysisGroup {

@@ -224,3 +224,19 @@ Strategy text.
     expect(() => parseSynthesis(json)).toThrow(/Missing overview/);
   });
 });
+
+describe('FileAnalysis type', () => {
+  it('FileAnalysis type accepts optional analyzedAtBaseBlob and analyzedAtHeadBlob', () => {
+    // Compile-time check: this just needs to typecheck.
+    const entry: import('../parse-analysis.js').FileAnalysis = {
+      priority: 'normal',
+      phase: 'review',
+      summary: 's',
+      category: 'c',
+      analyzedAtBaseBlob: 'abc',
+      analyzedAtHeadBlob: 'def',
+    };
+    expect(entry.analyzedAtBaseBlob).toBe('abc');
+    expect(entry.analyzedAtHeadBlob).toBe('def');
+  });
+});
