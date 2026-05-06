@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { createGitFixture, type GitFixture } from './helpers/git-fixture.js';
 import {
   gitRun,
   detectBaseBranch,
   getBranchDiff,
+  getBranchDiffRaw,
   getSelectedCommitsDiff,
   getBranchCommits,
   getRepoMeta,
@@ -113,6 +118,62 @@ describe('git-ops', () => {
       const lines = getFileLines(fixture.repoPath, 'nonexistent.ts', 0, 5);
       expect(lines).toEqual([]);
     });
+  });
+});
+
+describe('getBranchDiffRaw', () => {
+  let repo: string;
+
+  beforeAll(() => {
+    repo = mkdtempSync(join(tmpdir(), 'lgtm-rawdiff-'));
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    writeFileSync(join(repo, 'kept.txt'), 'unchanged\n');
+    writeFileSync(join(repo, 'removed.txt'), 'will be removed\n');
+    writeFileSync(join(repo, 'modified.txt'), 'old\n');
+    git('add', '.');
+    git('commit', '-q', '-m', 'base');
+    git('checkout', '-q', '-b', 'feature');
+    writeFileSync(join(repo, 'modified.txt'), 'new\n');
+    writeFileSync(join(repo, 'added.txt'), 'fresh file\n');
+    execFileSync('rm', [join(repo, 'removed.txt')]);
+    git('add', '-A');
+    git('commit', '-q', '-m', 'feature work');
+  });
+
+  afterAll(() => {
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('returns a map of path -> {oldBlob, newBlob, status} for branch changes', () => {
+    const result = getBranchDiffRaw(repo, 'main');
+    expect(result.has('modified.txt')).toBe(true);
+    const m = result.get('modified.txt')!;
+    expect(m.status).toBe('M');
+    expect(m.oldBlob).toMatch(/^[0-9a-f]{40}$/);
+    expect(m.newBlob).toMatch(/^[0-9a-f]{40}$/);
+    expect(m.oldBlob).not.toBe(m.newBlob);
+  });
+
+  it('marks added files with zero old-blob', () => {
+    const result = getBranchDiffRaw(repo, 'main');
+    const a = result.get('added.txt')!;
+    expect(a.status).toBe('A');
+    expect(a.oldBlob).toBe('0000000000000000000000000000000000000000');
+  });
+
+  it('marks deleted files with zero new-blob', () => {
+    const result = getBranchDiffRaw(repo, 'main');
+    const d = result.get('removed.txt')!;
+    expect(d.status).toBe('D');
+    expect(d.newBlob).toBe('0000000000000000000000000000000000000000');
+  });
+
+  it('omits files unchanged on the branch', () => {
+    const result = getBranchDiffRaw(repo, 'main');
+    expect(result.has('kept.txt')).toBe(false);
   });
 });
 
