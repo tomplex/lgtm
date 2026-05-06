@@ -8,6 +8,7 @@ import {
   reviewedFiles,
   toggleReviewed,
   analysis,
+  analysisFreshness,
   dismissFile,
   walkthrough,
   stopsByFile,
@@ -33,6 +34,7 @@ export default function TreeFile(props: Props) {
   const lastSlash = () => path().lastIndexOf('/');
   const base = () => (lastSlash() >= 0 ? path().slice(lastSlash() + 1) : path());
   const priority = () => analysis()?.files[path()]?.priority;
+  const isStale = createMemo(() => analysisFreshness()?.staleFiles.includes(path()) ?? false);
 
   function handleSelect() {
     setActiveRowId(props.node.id);
@@ -72,6 +74,9 @@ export default function TreeFile(props: Props) {
         <span class="badge comments-badge" title="Your comments">
           {userCount()}
         </span>
+      </Show>
+      <Show when={isStale()}>
+        <span class="stale-badge" title="Diff has changed since last analysis">●</span>
       </Show>
       <Show when={stopsByFile()[path()]?.length}>
         {(count) => (
