@@ -1,7 +1,6 @@
 import { createSignal, Show, For, onCleanup } from 'solid-js';
 import { escapeHtml, highlightLine } from '../../utils';
-import { comments, addLocalComment, updateLocalComment, peekState, setPeekState } from '../../state';
-import { createComment as apiCreateComment } from '../../comment-api';
+import { comments, addLocalComment, peekState, setPeekState, saveOrRetryComment } from '../../state';
 import type { Comment } from '../../comment-types';
 import type { DiffLine as DiffLineType } from '../../state';
 import CommentRow from '../comments/CommentRow';
@@ -118,43 +117,18 @@ export default function DiffLine(props: Props) {
     return p && p.filePath === props.filePath && p.lineIdx === props.lineIdx;
   };
 
-  async function handleSaveNew(text: string) {
-    const tempId = `temp-${Date.now()}`;
-    const lineNum = absLine();
-    const localComment: Comment = {
-      id: tempId,
-      author: 'user',
-      text,
-      status: 'active',
-      item: 'diff',
-      file: props.filePath,
-      line: lineNum ?? undefined,
-      side: absSide(),
-      mode: 'review',
-    };
-    addLocalComment(localComment);
-    setShowNewComment(false);
-    try {
-      const created = await apiCreateComment({
-        author: 'user',
-        text,
-        item: 'diff',
-        file: props.filePath,
-        line: lineNum ?? undefined,
-        side: absSide(),
-        mode: 'review',
-      });
-      updateLocalComment(tempId, { id: created.id });
-    } catch {
-      /* optimistic update already applied */
-    }
+  function handleSaveNew(text: string) {
+    submitNew(text, 'review');
   }
 
-  async function handleAskClaude(text: string) {
-    const tempId = `temp-${Date.now()}`;
+  function handleAskClaude(text: string) {
+    submitNew(text, 'direct');
+  }
+
+  function submitNew(text: string, mode: 'review' | 'direct') {
     const lineNum = absLine();
     const localComment: Comment = {
-      id: tempId,
+      id: `temp-${Date.now()}`,
       author: 'user',
       text,
       status: 'active',
@@ -162,24 +136,11 @@ export default function DiffLine(props: Props) {
       file: props.filePath,
       line: lineNum ?? undefined,
       side: absSide(),
-      mode: 'direct',
+      mode,
     };
     addLocalComment(localComment);
     setShowNewComment(false);
-    try {
-      const created = await apiCreateComment({
-        author: 'user',
-        text,
-        item: 'diff',
-        file: props.filePath,
-        line: lineNum ?? undefined,
-        side: absSide(),
-        mode: 'direct',
-      });
-      updateLocalComment(tempId, { id: created.id });
-    } catch {
-      /* optimistic update already applied */
-    }
+    void saveOrRetryComment(localComment);
   }
 
   return (

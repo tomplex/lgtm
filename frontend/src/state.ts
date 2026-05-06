@@ -3,6 +3,7 @@ import { createStore, reconcile } from 'solid-js/store';
 import type { Comment } from './comment-types';
 import type { Walkthrough } from './walkthrough-types';
 import { buildTree, flattenVisible, type TreeNode } from './tree';
+import { createComment as apiCreateComment } from './comment-api';
 
 // --- Types (re-exported for consumers) ---
 
@@ -182,6 +183,33 @@ export function updateLocalComment(id: string, fields: Partial<Comment>) {
 
 export function removeLocalComment(id: string) {
   setComments('list', (prev) => prev.filter((c) => c.id !== id));
+}
+
+/**
+ * Attempt (or retry) saving a comment whose optimistic insert is still in the
+ * store. Used both for the initial create and for the user-facing retry button
+ * after a failed POST. Sets `error` on the local comment if it fails again.
+ */
+export async function saveOrRetryComment(c: Comment): Promise<void> {
+  updateLocalComment(c.id, { error: undefined });
+  try {
+    const created = await apiCreateComment({
+      author: 'user',
+      text: c.text,
+      item: c.item,
+      file: c.file,
+      line: c.line,
+      side: c.side,
+      block: c.block,
+      parentId: c.parentId,
+      mode: c.mode,
+    });
+    updateLocalComment(c.id, { id: created.id, error: undefined });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    updateLocalComment(c.id, { error: msg });
+    console.error('Comment save failed:', err);
+  }
 }
 
 export const [reviewedFiles, setReviewedFiles] = createStore<Record<string, boolean>>({});

@@ -1,11 +1,20 @@
 import { createSignal, For, Show } from 'solid-js';
 import { renderMd } from '../../utils';
-import { comments, addLocalComment, updateLocalComment, removeLocalComment } from '../../state';
 import {
-  createComment as apiCreateComment,
+  comments,
+  addLocalComment,
+  updateLocalComment,
+  removeLocalComment,
+  saveOrRetryComment,
+} from '../../state';
+import {
   updateComment as apiUpdateComment,
   deleteComment as apiDeleteComment,
 } from '../../comment-api';
+
+function logFailure(op: string) {
+  return (err: unknown) => console.error(`${op} failed:`, err);
+}
 import type { Comment } from '../../comment-types';
 import CommentTextarea from './CommentTextarea';
 import ReplyTextarea from './ReplyTextarea';
@@ -23,36 +32,35 @@ export default function CommentRow(props: Props) {
   const isResolved = () => props.comment.status === 'resolved';
   const isDismissed = () => props.comment.status === 'dismissed';
 
-  async function handleResolve() {
+  function handleResolve() {
     updateLocalComment(props.comment.id, { status: 'resolved' });
-    apiUpdateComment(props.comment.id, { status: 'resolved' });
+    apiUpdateComment(props.comment.id, { status: 'resolved' }).catch(logFailure('resolve'));
   }
 
-  async function handleUnresolve() {
+  function handleUnresolve() {
     updateLocalComment(props.comment.id, { status: 'active' });
-    apiUpdateComment(props.comment.id, { status: 'active' });
+    apiUpdateComment(props.comment.id, { status: 'active' }).catch(logFailure('unresolve'));
   }
 
-  async function handleDismiss() {
+  function handleDismiss() {
     updateLocalComment(props.comment.id, { status: 'dismissed' });
-    apiUpdateComment(props.comment.id, { status: 'dismissed' });
+    apiUpdateComment(props.comment.id, { status: 'dismissed' }).catch(logFailure('dismiss'));
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     removeLocalComment(props.comment.id);
-    apiDeleteComment(props.comment.id);
+    apiDeleteComment(props.comment.id).catch(logFailure('delete'));
   }
 
-  async function handleEdit(text: string) {
+  function handleEdit(text: string) {
     updateLocalComment(props.comment.id, { text });
     setEditing(false);
-    apiUpdateComment(props.comment.id, { text });
+    apiUpdateComment(props.comment.id, { text }).catch(logFailure('edit'));
   }
 
-  async function handleReply(text: string) {
-    const tempId = `temp-${Date.now()}`;
+  function handleReply(text: string) {
     const localComment: Comment = {
-      id: tempId,
+      id: `temp-${Date.now()}`,
       author: 'user',
       text,
       status: 'active',
@@ -64,31 +72,22 @@ export default function CommentRow(props: Props) {
     };
     addLocalComment(localComment);
     setReplying(false);
-    try {
-      const created = await apiCreateComment({
-        author: 'user',
-        text,
-        item: props.comment.item,
-        parentId: props.comment.id,
-        file: props.comment.file,
-        line: props.comment.line,
-        block: props.comment.block,
-      });
-      updateLocalComment(tempId, { id: created.id });
-    } catch {
-      /* optimistic update already applied */
-    }
+    void saveOrRetryComment(localComment);
   }
 
-  async function handleEditReply(replyId: string, text: string) {
+  function handleEditReply(replyId: string, text: string) {
     updateLocalComment(replyId, { text });
     setEditingReplyId(null);
-    apiUpdateComment(replyId, { text });
+    apiUpdateComment(replyId, { text }).catch(logFailure('edit reply'));
   }
 
-  async function handleDeleteReply(replyId: string) {
+  function handleDeleteReply(replyId: string) {
     removeLocalComment(replyId);
-    apiDeleteComment(replyId);
+    apiDeleteComment(replyId).catch(logFailure('delete reply'));
+  }
+
+  function handleRetry(c: Comment) {
+    void saveOrRetryComment(c);
   }
 
   return (
@@ -115,6 +114,13 @@ export default function CommentRow(props: Props) {
 
         <Show when={isDismissed()}>
           <span class="resolve-badge">Dismissed</span>
+        </Show>
+
+        <Show when={props.comment.error}>
+          <span class="comment-error-badge" title={props.comment.error}>not saved</span>
+          <span class="inline-actions">
+            <a onClick={() => handleRetry(props.comment)}>retry</a>
+          </span>
         </Show>
 
         <Show when={!isResolved() && !isDismissed() && props.comment.author === 'claude'}>
@@ -144,6 +150,12 @@ export default function CommentRow(props: Props) {
           <div class="claude-reply">
             <div class="claude-reply-header">
               <span class="reply-label">{reply.author === 'claude' ? 'Claude' : 'You'}</span>
+              <Show when={reply.error}>
+                <span class="comment-error-badge" title={reply.error}>not saved</span>
+                <span class="inline-actions">
+                  <a onClick={() => handleRetry(reply)}>retry</a>
+                </span>
+              </Show>
               <span class="inline-actions">
                 <a onClick={() => setEditingReplyId(reply.id)}>edit</a>
                 <a class="del-action" onClick={() => handleDeleteReply(reply.id)}>

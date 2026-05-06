@@ -10,4 +10,6 @@ export interface Comment {
   side?: 'RIGHT' | 'LEFT';
   block?: number;
   mode?: 'review' | 'direct';
+  /** Set when the optimistic save POST failed. Cleared on successful retry. */
+  error?: string;
 }
