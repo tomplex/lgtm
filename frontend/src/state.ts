@@ -56,6 +56,8 @@ interface FileAnalysis {
   phase: 'review' | 'skim' | 'rubber-stamp';
   summary: string;
   category: string;
+  analyzedAtBaseBlob?: string;
+  analyzedAtHeadBlob?: string;
 }
 
 interface AnalysisGroup {
@@ -69,6 +71,22 @@ export interface Analysis {
   reviewStrategy: string;
   files: Record<string, FileAnalysis>;
   groups: AnalysisGroup[];
+  synthesizedAtFileSet?: string[];
+}
+
+export interface AnalysisFreshness {
+  staleFiles: string[];
+  missingFiles: string[];
+  removedFiles: string[];
+  staleSynthesis: boolean;
+  computedAtHead: string;
+  computedAtBase: string;
+}
+
+export interface ConnectionState {
+  claimed: boolean;
+  alive: boolean;
+  claimedAt: string | null;
 }
 
 export type Language = 'python' | 'typescript' | 'rust';
@@ -85,6 +103,8 @@ export const [mdMeta, setMdMeta] = createSignal<MdMeta>({});
 export const [sessionItems, setSessionItems] = createSignal<SessionItem[]>([]);
 export const [allCommits, setAllCommits] = createSignal<Commit[]>([]);
 export const [analysis, setAnalysis] = createSignal<Analysis | null>(null);
+export const [analysisFreshness, setAnalysisFreshness] = createSignal<AnalysisFreshness | null>(null);
+export const [connectionState, setConnectionState] = createSignal<ConnectionState>({ claimed: false, alive: false, claimedAt: null });
 
 export type SortMode = 'path' | 'priority';
 export type GroupMode = 'none' | 'phase';
