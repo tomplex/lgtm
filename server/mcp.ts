@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import type express from 'express';
 import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
-import { parseFileAnalysis, parseSynthesis } from './parse-analysis.js';
+import { parseFileAnalysis, parseSynthesis, type FileAnalysis } from './parse-analysis.js';
 import { parseWalkthrough } from './parse-walkthrough.js';
 import { sha256Hex } from './diff-hash.js';
 import { getBranchDiff } from './git-ops.js';
@@ -26,6 +26,14 @@ function resolveProject(
     autoClaimDiffReviewsIfUnheld(mcpServer, found.slug);
   }
   return { found };
+}
+
+function renderFileAnalysisMarkdown(files: Record<string, FileAnalysis>): string {
+  const paths = Object.keys(files).sort();
+  return paths.map(path => {
+    const f = files[path];
+    return `## ${path}\n- priority: ${f.priority}\n- phase: ${f.phase}\n- category: ${f.category}\n\n${f.summary}\n`;
+  }).join('\n');
 }
 
 function createMcpServer(manager: SessionManager): McpServer {
@@ -208,6 +216,38 @@ function createMcpServer(manager: SessionManager): McpServer {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: msg }) }],
         };
       }
+    },
+  );
+
+  server.tool(
+    'read_analysis',
+    'Read the previous analysis for this project, including per-file freshness data. Returns JSON, the file analysis re-rendered as markdown (suitable for passing to file-classifier as prior context), and freshness metadata listing stale/missing/removed files. Used by the /lgtm refresh skill.',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+    },
+    async ({ repoPath }) => {
+      const { found } = resolveProject(manager, repoPath, server);
+      const result = found.session.getAnalysisWithFreshness();
+      if (!result) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ json: null, markdown: '', freshness: null }) }] };
+      }
+      const stored = result.analysis as { files?: Record<string, FileAnalysis> };
+      const markdown = renderFileAnalysisMarkdown(stored.files ?? {});
+      console.log(`MCP_READ_ANALYSIS slug=${found.slug} files=${Object.keys(stored.files ?? {}).length} stale=${result.freshness.staleFiles.length}`);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({
+          json: result.analysis,
+          markdown,
+          freshness: {
+            staleFiles: result.freshness.staleFiles,
+            missingFiles: result.freshness.missingFiles,
+            removedFiles: result.freshness.removedFiles,
+            staleSynthesis: result.freshness.staleSynthesis,
+            computedAtHead: result.computedAtHead,
+            computedAtBase: result.computedAtBase,
+          },
+        }) }],
+      };
     },
   );
 

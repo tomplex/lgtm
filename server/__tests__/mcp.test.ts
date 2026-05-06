@@ -275,4 +275,65 @@ A short narrative.
       }
     });
   });
+
+  describe('read_analysis', () => {
+    it('returns null json + empty markdown + null freshness when no analysis is set', async () => {
+      // Use a fresh fixture so we don't pick up state from earlier tests.
+      const f = createGitFixture();
+      try {
+        const c = await createMcpClient(app);
+        try {
+          const res = await c.callTool('read_analysis', { repoPath: f.repoPath });
+          expect(res.error).toBeUndefined();
+          expect(res.json).toBeDefined();
+          expect((res.json as { json: unknown }).json).toBeNull();
+          expect((res.json as { markdown: string }).markdown).toBe('');
+          expect((res.json as { freshness: unknown }).freshness).toBeNull();
+        } finally {
+          await c.close();
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('returns json + markdown + freshness when analysis is set', async () => {
+      const f = createGitFixture();
+      try {
+        // Register and seed an analysis directly via the manager.
+        const reg = manager.register(f.repoPath);
+        const session = manager.get(reg.slug)!;
+        const blobMap = session.getCurrentBlobMap();
+        const paths = Object.keys(blobMap.blobsByPath);
+        const path = paths[0] ?? 'placeholder.ts';
+
+        session.setAnalysis({
+          overview: 'o', reviewStrategy: 's',
+          files: {
+            [path]: { priority: 'critical', phase: 'review', summary: 'multi line\nsummary content', category: 'core' },
+          },
+          groups: [],
+          synthesizedAtFileSet: [path],
+        });
+
+        const c = await createMcpClient(app);
+        try {
+          const res = await c.callTool('read_analysis', { repoPath: f.repoPath });
+          expect(res.error).toBeUndefined();
+          const payload = res.json as { json: Record<string, unknown> | null; markdown: string; freshness: { staleFiles: string[] } | null };
+          expect(payload.json).not.toBeNull();
+          expect(payload.markdown).toMatch(new RegExp(`^## ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'm'));
+          expect(payload.markdown).toMatch(/- priority: critical/);
+          expect(payload.markdown).toMatch(/- phase: review/);
+          expect(payload.markdown).toMatch(/- category: core/);
+          expect(payload.freshness).not.toBeNull();
+          expect(Array.isArray(payload.freshness!.staleFiles)).toBe(true);
+        } finally {
+          await c.close();
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+  });
 });
