@@ -238,6 +238,23 @@ export function createApp(manager: SessionManager): express.Express {
     req.on('close', cleanup);
   });
 
+  projectRouter.get('/analysis/freshness', (_req, res) => {
+    const session: Session = res.locals.session;
+    const result = session.getAnalysisWithFreshness();
+    if (!result) {
+      res.status(404).json({ error: 'No analysis set for this project' });
+      return;
+    }
+    res.json({
+      staleFiles: result.freshness.staleFiles,
+      missingFiles: result.freshness.missingFiles,
+      removedFiles: result.freshness.removedFiles,
+      staleSynthesis: result.freshness.staleSynthesis,
+      computedAtHead: result.computedAtHead,
+      computedAtBase: result.computedAtBase,
+    });
+  });
+
   projectRouter.get('/analysis', (_req, res) => {
     res.json({ analysis: res.locals.session.analysis });
   });

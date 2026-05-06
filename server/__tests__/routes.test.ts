@@ -350,6 +350,50 @@ describe('routes', () => {
     });
   });
 
+  describe('analysis freshness', () => {
+    it('GET /analysis/freshness returns 404 when analysis is unset', async () => {
+      const session = manager.get(slug)!;
+      // Ensure no analysis has leaked in from earlier tests in this describe.
+      // Cast through unknown because _analysis is a private field, but at the
+      // start of this test we want to assert the 404 path works on an empty
+      // session.
+      (session as unknown as { _analysis: unknown; _freshnessCache: unknown })._analysis = null;
+      (session as unknown as { _analysis: unknown; _freshnessCache: unknown })._freshnessCache = null;
+
+      const res = await request(app).get(`/project/${slug}/analysis/freshness`);
+      expect(res.status).toBe(404);
+      expect(res.body.error).toContain('analysis');
+    });
+
+    it('GET /analysis/freshness returns the freshness shape when analysis is set', async () => {
+      const session = manager.get(slug)!;
+      const blobMap = session.getCurrentBlobMap();
+      const paths = Object.keys(blobMap.blobsByPath);
+      expect(paths.length).toBeGreaterThan(0); // fixture has a diff
+
+      session.setAnalysis({
+        overview: 'o',
+        reviewStrategy: 's',
+        files: {
+          [paths[0]]: { priority: 'normal', phase: 'review', summary: '', category: '' },
+        },
+        groups: [],
+        synthesizedAtFileSet: [paths[0]],
+      });
+
+      const res = await request(app).get(`/project/${slug}/analysis/freshness`);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.staleFiles)).toBe(true);
+      expect(Array.isArray(res.body.missingFiles)).toBe(true);
+      expect(Array.isArray(res.body.removedFiles)).toBe(true);
+      expect(typeof res.body.staleSynthesis).toBe('boolean');
+      expect(typeof res.body.computedAtHead).toBe('string');
+      expect(typeof res.body.computedAtBase).toBe('string');
+      // Should NOT include the heavy analysis blob.
+      expect(res.body.analysis).toBeUndefined();
+    });
+  });
+
   describe('error handling', () => {
     it('returns 404 for unknown project slug', async () => {
       await request(app)
