@@ -328,6 +328,34 @@ const activeMcpSessions = new Map<string, {
   itemIds: Set<string>;
 }>();
 
+export interface ProjectClaim {
+  slug: string;
+  sessionId: string;
+  claimedAt: string;
+}
+
+const projectClaims = new Map<string, ProjectClaim>(); // keyed by slug
+
+function setProjectClaim(slug: string, sessionId: string): void {
+  projectClaims.set(slug, { slug, sessionId, claimedAt: new Date().toISOString() });
+}
+
+function clearProjectClaimsForSession(sessionId: string): void {
+  for (const [slug, claim] of projectClaims) {
+    if (claim.sessionId === sessionId) projectClaims.delete(slug);
+  }
+}
+
+export function getProjectClaim(slug: string): ProjectClaim | null {
+  return projectClaims.get(slug) ?? null;
+}
+
+export function isClaimAlive(slug: string): boolean {
+  const claim = projectClaims.get(slug);
+  if (!claim) return false;
+  return activeMcpSessions.has(claim.sessionId);
+}
+
 // Associate an MCP server instance with a project slug (called when tools use repoPath)
 export function associateMcpSession(server: McpServer, slug: string): void {
   for (const entry of activeMcpSessions.values()) {
@@ -355,9 +383,10 @@ function autoClaimDiffReviewsIfUnheld(server: McpServer, slug: string): void {
   for (const entry of activeMcpSessions.values()) {
     if (entry.projectSlug === slug && entry.claimedDiff) return; // someone holds it
   }
-  for (const entry of activeMcpSessions.values()) {
+  for (const [sid, entry] of activeMcpSessions) {
     if (entry.server === server) {
       entry.claimedDiff = true;
+      setProjectClaim(slug, sid);
       return;
     }
   }
@@ -368,9 +397,10 @@ function claimDiffReviews(server: McpServer, slug: string): void {
   for (const entry of activeMcpSessions.values()) {
     if (entry.projectSlug === slug) entry.claimedDiff = false;
   }
-  for (const entry of activeMcpSessions.values()) {
+  for (const [sid, entry] of activeMcpSessions) {
     if (entry.server === server) {
       entry.claimedDiff = true;
+      setProjectClaim(slug, sid);
       return;
     }
   }
@@ -426,7 +456,10 @@ export function mountMcp(app: express.Express, manager: SessionManager): void {
 
     transport.onclose = () => {
       const sid = transport.sessionId;
-      if (sid) activeMcpSessions.delete(sid);
+      if (sid) {
+        clearProjectClaimsForSession(sid);
+        activeMcpSessions.delete(sid);
+      }
     };
 
     await mcpServer.connect(transport);

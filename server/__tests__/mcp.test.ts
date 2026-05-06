@@ -337,6 +337,65 @@ A short narrative.
     });
   });
 
+  describe('project claims', () => {
+    it('getProjectClaim returns null before any claim', async () => {
+      const f = createGitFixture();
+      try {
+        // Register the project but do not call claim_reviews.
+        const reg = manager.register(f.repoPath);
+        // Import is at the top of the test file in implementation step.
+        const { getProjectClaim } = await import('../mcp.js');
+        expect(getProjectClaim(reg.slug)).toBeNull();
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('claim_reviews populates getProjectClaim', async () => {
+      const f = createGitFixture();
+      try {
+        const c = await createMcpClient(app);
+        try {
+          const res = await c.callTool('claim_reviews', { repoPath: f.repoPath });
+          expect(res.error).toBeUndefined();
+          const slug = (res.json as { slug: string }).slug;
+          const { getProjectClaim, isClaimAlive } = await import('../mcp.js');
+          const claim = getProjectClaim(slug);
+          expect(claim).not.toBeNull();
+          expect(claim!.slug).toBe(slug);
+          expect(typeof claim!.sessionId).toBe('string');
+          expect(claim!.sessionId.length).toBeGreaterThan(0);
+          expect(typeof claim!.claimedAt).toBe('string');
+          expect(isClaimAlive(slug)).toBe(true);
+        } finally {
+          await c.close();
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('isClaimAlive returns false after the MCP transport closes', async () => {
+      const f = createGitFixture();
+      try {
+        const c = await createMcpClient(app);
+        const res = await c.callTool('claim_reviews', { repoPath: f.repoPath });
+        const slug = (res.json as { slug: string }).slug;
+        const { getProjectClaim, isClaimAlive } = await import('../mcp.js');
+        expect(isClaimAlive(slug)).toBe(true);
+        // Close the MCP client, triggering transport.onclose.
+        await c.close();
+        // Give the transport a tick to process the close event.
+        await new Promise((r) => setTimeout(r, 50));
+        // After cleanup, the claim should be removed entirely (cleared by clearProjectClaimsForSession).
+        expect(getProjectClaim(slug)).toBeNull();
+        expect(isClaimAlive(slug)).toBe(false);
+      } finally {
+        f.cleanup();
+      }
+    });
+  });
+
   describe('set_analysis modes', () => {
     it('mode=replace stamps blob SHAs on entries and broadcasts analysis_changed', async () => {
       const f = createGitFixture();
