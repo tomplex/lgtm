@@ -35,7 +35,7 @@ The recent `iterative-analysis-design.md` already names this as out-of-scope-but
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Process model | One-shot `claude -p "<prompt>"` subprocess per request, `cwd = project.repoPath` | "Fresh session per generation" mapped directly onto the CLI's one-shot mode. No process lifecycle to manage beyond spawn → exit. |
+| Process model | One-shot `claude -p "<prompt>" --permission-mode bypassPermissions` subprocess per request, `cwd = project.repoPath` | "Fresh session per generation" mapped directly onto the CLI's one-shot mode. `--permission-mode bypassPermissions` is load-bearing: without it, every first-touch of an MCP tool prompts for permission, and there's no human at the keyboard to answer — the subprocess hangs forever. The trust assumption is fine: the subprocess is local, the prompts come from skills the project author wrote, and the spawned claude is invoked with explicit user intent (button click). |
 | Project identification | CWD only — the spawned claude calls existing MCP tools (`claim_reviews`, `set_analysis`, `reply`) which already infer project from repo path | No project ID juggling, no env var, no MCP config rewriting. Inherits the user's installed plugin config as-is. |
 | Concurrency | One in-flight job per `(project, kind, subjectId)`. Button disabled while running. No queue. Different projects/kinds run concurrently. | Matches user expectation. Queue adds complexity without obvious value at v0. |
 | In-flight rerun | Click-while-running is a no-op (button is disabled). No cancel. | YAGNI; cancel is out-of-scope. |
@@ -48,10 +48,17 @@ The recent `iterative-analysis-design.md` already names this as out-of-scope-but
 | First-open banner | Banner appears when neither analysis nor walkthrough exists. Three buttons: "Generate both" / "Just analysis" / "Skip". Per-project skip flag persists. | Discoverable. Skip is sticky so it doesn't nag. |
 | Per-project running indicator | Small dot in the project header during any active job for that project. No global aggregate indicator. | Per-project view already where the user is; global indicators tend to mislead. |
 | Auth | Spawned claude inherits the user's environment (`HOME`, `PATH`, `~/.claude/`). | Local-only assumption already established. |
+| Tool surface | Spawned claude inherits the user's full plugin install (gh, github, gcloud, refactor, etc., plus lgtm). v0 does NOT pass `--allowed-tools` to constrain. | Trust assumption: max-plan, local, single-user, button-driven. A misbehaving spawned claude could in principle call any plugin tool. The constraint option (`--allowed-tools "mcp__lgtm__* Read Bash(git:*) Grep Glob"`) is documented as future-work in case real-world behavior demands it. |
 
 ## Hard dependency
 
-This spec depends on `iterative-analysis-design.md` shipping first — specifically the `/lgtm refresh` skill it introduces. Managed claude's analysis-regenerate path invokes that skill. Walkthrough-regenerate calls the existing `/lgtm walkthrough`. If iterative-analysis hasn't shipped, managed-claude analysis-regenerate has nothing to invoke.
+This spec depends on `iterative-analysis-design.md` shipping first. Specifically:
+
+- The `/lgtm refresh` skill introduced there is what managed-claude's analysis-regenerate path invokes. Walkthrough-regenerate calls the existing `/lgtm walkthrough`.
+- Three pieces of the iterative-analysis spec are **superseded** by this one when it lands and should be dropped from that spec's implementation:
+  - `POST /project/:slug/refresh-analysis` REST route (replaced by `POST /project/:slug/jobs` with `kind='analysis'`).
+  - The "claimed and alive" gating on the Refresh-analysis button (managed-claude buttons are always enabled because the supervisor itself spawns the worker).
+  - The "Copy refresh prompt" fallback affordance (no longer needed; if managed-claude proves unreliable in practice, restoring the fallback is a future-work item).
 
 The two specs were written in the same session and are intended to land sequentially.
 
@@ -99,7 +106,9 @@ Internal mechanics:
 - `enqueueJob` looks up the prompt template by kind, builds the command (`claude -p "<rendered prompt>"`), spawns via `child_process.spawn` with `cwd = repoPath`, inherits `process.env`, captures stdout and stderr.
 - Each captured line is broadcast as an SSE `claude_stream` event on the project's session AND appended to an in-memory ring buffer (capped at 200 entries) that's persisted to the row on completion or failure.
 - On exit: row status moves to `succeeded` (exit 0) or `failed` (non-zero). SSE `claude_job_status` event fires with the new state.
-- One-job-at-a-time enforced by a check-then-insert inside `enqueueJob` against `(projectSlug, kind, subjectId, status='running')`. Race-window is small but the worst case is two concurrent claudes running for the same key — observable, not catastrophic.
+- One-job-at-a-time enforced inside `enqueueJob`. Implementation:
+  - For `analysis` and `walkthrough` kinds: `BEGIN IMMEDIATE` SQLite transaction wrapping the check-then-insert against `(projectSlug, kind, subjectId, status='running')`. Eliminates the race for repeat-clicks on the regenerate buttons.
+  - For `comment-reply` kind specifically: key on `(projectSlug, kind, subjectId)` across **all** statuses. Once a reply has been started for a comment — running, succeeded, or failed — no second job for the same comment is ever enqueued. The trigger (`POST /comments`) can land twice (network retry, double-click on Save, browser bfcache) and would otherwise produce two replies under one question. Failed replies are explicitly retryable via a manual UI action that calls a separate endpoint, not via re-trigger from the comment-create path.
 
 ### Prompt templates
 
@@ -134,13 +143,31 @@ Existing events (`comments_changed`, `analysis_changed`, `walkthrough_changed`, 
 
 ### MCP changes
 
-- **One new tool: `read_comment(commentId)`.** Returns `{comment, fileContext}` where `fileContext` is the ±3 lines around the anchored line. Required by the new `/lgtm answer` skill — the existing `read_feedback` only returns submitted-feedback batches, not arbitrary comments by ID.
+- **One new tool: `read_comment(commentId)`.** Returns:
+  ```ts
+  {
+    comment: Comment;                       // full record from comment-types.ts
+    fileContext: {                          // null for non-diff comments (item != 'diff')
+      file: string;
+      lineRange: { from: number; to: number };
+      side: 'RIGHT' | 'LEFT';
+      lines: { num: number; content: string }[];  // ±3 around the anchor
+    } | null;
+  }
+  ```
+  For `side === 'RIGHT'` (and unspecified, which defaults to RIGHT), `fileContext.lines` come from the working tree (`getFileLines` in `server/git-ops.ts`). For `side === 'LEFT'`, the lines come from the base SHA — the deleted content the user commented on. `read_feedback` already exists but only returns submitted-feedback batches; `read_comment` is the missing per-comment lookup.
 - **All other tools unchanged.** The spawned claude uses existing `read_analysis`, `read_feedback`, `set_analysis`, `set_walkthrough`, `comment`, `reply`.
-- **`claim_reviews` is NOT called by the spawned claude.** The spawned claude isn't going to receive channel notifications — it has a one-shot job. Skipping the claim avoids stomping on the user's interactive-claude claim. Skills (`/lgtm refresh`, `/lgtm walkthrough`, `/lgtm answer`) need to tolerate not having claimed. Today they'd implicitly claim via initialization paths — that needs verification during implementation; if a skill calls `claim_reviews` as a side effect, we either remove it from the skill or accept the claim-flicker.
+- **`autoClaimDiffReviewsIfUnheld` is suppressed during a managed-claude run.** Today, every MCP tool call lands in `resolveProject` (`server/mcp.ts:13`), which calls `autoClaimDiffReviewsIfUnheld` (`mcp.ts:283`). That function silently grants the claim to whichever MCP session calls first when no holder exists. A spawned claude on its first MCP call would auto-claim and stomp the user's interactive flow.
+
+  Fix: `autoClaimDiffReviewsIfUnheld` checks `managedClaude.hasActiveJob(slug)` first; if true, skip. While any managed job for the slug is running, no auto-claim happens. After the job ends, normal auto-claim resumes. The user's own pre-existing claim is never touched (the function only acts when no holder exists).
+
+  Side-benefit: managed-claude tools never claim, never receive channel notifications, never appear in the iterative-analysis spec's `connection-state` UI. They are invisible to the channel-notification system, which is what we want — channel notifications are for collaboration with the user's interactive claude, not for managed jobs.
+
+  Skills invoked by managed claude (`/lgtm refresh`, `/lgtm walkthrough`, `/lgtm answer`) are unaffected: they don't call `claim_reviews` directly (verified in `skills/analyze/SKILL.md` and `skills/walkthrough/SKILL.md`), and the implicit auto-claim path is now suppressed for them by the supervisor flag.
 
 ### Replacing the existing channel-notification path
 
-`server/app.ts:650-664` currently sends a channel notification when a `mode='direct'` comment is created. With managed claude, that path is replaced:
+The `POST /project/:slug/comments` route (`server/app.ts`) currently has a `mode === 'direct' && !parentId` branch that calls `notifyChannel`. With managed claude, that branch is replaced:
 
 ```ts
 // Before (today):
@@ -196,11 +223,11 @@ History is preserved (rows are not deleted on completion). "Current job for key"
 
 ### Project metadata extension
 
-A new column `first_open_banner_skipped INTEGER NOT NULL DEFAULT 0` on the existing `projects` table. The `GET /project/:slug` summary surfaces it as `firstOpenBannerSkipped: boolean`.
+The existing `projects` table is `(slug TEXT PRIMARY KEY, data TEXT NOT NULL)` — all per-project state already lives inside the `data` JSON blob (see `ProjectBlob` in `server/store.ts:6`). Add `firstOpenBannerSkipped: boolean` (default `false`) to `ProjectBlob`, plumbed through `Session.toBlob()` / `fromBlob()`. No schema migration required; missing field reads as `false`. The `GET /project/:slug` summary surfaces it directly.
 
 ### Comment shape
 
-Unchanged. The reply mechanism (`mcp__lgtm__reply`) and existing `Comment` type already cover the data the spawned claude will produce.
+Unchanged on the persistence layer — the spawned claude's eventual reply lands as a regular `Comment` via `mcp__lgtm__reply`, no new fields. The live transcript shown during a running `comment-reply` job is **transient view-only state in the frontend**, derived from `claude_stream` SSE events, not persisted as a Comment. When the job completes and the reply Comment lands via `comments_changed`, the frontend swaps the streaming view for the persisted comment.
 
 ## Skill: `/lgtm answer`
 
@@ -236,15 +263,20 @@ The `read_comment` MCP tool the skill depends on is specified in MCP changes abo
 | Server restart while running | Boot-time recovery scan: any `status='running'` rows → `'failed'` with reason `server-restart` | Failed pill on next page load; user clicks Retry to re-enqueue. |
 | Hung subprocess | Not detected. v0 punts. | User waits or restarts the server. Acknowledged in out-of-scope. |
 | MCP-side error during the run (e.g. `set_analysis` fails) | Skill emits stderr; subprocess exits non-zero | Same path as non-zero exit. |
-| Spawned claude calls `claim_reviews` and steals user's claim | Possible if a skill auto-claims | Implementation note: skills invoked by managed claude must not claim. Verify in implementation; remove auto-claim from skills if found. |
+| Exit 0 but no artifact produced (model silently returned without calling `set_walkthrough` etc.) | For `analysis` and `walkthrough` jobs: snapshot artifact existence/identity (e.g., updated-at SHA pair) before/after the run; if unchanged on a successful exit, downgrade `succeeded` → `failed` with reason `no-artifact`. For `comment-reply`: similarly verify a child Comment with the right `parentId` was created. | Failed pill with "model returned without producing an artifact" message. Retry button enabled. |
+| Spawned claude attempts to claim the slug | Suppressed by `autoClaimDiffReviewsIfUnheld` checking `managedClaude.hasActiveJob(slug)` first | Not possible during a managed run — see MCP changes section. |
 
 ## Testing
 
-- **Unit (managed-claude.ts):** `enqueueJob` rejects when a running job exists for the same key; allows when keys differ. `recoverFromCrash` flips running rows to failed. Last-lines ring buffer correctly caps at 200 entries with newest preserved.
-- **Unit:** prompt rendering for each `JobKind` produces the right command string.
+- **Unit (managed-claude.ts):** `enqueueJob` rejects when a running job exists for the same key for `analysis` / `walkthrough`. For `comment-reply`, rejects when ANY job (running, succeeded, or failed) exists for the same `(slug, commentId)`. `recoverFromCrash` flips running rows to failed. Last-lines ring buffer correctly caps at 200 entries with newest preserved.
+- **Unit:** prompt rendering for each `JobKind` produces the right command string with `--permission-mode bypassPermissions`.
+- **Unit (mcp.ts):** `autoClaimDiffReviewsIfUnheld` skips when `managedClaude.hasActiveJob(slug) === true`; auto-claims as before when `false`. Existing claims are never touched regardless.
 - **Integration:** end-to-end `POST /project/:slug/jobs` with `kind='walkthrough'` against a real subprocess that exits successfully → row moves to `succeeded`, SSE events fire in order (`stream` lines, then `status` transition), walkthrough artifact lands.
 - **Integration:** subprocess that exits non-zero → `failed` row with stderr captured; SSE `status` event carries the exit code.
+- **Integration:** subprocess that exits 0 but produces no artifact → row downgraded to `failed` with reason `no-artifact`.
 - **Integration:** comment with `mode='direct'` posted → server enqueues `comment-reply` job → spawned claude calls `mcp__lgtm__reply` → reply comment lands → `comments_changed` SSE fires. Verify the channel-notification path is no longer invoked for direct comments.
+- **Integration:** double-`POST /comments` for the same `mode='direct'` comment (network-retry simulation) — only ONE `comment-reply` job is enqueued.
+- **Integration:** managed claude run starts; concurrent MCP tool call from a separate "user" session — auto-claim is suppressed for the user session for the duration; resumes after the managed run completes.
 - **Integration:** server killed mid-run, restarted → orphaned row recovered to `failed` state on boot.
 - **Integration:** two `RegenerateButton` clicks on different kinds for the same project run concurrently. Two clicks on the same kind: first runs, second 409s.
 - **Frontend (vitest):** `RegenerateButton` state machine driven by mock SSE events transitions correctly through idle → running → succeeded → idle (post-completion stable state). Failed-state expansion shows captured lines.
@@ -268,5 +300,4 @@ The replacement of `app.ts:650-664` channel-notification path is a behavior chan
 
 ## Open questions
 
-- **Does any existing skill (`/lgtm refresh`, `/lgtm walkthrough`) implicitly call `claim_reviews`?** If yes, the spawned claude will stomp on the user's interactive claim. Verify during implementation and either remove the auto-claim or accept the flicker. Decision deferred until implementation reads the skill internals.
-- **Does the spawned claude need an explicit `--dangerously-skip-permissions` (or equivalent) to run non-interactively?** The CLI may prompt for tool permissions on first use even with `-p`. Verify and pass the right flag at spawn time.
+- **First implementation step is a smoke test.** Spawn `claude -p "/lgtm walkthrough" --permission-mode bypassPermissions` against a registered project and confirm: (a) it runs to completion non-interactively, (b) it does NOT auto-claim (after the supervisor's `hasActiveJob` suppression in `autoClaimDiffReviewsIfUnheld` is in place), (c) `set_walkthrough` writes the artifact. If the CLI flag name has drifted or the auto-claim suppression has a hole, surface immediately before building the supervisor on top.
