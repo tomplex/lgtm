@@ -2,7 +2,7 @@
 
 A browser-based code review UI for collaborating with Claude Code. Claude registers a project, seeds inline comments on the diff, adds documents for review, and runs analysis to prioritize files. You review everything in the browser and submit feedback that Claude reads and acts on.
 
-![LGTM screenshot](images/Screenshot%202026-04-01%20at%203.53.15%20PM.png)
+![LGTM — sidebar in phased view, diff with an inline comment, and the analysis layer surfacing review priority](images/hero.png)
 
 ## Install as a Claude Code plugin
 
@@ -53,7 +53,7 @@ The review loop is iterative. Claude addresses feedback, you refresh the diff, p
 
 Claude can also run an analysis pass that classifies every file in the diff by priority (critical / important / normal / low) and review phase (review / skim / rubber-stamp), then groups files thematically with a suggested review strategy. The sidebar switches between flat, grouped and phased views based on this analysis.
 
-<!-- screenshot: analysis sidebar in phased view, showing review/skim/rubber-stamp groups -->
+![Sidebar in phased view: Review Carefully / Skim / Rubber Stamp groups with per-file priority chips and tree-view directory hierarchy](images/analysis-sidebar.png)
 
 ### Walkthrough
 
@@ -61,7 +61,7 @@ For larger or more architectural changes, Claude can generate a *narrated walkth
 
 Press `W` from the diff to enter walkthrough mode. `Enter` and `Shift+Enter` step forward and back; `g` followed by a digit jumps directly to a stop; `d` exits back to the diff.
 
-<!-- screenshot: walkthrough view with active stop, narrative, and the referenced diff lines below -->
+![Walkthrough mode: ordered stops on the left, active stop with narrative + multi-file artifacts on the right](images/walkthrough.png)
 
 ## Features
 
@@ -77,13 +77,13 @@ Cmd+click any identifier in the diff to peek at its definition without leaving t
 
 For other languages (and for top-level Go decls), peek falls back to ripgrep heuristics — fast, no setup, works across the whole repo. Double-tap `Shift` to open symbol search and jump to any symbol by name.
 
-<!-- screenshot: peek panel open over a diff line, showing definition + hover docs + collapsible references -->
+![Peek panel: LSP-resolved type alias, definition snippet, and a collapsible references section](images/peek-panel.png)
 
 ### Document review
 
 Claude can attach markdown docs — design specs, planning notes, ADRs, anything textual — as separate review tabs alongside the diff. Markdown renders with proper formatting; you can leave block-level comments on any paragraph, code block, or heading. Useful when the design context lives outside the diff itself.
 
-<!-- screenshot: document tab with rendered markdown and a block-level comment -->
+![Document review tab with rendered markdown and a block-level Claude comment](images/document-review.png)
 
 ### Inline comments and threads
 
@@ -91,7 +91,7 @@ Threaded comments with replies. Claude's comments are visually distinct from you
 
 Jump between comments with `n` / `p`. Save with `Cmd+Enter`, cancel with `Esc`.
 
-<!-- screenshot: a comment thread with a reply, showing Claude's seeded comment vs user reply styling -->
+![Inline comment thread on a diff line: Claude's seeded comment with a user reply](images/comment-thread.png)
 
 ### Analysis-driven prioritization
 
