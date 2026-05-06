@@ -127,18 +127,21 @@ describe('getBranchDiffRaw', () => {
   beforeAll(() => {
     repo = mkdtempSync(join(tmpdir(), 'lgtm-rawdiff-'));
     const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
-    git('init', '-q');
+    // Pin default branch so tests don't rely on user's init.defaultBranch config.
+    git('init', '-q', '-b', 'main');
     git('config', 'user.email', 'test@example.com');
     git('config', 'user.name', 'Test');
     writeFileSync(join(repo, 'kept.txt'), 'unchanged\n');
     writeFileSync(join(repo, 'removed.txt'), 'will be removed\n');
     writeFileSync(join(repo, 'modified.txt'), 'old\n');
+    writeFileSync(join(repo, 'old-name.txt'), 'rename me\n');
     git('add', '.');
     git('commit', '-q', '-m', 'base');
     git('checkout', '-q', '-b', 'feature');
     writeFileSync(join(repo, 'modified.txt'), 'new\n');
     writeFileSync(join(repo, 'added.txt'), 'fresh file\n');
     execFileSync('rm', [join(repo, 'removed.txt')]);
+    git('mv', 'old-name.txt', 'new-name.txt');
     git('add', '-A');
     git('commit', '-q', '-m', 'feature work');
   });
@@ -174,6 +177,16 @@ describe('getBranchDiffRaw', () => {
   it('omits files unchanged on the branch', () => {
     const result = getBranchDiffRaw(repo, 'main');
     expect(result.has('kept.txt')).toBe(false);
+  });
+
+  it('keys renames by new path with R-prefixed status', () => {
+    const result = getBranchDiffRaw(repo, 'main');
+    expect(result.has('new-name.txt')).toBe(true);
+    expect(result.has('old-name.txt')).toBe(false);
+    const r = result.get('new-name.txt')!;
+    expect(r.status).toMatch(/^R/);
+    expect(r.oldBlob).toMatch(/^[0-9a-f]{40}$/);
+    expect(r.newBlob).toMatch(/^[0-9a-f]{40}$/);
   });
 });
 
