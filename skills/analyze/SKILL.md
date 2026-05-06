@@ -5,7 +5,7 @@ description: >
   phase, summary, and category, then produces an overview, review strategy, and
   thematic groupings. Use when the user asks to analyze a branch for review, or
   when code is mostly done and a review session is active.
-allowed-tools: "mcp__lgtm__set_analysis,mcp__plugin_lgtm_lgtm__set_analysis,Agent,Bash(git:*)"
+allowed-tools: "mcp__lgtm__read_analysis,mcp__plugin_lgtm_lgtm__read_analysis,mcp__lgtm__set_analysis,mcp__plugin_lgtm_lgtm__set_analysis,Agent,Bash(git:*)"
 ---
 
 # Analyze Skill
@@ -21,6 +21,21 @@ want the review UI open and claimed for notifications, call `claim_reviews`
 separately (via the `lgtm` skill).
 
 ## Pipeline
+
+### Step 0: Check for prior analysis
+
+Call `read_analysis` with the repo path. The response shape:
+
+- `json` — prior analysis (or `null`).
+- `freshness` — `{staleFiles, missingFiles, removedFiles, staleSynthesis, ...}`.
+
+Decide based on the response:
+
+- **`json` is null** → no prior analysis. Proceed with the full pipeline (Steps 1–3 below).
+- **`json` is non-null AND any of `freshness.staleFiles`, `missingFiles`, `removedFiles` is non-empty** → invoke the `refresh` skill instead. Do NOT run Steps 1–3.
+- **`json` is non-null AND freshness is all-empty** → report "analysis is fresh, nothing to do" and exit.
+
+The full pipeline below runs only when `read_analysis` returns null `json`.
 
 ### Step 1: File analysis
 
