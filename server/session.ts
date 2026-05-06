@@ -11,6 +11,7 @@ import { migrateBlob } from './comment-migration.js';
 import type { Comment, CreateComment, CommentFilter } from './comment-types.js';
 import { LspManager } from './lsp/index.js';
 import type { Walkthrough } from './walkthrough-types.js';
+import type { FileAnalysis, AnalysisGroup } from './parse-analysis.js';
 
 // --- Types ---
 
@@ -203,6 +204,45 @@ export class Session {
 
   setAnalysis(analysis: Record<string, unknown>): void {
     this._analysis = analysis;
+    this.persist();
+  }
+
+  /**
+   * Merge new file entries into the existing analysis, drop entries listed in
+   * removedFiles, and (if synthesisIfProvided is non-null) replace the synthesis.
+   * Stamps blob SHAs on every entry written.
+   */
+  mergeAnalysis(input: {
+    files: Record<string, FileAnalysis>;
+    synthesisIfProvided: { overview: string; reviewStrategy: string; opinion?: string; groups: AnalysisGroup[]; synthesizedAtFileSet: string[] } | null;
+    blobsByPath: Record<string, { oldBlob: string; newBlob: string }>;
+    removedFiles: string[];
+  }): void {
+    const prev = (this._analysis ?? {}) as {
+      overview?: string;
+      reviewStrategy?: string;
+      files?: Record<string, FileAnalysis>;
+      groups?: AnalysisGroup[];
+      synthesizedAtFileSet?: string[];
+    };
+    const mergedFiles: Record<string, FileAnalysis> = { ...(prev.files ?? {}) };
+    for (const path of input.removedFiles) delete mergedFiles[path];
+    for (const [path, entry] of Object.entries(input.files)) {
+      const blobs = input.blobsByPath[path];
+      mergedFiles[path] = {
+        ...entry,
+        analyzedAtBaseBlob: blobs?.oldBlob ?? entry.analyzedAtBaseBlob ?? '',
+        analyzedAtHeadBlob: blobs?.newBlob ?? entry.analyzedAtHeadBlob ?? '',
+      };
+    }
+    const synthesis = input.synthesisIfProvided;
+    this._analysis = {
+      overview: synthesis?.overview ?? prev.overview ?? '',
+      reviewStrategy: synthesis?.reviewStrategy ?? prev.reviewStrategy ?? '',
+      files: mergedFiles,
+      groups: synthesis?.groups ?? prev.groups ?? [],
+      synthesizedAtFileSet: synthesis?.synthesizedAtFileSet ?? prev.synthesizedAtFileSet ?? [],
+    };
     this.persist();
   }
 

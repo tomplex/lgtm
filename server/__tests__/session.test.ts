@@ -229,6 +229,114 @@ describe('Session', () => {
     });
   });
 
+  describe('analysis merge', () => {
+    it('stores synthesizedAtFileSet on setAnalysis', () => {
+      const session = makeSession('analysis-syn-fileset');
+      session.setAnalysis({
+        overview: 'o',
+        reviewStrategy: 's',
+        files: { 'a.ts': { priority: 'normal', phase: 'review', summary: '', category: '' } },
+        groups: [],
+        synthesizedAtFileSet: ['a.ts'],
+      });
+      const a = session.analysis as Record<string, unknown>;
+      expect(a.synthesizedAtFileSet).toEqual(['a.ts']);
+    });
+
+    it('mergeAnalysis stamps blob SHAs on file entries', () => {
+      const session = makeSession('analysis-merge-stamp');
+      session.setAnalysis({
+        overview: 'o', reviewStrategy: 's', files: {}, groups: [], synthesizedAtFileSet: [],
+      });
+      session.mergeAnalysis({
+        files: { 'a.ts': { priority: 'normal', phase: 'review', summary: '', category: '' } },
+        synthesisIfProvided: null,
+        blobsByPath: { 'a.ts': { oldBlob: 'B', newBlob: 'H' } },
+        removedFiles: [],
+      });
+      const a = session.analysis as { files: Record<string, { analyzedAtBaseBlob?: string; analyzedAtHeadBlob?: string }> };
+      expect(a.files['a.ts'].analyzedAtBaseBlob).toBe('B');
+      expect(a.files['a.ts'].analyzedAtHeadBlob).toBe('H');
+    });
+
+    it('mergeAnalysis preserves prior entries not in the new payload', () => {
+      const session = makeSession('analysis-merge-preserve');
+      session.setAnalysis({
+        overview: 'o', reviewStrategy: 's',
+        files: {
+          'a.ts': { priority: 'normal', phase: 'review', summary: 'first', category: 'core', analyzedAtBaseBlob: 'B1', analyzedAtHeadBlob: 'H1' },
+          'b.ts': { priority: 'low', phase: 'skim', summary: 'b', category: 'test', analyzedAtBaseBlob: 'B2', analyzedAtHeadBlob: 'H2' },
+        },
+        groups: [],
+        synthesizedAtFileSet: ['a.ts', 'b.ts'],
+      });
+      session.mergeAnalysis({
+        files: { 'a.ts': { priority: 'critical', phase: 'review', summary: 'updated', category: 'core' } },
+        synthesisIfProvided: null,
+        blobsByPath: { 'a.ts': { oldBlob: 'B1-NEW', newBlob: 'H1-NEW' } },
+        removedFiles: [],
+      });
+      const a = session.analysis as { files: Record<string, { priority: string; summary: string; analyzedAtBaseBlob?: string }> };
+      expect(Object.keys(a.files).sort()).toEqual(['a.ts', 'b.ts']);
+      expect(a.files['a.ts'].priority).toBe('critical');
+      expect(a.files['a.ts'].summary).toBe('updated');
+      expect(a.files['a.ts'].analyzedAtBaseBlob).toBe('B1-NEW');
+      expect(a.files['b.ts'].summary).toBe('b'); // untouched
+      expect(a.files['b.ts'].analyzedAtBaseBlob).toBe('B2'); // untouched
+    });
+
+    it('mergeAnalysis drops entries in removedFiles', () => {
+      const session = makeSession('analysis-merge-remove');
+      session.setAnalysis({
+        overview: 'o', reviewStrategy: 's',
+        files: {
+          'a.ts': { priority: 'normal', phase: 'review', summary: 'a', category: 'core' },
+          'gone.ts': { priority: 'low', phase: 'skim', summary: 'g', category: 'old' },
+        },
+        groups: [],
+        synthesizedAtFileSet: ['a.ts', 'gone.ts'],
+      });
+      session.mergeAnalysis({
+        files: {},
+        synthesisIfProvided: null,
+        blobsByPath: {},
+        removedFiles: ['gone.ts'],
+      });
+      const a = session.analysis as { files: Record<string, unknown> };
+      expect(Object.keys(a.files)).toEqual(['a.ts']);
+    });
+
+    it('mergeAnalysis replaces synthesis when provided, preserves when null', () => {
+      const session = makeSession('analysis-merge-synth');
+      session.setAnalysis({
+        overview: 'old-overview', reviewStrategy: 'old-strategy',
+        files: { 'a.ts': { priority: 'normal', phase: 'review', summary: '', category: '' } },
+        groups: [{ name: 'old-group', files: ['a.ts'] }],
+        synthesizedAtFileSet: ['a.ts'],
+      });
+      // null: preserve.
+      session.mergeAnalysis({
+        files: {},
+        synthesisIfProvided: null,
+        blobsByPath: {},
+        removedFiles: [],
+      });
+      let a = session.analysis as { overview: string; groups: unknown[] };
+      expect(a.overview).toBe('old-overview');
+      expect(a.groups).toEqual([{ name: 'old-group', files: ['a.ts'] }]);
+      // non-null: replace.
+      session.mergeAnalysis({
+        files: {},
+        synthesisIfProvided: { overview: 'new-overview', reviewStrategy: 'new-strategy', groups: [], synthesizedAtFileSet: ['a.ts'] },
+        blobsByPath: {},
+        removedFiles: [],
+      });
+      a = session.analysis as { overview: string; groups: unknown[] };
+      expect(a.overview).toBe('new-overview');
+      expect(a.groups).toEqual([]);
+    });
+  });
+
   describe('SSE', () => {
     it('broadcast sends event to subscribed clients', () => {
       const session = makeSession('sse-test');
