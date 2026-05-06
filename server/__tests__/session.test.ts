@@ -337,6 +337,66 @@ describe('Session', () => {
     });
   });
 
+  describe('analysis freshness', () => {
+    it('getAnalysisWithFreshness returns null when no analysis is set', () => {
+      const session = makeSession('freshness-empty');
+      expect(session.getAnalysisWithFreshness()).toBeNull();
+    });
+
+    it('getAnalysisWithFreshness reports staleFiles for unstamped legacy entries', () => {
+      const session = makeSession('freshness-legacy');
+      // Use a file path that exists in the fixture's branch diff. The fixture
+      // has at least one file changed on its feature branch — find one and
+      // seed the analysis with a legacy-shape entry.
+      const blobMap = session.getCurrentBlobMap();
+      const paths = Object.keys(blobMap.blobsByPath);
+      expect(paths.length).toBeGreaterThan(0); // sanity: branch has changes
+      const path = paths[0];
+
+      // Seed legacy-shape analysis (no blob fields).
+      session.setAnalysis({
+        overview: 'o',
+        reviewStrategy: 's',
+        files: {
+          [path]: { priority: 'normal', phase: 'review', summary: '', category: '' },
+        },
+        groups: [],
+        synthesizedAtFileSet: [path],
+      });
+
+      const result = session.getAnalysisWithFreshness();
+      expect(result).not.toBeNull();
+      expect(result!.freshness.staleFiles).toContain(path);
+      expect(typeof result!.computedAtHead).toBe('string');
+      expect(result!.computedAtHead).toMatch(/^[0-9a-f]{7,40}$/);
+    });
+
+    it('mergeAnalysis invalidates the freshness cache', () => {
+      const session = makeSession('freshness-cache-invalidate');
+      const blobMap = session.getCurrentBlobMap();
+      const paths = Object.keys(blobMap.blobsByPath);
+      const path = paths[0];
+
+      // Seed legacy entry => stale.
+      session.setAnalysis({
+        overview: 'o', reviewStrategy: 's',
+        files: { [path]: { priority: 'normal', phase: 'review', summary: '', category: '' } },
+        groups: [],
+        synthesizedAtFileSet: [path],
+      });
+      expect(session.getAnalysisWithFreshness()!.freshness.staleFiles).toContain(path);
+
+      // Re-stamp via mergeAnalysis with the right blobs => fresh.
+      session.mergeAnalysis({
+        files: { [path]: { priority: 'normal', phase: 'review', summary: '', category: '' } },
+        synthesisIfProvided: null,
+        blobsByPath: blobMap.blobsByPath,
+        removedFiles: [],
+      });
+      expect(session.getAnalysisWithFreshness()!.freshness.staleFiles).not.toContain(path);
+    });
+  });
+
   describe('SSE', () => {
     it('broadcast sends event to subscribed clients', () => {
       const session = makeSession('sse-test');

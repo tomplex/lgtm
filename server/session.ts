@@ -3,8 +3,10 @@ import { appendFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import {
   getBranchDiff, getSelectedCommitsDiff, getRepoMeta, getRepoMetaAsync,
+  gitRun, getBranchDiffRaw,
   type RepoMeta,
 } from './git-ops.js';
+import { computeFreshness, type AnalysisFreshness } from './freshness.js';
 import { storePut, type ProjectBlob } from './store.js';
 import { CommentStore } from './comment-store.js';
 import { migrateBlob } from './comment-migration.js';
@@ -56,6 +58,7 @@ export class Session {
   private _groupModeUserTouched = false;
   private _collapsedFolders: Record<string, boolean> = {};
   private _metaCache: { meta: RepoMeta; at: number } | null = null;
+  private _freshnessCache: { headSha: string; baseSha: string; freshness: AnalysisFreshness; computedAt: number } | null = null;
   private _lsp: LspManager;
 
   constructor(opts: {
@@ -204,7 +207,48 @@ export class Session {
 
   setAnalysis(analysis: Record<string, unknown>): void {
     this._analysis = analysis;
+    this._freshnessCache = null;
     this.persist();
+  }
+
+  getAnalysisWithFreshness(): { analysis: Record<string, unknown>; freshness: AnalysisFreshness; computedAtHead: string; computedAtBase: string } | null {
+    if (!this._analysis) return null;
+
+    const headSha = gitRun(this.repoPath, 'rev-parse', 'HEAD');
+    let baseSha = '';
+    try {
+      baseSha = gitRun(this.repoPath, 'rev-parse', this.baseBranch);
+    } catch {
+      /* base may not be resolvable in some test setups */
+    }
+
+    const now = Date.now();
+    const cached = this._freshnessCache;
+    if (cached && cached.headSha === headSha && cached.baseSha === baseSha && now - cached.computedAt < 5000) {
+      return { analysis: this._analysis, freshness: cached.freshness, computedAtHead: headSha, computedAtBase: baseSha };
+    }
+
+    const stored = this._analysis as { files?: Record<string, FileAnalysis>; synthesizedAtFileSet?: string[] };
+    const currentDiff = getBranchDiffRaw(this.repoPath, this.baseBranch);
+    const freshness = computeFreshness({
+      storedFiles: stored.files ?? {},
+      currentDiff,
+      synthesizedAtFileSet: stored.synthesizedAtFileSet ?? [],
+    });
+
+    this._freshnessCache = { headSha, baseSha, freshness, computedAt: now };
+    return { analysis: this._analysis, freshness, computedAtHead: headSha, computedAtBase: baseSha };
+  }
+
+  /** Returns the raw diff blob map alongside HEAD/base SHAs. Used by set_analysis call sites. */
+  getCurrentBlobMap(): { blobsByPath: Record<string, { oldBlob: string; newBlob: string }>; headSha: string; baseSha: string } {
+    const headSha = gitRun(this.repoPath, 'rev-parse', 'HEAD');
+    let baseSha = '';
+    try { baseSha = gitRun(this.repoPath, 'rev-parse', this.baseBranch); } catch { /* ignore */ }
+    const map = getBranchDiffRaw(this.repoPath, this.baseBranch);
+    const blobsByPath: Record<string, { oldBlob: string; newBlob: string }> = {};
+    for (const [path, entry] of map) blobsByPath[path] = { oldBlob: entry.oldBlob, newBlob: entry.newBlob };
+    return { blobsByPath, headSha, baseSha };
   }
 
   /**
@@ -243,6 +287,7 @@ export class Session {
       groups: synthesis?.groups ?? prev.groups ?? [],
       synthesizedAtFileSet: synthesis?.synthesizedAtFileSet ?? prev.synthesizedAtFileSet ?? [],
     };
+    this._freshnessCache = null;
     this.persist();
   }
 
