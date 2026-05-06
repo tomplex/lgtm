@@ -123,8 +123,12 @@ Read the new CHANGELOG entry (everything between `## [X.Y.Z]` and the next
 `## [` heading or EOF). Use that as the tag message body:
 
 ```bash
-git tag -a "vX.Y.Z" -m "<changelog entry body>"
+git tag -a --cleanup=verbatim "vX.Y.Z" -m "<changelog entry body>"
 ```
+
+`--cleanup=verbatim` is required: without it, `git tag` strips lines starting
+with `#`, which would eat `### Fixed` / `### Changed` markdown headers from
+the message.
 
 ### 8. Push
 
