@@ -43,8 +43,11 @@ import {
   activeStopIdx,
   markStopVisited,
   setLspStatus,
+  setAnalysisFreshness,
+  setConnectionState,
   type Language,
 } from './state';
+import { fetchFreshness, fetchConnectionState } from './refresh-api';
 import {
   fetchItems,
   fetchItemData,
@@ -377,6 +380,23 @@ export default function ProjectView() {
 
   // --- SSE ---
 
+  async function refetchFreshness() {
+    try {
+      setAnalysisFreshness(await fetchFreshness());
+    } catch {
+      /* ignore — server may not have analysis set yet */
+    }
+  }
+
+  async function refetchAnalysisAndFreshness() {
+    const [a, f] = await Promise.all([
+      fetchAnalysis().catch(() => null),
+      fetchFreshness().catch(() => null),
+    ]);
+    if (a) setAnalysis(a);
+    setAnalysisFreshness(f);
+  }
+
   function connectSSE() {
     const es = new EventSource(`${baseUrl()}/events`);
     es.addEventListener('comments_changed', async () => {
@@ -393,6 +413,9 @@ export default function ProjectView() {
     es.addEventListener('walkthrough_changed', () => {
       loadWalkthrough().then(() => showToast('Walkthrough updated', 2000));
     });
+    es.addEventListener('analysis_changed', () => {
+      void refetchAnalysisAndFreshness();
+    });
     es.addEventListener('git_changed', async () => {
       handleRefresh();
       loadWalkthrough();
@@ -403,6 +426,8 @@ export default function ProjectView() {
       } catch {
         /* ignore */
       }
+      // NEW: git state shift may change which files are stale.
+      await refetchFreshness();
     });
     es.onerror = () => {
       es.close();
@@ -420,6 +445,12 @@ export default function ProjectView() {
 
     const analysisData = await fetchAnalysis();
     if (analysisData) setAnalysis(analysisData);
+
+    // Prime freshness and connection state for the UI.
+    setAnalysisFreshness(await fetchFreshness().catch(() => null));
+    setConnectionState(
+      await fetchConnectionState().catch(() => ({ claimed: false, alive: false, claimedAt: null })),
+    );
 
     await loadWalkthrough();
 
