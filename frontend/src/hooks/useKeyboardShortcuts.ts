@@ -29,6 +29,7 @@ interface Options {
   onJumpComment: (direction: 'next' | 'prev') => void;
   onSymbolSearch: () => void;
   onOpenPalette: () => void;
+  onOpenHelp: () => void;
 }
 
 export function useKeyboardShortcuts(options: Options) {
@@ -70,6 +71,12 @@ export function useKeyboardShortcuts(options: Options) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       options.onOpenPalette();
+      return;
+    }
+
+    if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      options.onOpenHelp();
       return;
     }
 
