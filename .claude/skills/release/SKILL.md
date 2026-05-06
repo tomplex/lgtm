@@ -167,11 +167,9 @@ lgtm vX.Y.Z is out — <one-line summary of the most user-visible change>.
 Run /plugin update to pull. Notes: <github release URL>
 ```
 
-Plus a one-line reminder:
-
-> Note: `fdy-skills/marketplace.json` still pins lgtm to its old version.
-> That's safe to leave (plugin.json is canonical), but if you ever bump it,
-> keep it ≤ plugin.json's version.
+`fdy-skills/marketplace.json` has no `version` field for lgtm — Claude Code
+falls back to `plugin.json`'s version on the upstream repo (the only source
+of truth). Nothing to sync there.
 
 ## Failure summary
 
