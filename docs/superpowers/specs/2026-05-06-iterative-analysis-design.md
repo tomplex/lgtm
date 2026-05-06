@@ -28,16 +28,18 @@ The fix is twofold: make LGTM the canonical persistence layer for analysis (so C
 | Decision | Choice | Rationale |
 |---|---|---|
 | Source of truth | LGTM SQLite — no `/tmp/*.md` artifacts persist across runs | Eliminates transient state; agents read prior analysis via MCP. |
-| Freshness primitive | sha1 of `git diff <base>...HEAD -- <file>` per file | Captures both file changes and base-branch advances. Cheap, recomputable on demand. |
+| Freshness primitive | Blob-SHA pair `(oldBlob, newBlob)` from one `git diff --raw <base>...HEAD` invocation per freshness check | Captures both file changes and base-branch advances. One git spawn for the whole branch instead of N. Working-tree edits are deliberately ignored (review is for committed work). |
 | Synthesis freshness | Stale when any file is stale OR the file set changed | Synth is holistic; partial updates are not worth the prompt complexity. |
-| Refresh API | `set_analysis(..., mode: "replace" \| "merge")` | One tool, two behaviors. Merge preserves files not in the new payload. |
+| On-disk shape | Keep existing `{overview, reviewStrategy, files: Record<path, FileAnalysis>, groups}` and add per-entry freshness fields + a top-level `freshness` block | Avoids breaking `frontend/src/analysis.ts` which assumes map-keyed `files`. Migration becomes additive. |
+| Refresh API | `set_analysis(..., mode: "replace" \| "merge", removedFiles?)` | One tool, two behaviors. Merge preserves files not in the new payload; `removedFiles` is the explicit drop list. |
 | Read-back | New MCP tool `read_analysis()` | Returns JSON + rendered markdown for agent input. |
-| Trigger model | Pull-first; UI button generates a human-initiated channel message | Matches the rule: all push-to-Claude is human-initiated. |
-| Connection state | MCP transport liveness + `claim_reviews` claim state | Reliable enough to gate UI affordances; mid-turn opacity is fine because notifications queue. |
+| Update broadcast | New SSE event `analysis_changed` on every `set_analysis` write | Matches the existing `git_changed`, `comments_changed`, `walkthrough_changed` pattern. Today's `set_analysis` doesn't broadcast at all. |
+| Trigger model | Pull-first; UI button generates a human-initiated channel message via a new REST route | Matches the rule: all push-to-Claude is human-initiated. |
+| Connection state | MCP transport-entry presence + `claim_reviews` claim state | Reflects "transport is in `activeMcpSessions`," which catches explicit disconnect but not crash/half-open. Sufficient for gating UI affordances; heartbeat is future work. |
 
 ## Data model
 
-Restructure `_analysis` from an opaque blob to:
+Augment the existing `_analysis` shape additively. The current shape stays:
 
 ```ts
 type FileAnalysis = {
@@ -46,55 +48,56 @@ type FileAnalysis = {
   phase: 'review' | 'skim' | 'rubber-stamp';
   category: string;
   summary: string;
-  // Freshness metadata
-  analyzedAtSha: string;       // HEAD SHA when this entry was written
-  diffHash: string;            // sha1 of `git diff <base>...HEAD -- <path>` at that SHA
-};
-
-type Synthesis = {
-  overview: string;
-  strategy: string;
-  opinion: string;
-  groups: ThematicGroup[];
-  synthesizedAtSha: string;
-  fileSet: string[];           // sorted paths in scope at synthesis time
+  // NEW — freshness metadata, written by the server on every `set_analysis` entry
+  analyzedAtBaseBlob: string;  // blob SHA of <base>:<path> when this entry was written
+  analyzedAtHeadBlob: string;  // blob SHA of HEAD:<path> when this entry was written
 };
 
 type Analysis = {
-  files: FileAnalysis[];
-  synthesis: Synthesis | null;
+  overview: string;            // unchanged
+  reviewStrategy: string;      // unchanged
+  files: Record<string, FileAnalysis>;  // unchanged shape (map keyed by path)
+  groups: ThematicGroup[];     // unchanged
+  // NEW — synthesis-level provenance, used to detect "synth is stale"
+  synthesizedAtFileSet: string[];  // sorted paths covered by the last synthesis
 };
 ```
 
-The frontend continues to receive a single `analysis` JSON object, augmented with a freshness field computed on read:
+The freshness primitive is the blob-SHA pair: a file's stored `(analyzedAtBaseBlob, analyzedAtHeadBlob)` is compared to the *current* `(baseBlob, headBlob)` from a single `git diff --raw <base>...HEAD` invocation. Mismatch on either side = stale. This catches both file content changes and base-branch advances in one git call.
+
+The `GET /project/:slug/analysis` response is augmented with a top-level `freshness` field (frontend doesn't touch the existing fields):
 
 ```ts
 type AnalysisFreshness = {
-  staleFiles: string[];        // paths whose current diffHash differs from stored
-  missingFiles: string[];      // paths in current diff but not in analysis
-  removedFiles: string[];      // paths in analysis but not in current diff
-  staleSynthesis: boolean;     // any of the above is non-empty
-  computedAt: string;          // ISO timestamp; cached briefly server-side
+  staleFiles: string[];        // paths whose current blob pair differs from stored
+  missingFiles: string[];      // paths in current diff but not in `files`
+  removedFiles: string[];      // paths in `files` but not in current diff
+  staleSynthesis: boolean;     // any of the above is non-empty OR fileSet differs
+  computedAtHead: string;      // HEAD SHA at compute time, used as cache key
+  computedAtBase: string;      // base SHA at compute time, used as cache key
 };
 ```
 
-**Migration.** Existing `_analysis` blobs without per-file freshness metadata are treated as fully stale on first read. Detection: if a file entry lacks `diffHash`, the freshness check treats its stored hash as empty string, which never matches the recomputed value — so every legacy entry surfaces as `staleFiles`. The next refresh re-hydrates with current SHAs. No migration script needed; the read path tolerates the legacy shape and the next `set_analysis` writes the new shape.
+Server-side freshness cache is keyed on `(headSha, baseSha)` — when neither has moved, the cached freshness is valid indefinitely. The 5s wall-clock TTL on the analysis endpoint is just to absorb UI bursts within a single SHA pair.
+
+**Migration.** Existing `_analysis` blobs lack `analyzedAtBaseBlob` / `analyzedAtHeadBlob` per file and `synthesizedAtFileSet` at the top level. Detection: if a file entry lacks `analyzedAtHeadBlob`, freshness treats its stored pair as empty strings, which never matches the recomputed pair — so every legacy entry surfaces as `staleFiles`. Synthesis is stale because `synthesizedAtFileSet` is empty (or absent). The next `set_analysis` (replace or merge) writes the new fields. No migration script needed; the read path tolerates absent fields. Frontend keeps consuming the unchanged top-level fields; only new components that render staleness indicators look at `freshness`.
 
 ## API surface
 
 ### REST
 
-- `GET /project/:slug/analysis` — current analysis + freshness, computed on demand, cached for ~5s server-side to absorb UI bursts.
-- `GET /project/:slug/analysis/freshness` — freshness only; cheaper for UI polling and for the `/lgtm refresh` skill's pre-check.
-- `GET /project/:slug/connection-state` — `{claimed: bool, alive: bool, claimedAt: string | null}`. Drives the refresh button's enabled state and the header connection indicator.
+- `GET /project/:slug/analysis` — current analysis + freshness, computed on demand. Cached server-side keyed by `(headSha, baseSha)` plus a 5s wall-clock TTL on the keyed entry to absorb UI bursts.
+- `GET /project/:slug/analysis/freshness` — freshness only; cheaper for UI polling and for the `/lgtm refresh` skill's pre-check. Same cache.
+- `GET /project/:slug/connection-state` — `{claimed: bool, alive: bool, claimedAt: string | null}`. Drives the refresh button's enabled state and the header connection indicator. `alive` reflects "transport entry present in `activeMcpSessions`," which catches explicit close but not crash/network drop — see Connection state detection below.
+- `POST /project/:slug/refresh-analysis` — UI-triggered. Server packs freshness data into a channel-message payload and sends it via the existing `notifyChannel` path. Returns `{delivered: bool, reason?: string}` so the UI can show a success toast or fall back to "copy prompt."
 
 ### MCP tools
 
 - **`read_analysis(repoPath)`** — returns `{json, markdown, freshness}`.
-  - `markdown` is the file-classifier-format rendering of the previous file analysis, suitable for passing to the agent as prior context. Generated on demand from the JSON; not stored.
+  - `markdown` is the file-classifier-format rendering of the previous file analysis, suitable for passing to the agent as prior context. Generated on demand from the JSON; not stored. Note: this roundtrip is *lossy* for multiline summaries — `parse-analysis.ts` joins summary lines with a single space, so the rendered markdown won't reproduce paragraph breaks. The agent prompt should not promise verbatim copy of unchanged entries.
   - `freshness` is the same shape returned by `GET /analysis/freshness`.
 - **`set_analysis(repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath?, mode?, removedFiles?)`** — `mode` defaults to `"replace"` for backwards compat.
-  - `mode: "merge"` parses the new file analysis md, merges entries by path (new overwrites old; entries in old-but-not-new are preserved unless they appear in `removedFiles`), and replaces the synthesis wholesale. `removedFiles` is a list of paths to drop from the merged result; the skill computes it from `freshness.removedFiles`. The agent only outputs entries for files it (re-)classified — preservation of unchanged entries happens server-side. The server stamps `analyzedAtSha` and recomputes `diffHash` for every entry it writes; the agent does not need to compute these.
+  - `mode: "merge"` parses the new file analysis md, merges entries by path (new overwrites old; entries in old-but-not-new are preserved unless they appear in `removedFiles`), and replaces the synthesis wholesale. `removedFiles` is a list of paths to drop from the merged result; the skill computes it from `freshness.removedFiles`. The agent only outputs entries for files it (re-)classified — preservation of unchanged entries happens server-side. The server stamps `analyzedAtBaseBlob` and `analyzedAtHeadBlob` (from a single `git diff --raw <base>...HEAD` query) for every entry it writes; the agent does not need to compute these.
 
 ### UI
 
@@ -102,8 +105,8 @@ type AnalysisFreshness = {
 - **Stale count chip** in the analysis tab header ("3 files stale").
 - **"Refresh analysis" button** next to the existing "Run analysis" affordance.
   - Enabled when a Claude is claimed and alive for this project.
-  - Disabled with a fallback "Copy refresh prompt" affordance otherwise.
-  - Clicking enabled: pushes a human-initiated channel message of shape `{type: "refresh_analysis_requested", staleFiles, missingFiles, removedFiles}` to the claimed Claude. Same delivery path as review submission.
+  - Disabled with a fallback "Copy refresh prompt" affordance otherwise (a static instruction with the project slug, e.g. "Run `/lgtm refresh` for project `<slug>`").
+  - Clicking enabled: `POST /project/:slug/refresh-analysis`. The server JSON-encodes the freshness payload into the channel-message `content` (string), with `meta = {event: "refresh_analysis_requested", project: slug}`. Same delivery primitive as review submission (`notifyChannel`); only the `meta.event` value is new.
 - **Connection indicator** in the header: small dot showing whether a Claude is currently claimed for this project. Drawn from `GET /connection-state`.
 
 ## Skill flow
@@ -119,7 +122,7 @@ type AnalysisFreshness = {
    - Instruction to output **only** entries for those files. The server preserves unchanged entries; the agent does not copy them forward.
 5. Locally compose the merged file analysis (previous entries minus `removedFiles`, overlaid with the new entries) and write it to `/tmp/lgtm-analysis-files-merged.md`. This is the input to synthesizer.
 6. Spawn `synthesizer` on the merged file analysis (existing behavior; no changes).
-7. Call `set_analysis(..., mode: "merge", removedFiles: freshness.removedFiles)` — passing the *agent's delta-only* file analysis md plus the explicit removal list. The server merges, stamps freshness metadata, and broadcasts on the existing SSE channel.
+7. Call `set_analysis(..., mode: "merge", removedFiles: freshness.removedFiles)` — passing the *agent's delta-only* file analysis md plus the explicit removal list. The server merges, stamps freshness metadata (blob SHAs from the same `git diff --raw` query), and broadcasts a new `analysis_changed` SSE event so connected browsers refresh.
 
 ### `/lgtm analyze` (modified)
 
@@ -131,41 +134,54 @@ One entry point; behavior keys off persisted state.
 
 ## Connection state detection
 
-The MCP server already routes `claim_reviews` claims into a per-project record. Extend the record with transport liveness:
+The current MCP layer tracks claims as a per-MCP-session `claimedDiff` flag inside `activeMcpSessions` (see `server/mcp.ts`). There is no per-project claim record today. Introduce one:
 
 ```ts
-type Claim = {
+type ProjectClaim = {
   slug: string;
-  sessionId: string;          // MCP session id
+  sessionId: string;          // MCP session id of the claiming Claude
   claimedAt: string;
-  // Tracked by the MCP transport layer:
-  transportAlive: boolean;
 };
+
+// Keyed by slug, with a reverse index from sessionId for cleanup
+// when the transport entry is removed from activeMcpSessions.
 ```
 
-On MCP transport disconnect (explicit or close), the server flips `transportAlive` to `false` for any claims held by that session id. `GET /connection-state` returns `{claimed: <claim exists>, alive: <claim exists && transportAlive>, claimedAt}`.
+When the MCP transport entry for `sessionId` is removed from `activeMcpSessions` (the existing `transport.onclose` path), the corresponding claim is dropped. `GET /connection-state` returns:
 
-The server cannot tell whether a connected Claude is mid-turn — that's opaque from MCP's side. That's fine: human-initiated channel messages queue and deliver on the next idle moment. The "Claude is mid-turn ignoring server notifications" failure mode we want to avoid is specifically server-generated events triggered by activity Claude itself caused, which this design eliminates.
+```ts
+{
+  claimed: boolean;            // true iff a ProjectClaim exists for this slug
+  alive: boolean;              // claimed AND that sessionId is still in activeMcpSessions
+  claimedAt: string | null;
+}
+```
+
+**Liveness limitations.** `transport.onclose` fires for explicit disconnect, but does not reliably detect a half-open TCP, a wedged Claude process, or a network drop on the streamable-HTTP transport. `alive: true` means "we haven't been told the transport died" — not "we just ping-pong'd." This is sufficient for gating the UI's refresh button: worst case, the user clicks refresh, the channel message goes nowhere, `notifyChannel` fails or times out, `POST /refresh-analysis` returns `{delivered: false}`, and the UI falls back to "copy prompt." A heartbeat / TTL on the claim record is **future work**, captured in out-of-scope.
+
+The server still cannot tell whether a connected Claude is mid-turn — opaque from MCP's side. That's fine: human-initiated channel messages queue and deliver on the next idle moment. The failure mode we're avoiding (server-generated events during Claude's own commit activity) is eliminated by the no-`analysis_stale`-event decision, not by liveness detection.
 
 ## Agent prompt updates
 
-`file-classifier` agent gets a new optional input shape: previous analysis md + a list of files to re-classify + a list to drop. When given these, the agent:
+`file-classifier` agent gets a new optional input shape: previous analysis md (for category/style continuity) + a list of files to re-classify. When given these, the agent:
 
+- Reads the previous analysis to inform consistent classifications (categories, terminology) but does **not** copy unchanged entries forward.
 - Re-classifies only the listed files.
-- Drops the listed files from output.
-- Copies all other entries from the previous analysis verbatim.
-- Outputs the merged file analysis in the existing markdown format.
+- Outputs **only** entries for those files in the existing markdown format.
 
 When the previous-analysis input is absent (full run), behavior is unchanged.
 
-`synthesizer` agent is unchanged. It always receives the full (merged) file analysis and synthesizes from scratch.
+`synthesizer` agent is unchanged. It always receives the full merged file analysis (composed by the skill from previous + delta minus `removedFiles`) and synthesizes from scratch.
 
 ## Testing
 
-- **Unit:** freshness computation across git states (file unchanged, file content changed, base advanced, file added since analysis, file removed since analysis, file rename).
-- **Unit:** `set_analysis` merge mode — overlapping file sets preserve correct entries; `removedFiles` parameter drops entries; legacy blob shape (no freshness metadata) is treated as fully stale.
-- **Integration:** full `/lgtm analyze` run → make a commit affecting one file → call `/lgtm refresh` → verify the file-classifier prompt only listed the changed file → verify final state has the new entry plus the old entries verbatim.
-- **Integration:** connection-state endpoint reflects MCP transport disconnect within ~1s.
+- **Unit:** freshness computation across git states (file unchanged, file content changed via new commit, base advanced affecting a file, file added since analysis, file removed since analysis, file rename surfacing as add+remove).
+- **Unit:** `git diff --raw` parsing — verify the blob-pair extraction handles add (`0000…` old blob), delete (`0000…` new blob), and rename (`R100` status).
+- **Unit:** `set_analysis` merge mode — overlapping file sets preserve correct entries; `removedFiles` drops entries; legacy blob shape (no freshness metadata) is treated as fully stale; replace mode behaves as it does today.
+- **Integration:** full `/lgtm analyze` run → make a commit affecting one file → call `/lgtm refresh` → verify the file-classifier prompt only listed the changed file → verify final state has the new entry plus the old entries unmodified.
+- **Integration:** `analysis_changed` SSE event fires on `set_analysis` writes (replace and merge); frontend listener triggers a refetch.
+- **Integration:** `POST /refresh-analysis` calls `notifyChannel` with the right `meta.event`; returns `{delivered: false}` when no live claim exists.
+- **Integration:** `connection-state` endpoint reports `alive: false` after explicit MCP transport close. Crash/half-open is **not** tested — that's the documented liveness limitation.
 
 ## Open questions
 
@@ -174,6 +190,7 @@ When the previous-analysis input is absent (full run), behavior is unchanged.
 
 ## Out-of-scope future work
 
+- **Heartbeat / TTL on claim records.** The current "alive" signal misses crashes and half-open TCPs. A periodic ping (server → Claude via MCP) with a TTL on the claim would close the gap. Out of scope for this design; the fallback "copy prompt" affordance covers the failure case adequately for v1.
 - **LGTM-managed Claude Code instance.** A background Claude process owned by LGTM, used for triggered tasks (refresh, walkthrough generation, specialist passes) without depending on the user's interactive session being available. The current design is forward-compatible: such a process would simply be another claimer.
 - **Walkthrough refresh.** Mirror structure (per-stop freshness or whole-walkthrough staleness). Defer until analysis refresh is in real use.
 - **Per-component synthesis updates.** Overview / strategy / groups as separately stale. Defer; the "synth re-runs cheaply" assumption may not hold for very large branches.
