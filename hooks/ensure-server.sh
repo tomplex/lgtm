@@ -34,12 +34,13 @@ if [ -n "${CLAUDE_PLUGIN_DATA}" ]; then
       exit 0
     fi
   fi
-  export NODE_PATH="${CLAUDE_PLUGIN_DATA}/node_modules"
-fi
-
-# Fall back to plugin root node_modules (local dev)
-if [ -z "${NODE_PATH}" ] && [ -d "${CLAUDE_PLUGIN_ROOT}/node_modules" ]; then
-  export NODE_PATH="${CLAUDE_PLUGIN_ROOT}/node_modules"
+  # ESM resolution ignores NODE_PATH — it walks up from the importing file
+  # looking for node_modules. The server lives at dist/server/server.js, so
+  # symlink data-dir node_modules into PLUGIN_ROOT for ESM to find. Skip if a
+  # real node_modules already exists (local dev).
+  if [ ! -e "${CLAUDE_PLUGIN_ROOT}/node_modules" ]; then
+    ln -s "${CLAUDE_PLUGIN_DATA}/node_modules" "${CLAUDE_PLUGIN_ROOT}/node_modules"
+  fi
 fi
 
 SERVER_LOG="${CLAUDE_PLUGIN_DATA:-/tmp}/server.log"
