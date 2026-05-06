@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-05-06
+
+### Fixed
+
+- `walkthrough-author` agent now lives at the canonical `agents/walkthrough-author/AGENT.md` path so Claude Code auto-discovers it. Previously at `.claude-plugin/agents/`, which is not a discovery path — `/lgtm walkthrough` and `/lgtm prepare` would fail to load the agent on marketplace installs.
+- Agent frontmatter uses the canonical `tools:` field instead of `allowed-tools:` (skill-only field). The `synthesizer` and `file-classifier` agents previously inherited all tools because the wrong field name was silently ignored; they're now correctly restricted to their declared tool sets.
+
 ## [0.2.0] - 2026-05-06
 
 ### Added
