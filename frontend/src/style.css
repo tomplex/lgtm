@@ -18,6 +18,8 @@
   --comment-border: #58a6ff;
   --hover: #1f2937;
   --warning: #f0a020;
+  --success: #4caf50;
+  --muted: #888;
 }
 
 * {
@@ -3031,4 +3033,47 @@ body.cmd-held .line-content .hljs-type {
   margin-left: 4px;
   vertical-align: middle;
   line-height: 1;
+}
+
+.header-status-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conn-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.conn-dot.alive {
+  background: var(--success, #4caf50);
+}
+.conn-dot.down {
+  background: var(--muted, #888);
+}
+
+.refresh-button {
+  background: transparent;
+  border: 1px solid var(--border, #444);
+  color: var(--text, #ccc);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 6px;
+}
+.refresh-button.active {
+  border-color: var(--warning, #f0a020);
+  color: var(--warning, #f0a020);
+}
+.refresh-button.disabled {
+  opacity: 0.5;
+  cursor: pointer; /* still clickable to copy fallback */
+}
+.refresh-button:hover {
+  background: var(--hover, rgba(255, 255, 255, 0.05));
 }

@@ -13,6 +13,8 @@ import {
   activeStopIdx,
 } from '../../state';
 import LspStatusBadge from './LspStatusBadge';
+import ConnectionIndicator from './ConnectionIndicator';
+import RefreshButton from './RefreshButton';
 
 export type SubmitTarget = 'claude' | 'github';
 export type GithubEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
@@ -94,7 +96,11 @@ export default function Header(props: Props) {
           </Show>
         </div>
         <div class="header-actions">
-          <LspStatusBadge />
+          <span class="header-status-group">
+            <ConnectionIndicator />
+            <LspStatusBadge />
+            <RefreshButton />
+          </span>
           <Show when={props.showCommitToggle}>
             <div class="commit-toggle" id="commit-toggle-wrap">
               <button class="header-btn" onClick={props.onToggleCommits}>
