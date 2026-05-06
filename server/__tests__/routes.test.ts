@@ -423,4 +423,44 @@ describe('routes', () => {
       }
     });
   });
+
+  describe('refresh analysis', () => {
+    it('POST /refresh-analysis returns delivered=false when no claim exists', async () => {
+      const f = createGitFixture();
+      try {
+        const reg = manager.register(f.repoPath);
+        const session = manager.get(reg.slug)!;
+        const blobMap = session.getCurrentBlobMap();
+        const paths = Object.keys(blobMap.blobsByPath);
+        if (paths.length === 0) return; // skip in fixtures with no diff
+        const path = paths[0];
+        session.setAnalysis({
+          overview: 'o', reviewStrategy: 's',
+          files: { [path]: { priority: 'normal', phase: 'review', summary: '', category: '' } },
+          groups: [],
+          synthesizedAtFileSet: [path],
+        });
+
+        const res = await request(app).post(`/project/${reg.slug}/refresh-analysis`);
+        expect(res.status).toBe(200);
+        expect(res.body.delivered).toBe(false);
+        expect(typeof res.body.reason).toBe('string');
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('POST /refresh-analysis returns 404 when no analysis is set', async () => {
+      const f = createGitFixture();
+      try {
+        const reg = manager.register(f.repoPath);
+        const res = await request(app).post(`/project/${reg.slug}/refresh-analysis`);
+        expect(res.status).toBe(404);
+        expect(res.body.delivered).toBe(false);
+        expect(typeof res.body.reason).toBe('string');
+      } finally {
+        f.cleanup();
+      }
+    });
+  });
 });

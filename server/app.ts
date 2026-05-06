@@ -737,6 +737,30 @@ export function createApp(manager: SessionManager): express.Express {
     res.json({ ok: true, round: currentRound });
   });
 
+  projectRouter.post('/refresh-analysis', (req, res) => {
+    const session: Session = res.locals.session;
+    const slug = (req.params as Record<string, string>).slug;
+    const result = session.getAnalysisWithFreshness();
+    if (!result) {
+      res.status(404).json({ delivered: false, reason: 'No analysis set' });
+      return;
+    }
+    const claim = getProjectClaim(slug);
+    if (!claim || !isClaimAlive(slug)) {
+      res.json({ delivered: false, reason: 'No live Claude claim' });
+      return;
+    }
+    const content = JSON.stringify({
+      staleFiles: result.freshness.staleFiles,
+      missingFiles: result.freshness.missingFiles,
+      removedFiles: result.freshness.removedFiles,
+      staleSynthesis: result.freshness.staleSynthesis,
+    });
+    notifyChannel(content, { event: 'refresh_analysis_requested', project: slug });
+    console.log(`REFRESH_ANALYSIS_REQUESTED slug=${slug} stale=${result.freshness.staleFiles.length}`);
+    res.json({ delivered: true });
+  });
+
   projectRouter.post('/submit-github', (req, res) => {
     const session = res.locals.session;
     const meta = getRepoMeta(session.repoPath, session.baseBranch);
