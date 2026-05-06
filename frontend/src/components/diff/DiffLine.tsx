@@ -7,15 +7,6 @@ import CommentRow from '../comments/CommentRow';
 import CommentTextarea from '../comments/CommentTextarea';
 import PeekPanel from './PeekPanel';
 
-/**
- * Convert a caret offset within a line into a UTF-16 code-unit offset. JS strings are already
- * UTF-16 internally so this is effectively identity, but we name it explicitly so the caller
- * contract with LSP is clear.
- */
-export function computeUtf16Offset(line: string, caretOffsetWithinLine: number): number {
-  return line.substring(0, caretOffsetWithinLine).length;
-}
-
 interface Props {
   line: DiffLineType;
   lineIdx: number;
@@ -74,15 +65,27 @@ export default function DiffLine(props: Props) {
     const offset = 'offset' in sel ? sel.offset : sel.startOffset;
     if (node.nodeType !== Node.TEXT_NODE) return null;
 
-    const text = node.textContent ?? '';
-    let start = offset;
-    let end = offset;
-    while (start > 0 && /[\w]/.test(text[start - 1])) start--;
-    while (end < text.length && /[\w]/.test(text[end])) end++;
+    // Highlight.js wraps each token in its own <span>, so `offset` is local to one token, not
+    // the whole line. Compute the line-relative offset by measuring text from the start of the
+    // code container (the sibling of .diff-prefix inside .line-content) to the click position.
+    const cell = (node.parentElement?.closest('.line-content') as HTMLElement | null) ?? null;
+    const codeRoot = cell?.querySelector(':scope > span:not(.diff-prefix)') as HTMLElement | null;
+    if (!codeRoot || !codeRoot.contains(node)) return null;
 
-    const word = text.slice(start, end);
+    const range = document.createRange();
+    range.setStart(codeRoot, 0);
+    range.setEnd(node, offset);
+    const lineOffset = range.toString().length;
+
+    const line = props.line.content;
+    let start = lineOffset;
+    let end = lineOffset;
+    while (start > 0 && /[\w]/.test(line[start - 1])) start--;
+    while (end < line.length && /[\w]/.test(line[end])) end++;
+
+    const word = line.slice(start, end);
     if (word.length < 2 || !/^[a-zA-Z_]/.test(word)) return null;
-    return { word, character: computeUtf16Offset(props.line.content, start) };
+    return { word, character: start };
   }
 
   function handleLineClick(e: MouseEvent) {
