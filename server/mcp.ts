@@ -171,42 +171,73 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'set_analysis',
-    'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. The review UI uses this to show priority indicators, file groupings, and a review strategy. Optionally adds a review guide document. Called by the analyze skill after agents have written their output.',
+    'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. mode="replace" (default) replaces the entire analysis; mode="merge" merges new file entries into the existing analysis, preserving entries not in the new payload (use `removedFiles` for explicit drops). Broadcasts analysis_changed on success.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
       fileAnalysisPath: z.string().describe('Absolute path to the file-analyzer markdown output'),
       synthesisPath: z.string().describe('Absolute path to the synthesis agent markdown output'),
       reviewGuidePath: z.string().optional().describe('Absolute path to a markdown review guide (overview, strategy, opinion) to add as a reviewable document'),
+      mode: z.enum(['replace', 'merge']).optional().describe('replace (default) or merge'),
+      removedFiles: z.array(z.string()).optional().describe('When mode=merge, paths to drop from the merged result'),
     },
-    async ({ repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath }) => {
+    async ({ repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath, mode, removedFiles }) => {
       const { found } = resolveProject(manager, repoPath, server);
 
       try {
-        const files = parseFileAnalysis(readFileSync(fileAnalysisPath, 'utf-8'));
+        const fileAnalysisRaw = readFileSync(fileAnalysisPath, 'utf-8');
+        const files = fileAnalysisRaw.trim() ? parseFileAnalysis(fileAnalysisRaw) : {};
         const synthesis = parseSynthesis(readFileSync(synthesisPath, 'utf-8'));
+        const { blobsByPath } = found.session.getCurrentBlobMap();
 
-        const analysis = {
-          overview: synthesis.overview,
-          reviewStrategy: synthesis.reviewStrategy,
-          files,
-          groups: synthesis.groups,
-        };
+        if (mode === 'merge') {
+          // Compute the post-merge file set for synthesizedAtFileSet.
+          const prev = (found.session.analysis as { files?: Record<string, FileAnalysis> })?.files ?? {};
+          const next = new Set(Object.keys(prev));
+          for (const r of removedFiles ?? []) next.delete(r);
+          for (const k of Object.keys(files)) next.add(k);
+          const synthesizedAtFileSet = [...next].sort();
+          found.session.mergeAnalysis({
+            files,
+            synthesisIfProvided: { ...synthesis, synthesizedAtFileSet },
+            blobsByPath,
+            removedFiles: removedFiles ?? [],
+          });
+        } else {
+          // Replace: stamp blobs on each entry, then setAnalysis.
+          const stampedFiles: Record<string, FileAnalysis> = {};
+          for (const [path, entry] of Object.entries(files)) {
+            const blobs = blobsByPath[path];
+            stampedFiles[path] = {
+              ...entry,
+              analyzedAtBaseBlob: blobs?.oldBlob ?? '',
+              analyzedAtHeadBlob: blobs?.newBlob ?? '',
+            };
+          }
+          found.session.setAnalysis({
+            overview: synthesis.overview,
+            reviewStrategy: synthesis.reviewStrategy,
+            files: stampedFiles,
+            groups: synthesis.groups,
+            synthesizedAtFileSet: Object.keys(stampedFiles).sort(),
+          });
+        }
 
-        found.session.setAnalysis(analysis);
+        found.session.broadcast('analysis_changed', { mode: mode ?? 'replace' });
 
-        // Add review guide as a reviewable document
         if (reviewGuidePath) {
           found.session.addItem('review-guide', 'Review Guide', reviewGuidePath);
           found.session.broadcast('items_changed', { id: 'review-guide' });
         }
 
-        console.log(`MCP_SET_ANALYSIS slug=${found.slug} files=${Object.keys(files).length} groups=${synthesis.groups.length} reviewGuide=${!!reviewGuidePath}`);
+        console.log(`MCP_SET_ANALYSIS slug=${found.slug} mode=${mode ?? 'replace'} files=${Object.keys(files).length} removed=${(removedFiles ?? []).length} groups=${synthesis.groups.length}`);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             ok: true,
             fileCount: Object.keys(files).length,
+            removedCount: (removedFiles ?? []).length,
             groupCount: synthesis.groups.length,
             reviewGuide: !!reviewGuidePath,
+            mode: mode ?? 'replace',
           }) }],
         };
       } catch (err) {

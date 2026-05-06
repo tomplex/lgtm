@@ -336,4 +336,144 @@ A short narrative.
       }
     });
   });
+
+  describe('set_analysis modes', () => {
+    it('mode=replace stamps blob SHAs on entries and broadcasts analysis_changed', async () => {
+      const f = createGitFixture();
+      try {
+        const reg = manager.register(f.repoPath);
+        const session = manager.get(reg.slug)!;
+        const blobMap = session.getCurrentBlobMap();
+        const paths = Object.keys(blobMap.blobsByPath);
+        if (paths.length === 0) return; // fixture has no diff, nothing to assert
+        const path = paths[0];
+
+        // Track broadcast events.
+        const events: string[] = [];
+        const orig = session.broadcast.bind(session);
+        session.broadcast = (event: string, data: unknown) => { events.push(event); orig(event, data); };
+
+        // Write the agent-style markdown files.
+        const filesMd = join(tmpDir, 'set-replace-files.md');
+        writeFileSync(filesMd, `## ${path}\n- priority: critical\n- phase: review\n- category: core\n\nReplace test summary.\n`);
+        const synthMd = join(tmpDir, 'set-replace-synth.md');
+        writeFileSync(synthMd, `## Overview\nO\n\n## Review Strategy\nS\n\n## Opinion\nP\n\n## Groups\n### Core\n- ${path}\n`);
+
+        const c = await createMcpClient(app);
+        try {
+          const res = await c.callTool('set_analysis', {
+            repoPath: f.repoPath,
+            fileAnalysisPath: filesMd,
+            synthesisPath: synthMd,
+          });
+          expect(res.error).toBeUndefined();
+          const stored = (session.analysis as { files: Record<string, { analyzedAtBaseBlob?: string; analyzedAtHeadBlob?: string }>; synthesizedAtFileSet?: string[] });
+          expect(stored.files[path].analyzedAtBaseBlob).toBe(blobMap.blobsByPath[path].oldBlob);
+          expect(stored.files[path].analyzedAtHeadBlob).toBe(blobMap.blobsByPath[path].newBlob);
+          expect(stored.synthesizedAtFileSet).toEqual([path]);
+          expect(events).toContain('analysis_changed');
+        } finally {
+          await c.close();
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('mode=merge preserves entries not in the new payload', async () => {
+      const f = createGitFixture();
+      try {
+        const reg = manager.register(f.repoPath);
+        const session = manager.get(reg.slug)!;
+        const blobMap = session.getCurrentBlobMap();
+        const paths = Object.keys(blobMap.blobsByPath);
+        if (paths.length < 1) return;
+        const path = paths[0];
+
+        // First: replace with both a real path and a synthetic 'b.ts' entry that isn't in the diff.
+        // The synthetic entry will have empty blobs but exists in the analysis.
+        session.setAnalysis({
+          overview: 'o', reviewStrategy: 's',
+          files: {
+            [path]: { priority: 'normal', phase: 'review', summary: 'orig', category: 'core', analyzedAtBaseBlob: blobMap.blobsByPath[path].oldBlob, analyzedAtHeadBlob: blobMap.blobsByPath[path].newBlob },
+            'b.ts': { priority: 'low', phase: 'skim', summary: 'b summary', category: 'test' },
+          },
+          groups: [],
+          synthesizedAtFileSet: [path, 'b.ts'].sort(),
+        });
+
+        // Merge with only the real path having an updated summary.
+        const filesMd = join(tmpDir, 'merge-files.md');
+        writeFileSync(filesMd, `## ${path}\n- priority: critical\n- phase: review\n- category: core\n\nUpdated summary.\n`);
+        const synthMd = join(tmpDir, 'merge-synth.md');
+        writeFileSync(synthMd, `## Overview\nNewO\n\n## Review Strategy\nNewS\n\n## Groups\n### Core\n- ${path}\n`);
+
+        const c = await createMcpClient(app);
+        try {
+          const res = await c.callTool('set_analysis', {
+            repoPath: f.repoPath,
+            fileAnalysisPath: filesMd,
+            synthesisPath: synthMd,
+            mode: 'merge',
+          });
+          expect(res.error).toBeUndefined();
+          const stored = (session.analysis as { files: Record<string, { summary: string; priority: string }> });
+          expect(Object.keys(stored.files).sort()).toEqual([path, 'b.ts'].sort());
+          expect(stored.files[path].summary).toBe('Updated summary.');
+          expect(stored.files[path].priority).toBe('critical');
+          expect(stored.files['b.ts'].summary).toBe('b summary'); // preserved
+        } finally {
+          await c.close();
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('mode=merge with removedFiles drops listed entries', async () => {
+      const f = createGitFixture();
+      try {
+        const reg = manager.register(f.repoPath);
+        const session = manager.get(reg.slug)!;
+        const blobMap = session.getCurrentBlobMap();
+        const paths = Object.keys(blobMap.blobsByPath);
+        if (paths.length < 1) return;
+        const path = paths[0];
+
+        session.setAnalysis({
+          overview: 'o', reviewStrategy: 's',
+          files: {
+            [path]: { priority: 'normal', phase: 'review', summary: 'a', category: 'core' },
+            'gone.ts': { priority: 'low', phase: 'skim', summary: 'g', category: 'old' },
+          },
+          groups: [],
+          synthesizedAtFileSet: [path, 'gone.ts'],
+        });
+
+        // Merge with empty file analysis but explicit removal.
+        const filesMd = join(tmpDir, 'remove-files.md');
+        writeFileSync(filesMd, ``);
+        const synthMd = join(tmpDir, 'remove-synth.md');
+        writeFileSync(synthMd, `## Overview\nO\n\n## Review Strategy\nS\n\n## Groups\n`);
+
+        const c = await createMcpClient(app);
+        try {
+          const res = await c.callTool('set_analysis', {
+            repoPath: f.repoPath,
+            fileAnalysisPath: filesMd,
+            synthesisPath: synthMd,
+            mode: 'merge',
+            removedFiles: ['gone.ts'],
+          });
+          expect(res.error).toBeUndefined();
+          const stored = (session.analysis as { files: Record<string, unknown> });
+          expect(Object.keys(stored.files)).toEqual([path]);
+        } finally {
+          await c.close();
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+  });
 });
