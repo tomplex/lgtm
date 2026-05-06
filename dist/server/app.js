@@ -578,9 +578,11 @@ export function createApp(manager) {
         }
         const comment = session.addComment({ author, text, item, file, line, side, block, parentId, mode });
         session.broadcast('comments_changed', { item, comment });
+        const slug = req.params.slug;
+        const where = file ? `${file}${line != null ? `:${line}` : ''}` : (block != null ? `block=${block}` : '-');
+        console.log(`COMMENT_ADDED slug=${slug} item=${item} author=${author} mode=${mode ?? 'review'} reply=${parentId ? 'yes' : 'no'} where=${where} len=${text.length}`);
         // Push direct questions to Claude via channel notification
         if (mode === 'direct' && !parentId) {
-            const slug = req.params.slug;
             let content = text;
             if (file && line != null) {
                 content = `Question on ${file}:${line}:\n\n${text}`;
@@ -594,6 +596,7 @@ export function createApp(manager) {
                 meta.file = file;
             if (line != null)
                 meta.line = String(line);
+            console.log(`QUESTION_TO_CLAUDE slug=${slug} where=${where} commentId=${comment.id} len=${content.length}`);
             notifyChannel(content, meta);
         }
         res.json({ ok: true, comment });
@@ -625,9 +628,9 @@ export function createApp(manager) {
         const commentsText = req.body.comments ?? '';
         const item = req.body.item;
         const currentRound = await session.submitReview(commentsText, item);
-        console.log(`REVIEW_ROUND=${currentRound}${item ? ` item=${item}` : ''}`);
-        // Push review feedback to Claude via channel notification
         const slug = req.params.slug;
+        console.log(`REVIEW_SUBMITTED slug=${slug} round=${currentRound} item=${item ?? 'diff'} len=${commentsText.length}`);
+        // Push review feedback to Claude via channel notification
         const meta = {
             event: 'review_submitted',
             project: slug,
@@ -678,6 +681,7 @@ export function createApp(manager) {
             body: body || 'Review submitted via LGTM',
             comments: ghComments,
         });
+        const slug = req.params.slug;
         try {
             const result = execFileSync('gh', [
                 'api',
@@ -692,10 +696,12 @@ export function createApp(manager) {
                 stdio: ['pipe', 'pipe', 'pipe'],
             });
             const review = JSON.parse(result);
+            console.log(`GITHUB_REVIEW_SUBMITTED slug=${slug} pr=${meta.pr.number} event=${event} comments=${ghComments.length} url=${review.html_url}`);
             res.json({ ok: true, reviewUrl: review.html_url });
         }
         catch (e) {
             const msg = e.stderr?.trim() || e.message || 'GitHub API call failed';
+            console.log(`GITHUB_REVIEW_FAIL slug=${slug} pr=${meta.pr.number} event=${event} error=${msg}`);
             res.status(502).json({ error: msg });
         }
     });

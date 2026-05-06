@@ -33,6 +33,7 @@ function createMcpServer(manager) {
         const result = found.session.addItem(itemId, itemTitle, path);
         found.session.broadcast('items_changed', { id: itemId });
         associateMcpItem(server, itemId);
+        console.log(`MCP_ADD_DOCUMENT slug=${found.slug} item=${itemId} title="${itemTitle}" path=${path}`);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     });
     server.tool('comment', 'Add comments from Claude to a review item (diff or document). Comments appear inline in the review UI for the user to reply to, resolve, or dismiss. Use the file+line fields for diff comments, or the block field for document comments.', {
@@ -49,6 +50,7 @@ function createMcpServer(manager) {
         const itemId = item ?? 'diff';
         const count = found.session.addComments(itemId, comments);
         found.session.broadcast('comments_changed', { item: itemId, count: comments.length });
+        console.log(`MCP_COMMENT slug=${found.slug} item=${itemId} count=${count}`);
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, count }) }] };
     });
     server.tool('read_feedback', 'Read the review feedback the user submitted via the review UI. Returns markdown-formatted comments with file paths, line numbers, and the user\'s notes. Call this after the user says they submitted a review.', {
@@ -62,6 +64,7 @@ function createMcpServer(manager) {
         catch {
             // no feedback yet
         }
+        console.log(`MCP_READ_FEEDBACK slug=${found.slug} bytes=${feedback.length}`);
         return { content: [{ type: 'text', text: feedback || 'No feedback submitted yet.' }] };
     });
     server.tool('stop', 'Stop a review session and close it. The review UI will no longer be accessible for this repo.', {
@@ -72,6 +75,7 @@ function createMcpServer(manager) {
             return { content: [{ type: 'text', text: JSON.stringify({ error: 'No active review session for this repo path.' }) }] };
         }
         manager.deregister(found.slug);
+        console.log(`MCP_STOP slug=${found.slug}`);
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, slug: found.slug }) }] };
     });
     server.tool('claim_reviews', 'Claim code review notifications for a project. Auto-registers the project if needed. When the reviewer submits feedback on the diff, only the Claude session that called claim_reviews most recently will receive the notification. Optionally sets a description banner and base branch override. Returns the review URL.', {
@@ -82,6 +86,7 @@ function createMcpServer(manager) {
         const result = manager.register(repoPath, { description, baseBranch });
         associateMcpSession(server, result.slug);
         claimDiffReviews(server, result.slug);
+        console.log(`MCP_CLAIM_REVIEWS slug=${result.slug}${description ? ` description="${description.slice(0, 80)}"` : ''}${baseBranch ? ` base=${baseBranch}` : ''}`);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     });
     server.tool('reply', 'Reply to a user comment in the review UI. Use this to answer direct questions from the reviewer. The reply appears inline beneath the original comment.', {
@@ -92,6 +97,7 @@ function createMcpServer(manager) {
         const { found } = resolveProject(manager, repoPath, server);
         const parent = found.session.getComment(commentId);
         if (!parent) {
+            console.log(`MCP_REPLY_FAIL slug=${found.slug} commentId=${commentId} reason=parent_not_found`);
             return { content: [{ type: 'text', text: JSON.stringify({ error: `Comment not found: ${commentId}` }) }] };
         }
         const reply = found.session.addComment({
@@ -104,6 +110,8 @@ function createMcpServer(manager) {
             block: parent.block,
         });
         found.session.broadcast('comments_changed', { item: parent.item, comment: reply });
+        const where = parent.file ? `${parent.file}${parent.line != null ? `:${parent.line}` : ''}` : (parent.block != null ? `block=${parent.block}` : '-');
+        console.log(`MCP_REPLY slug=${found.slug} item=${parent.item} parent=${commentId} where=${where} len=${text.length}`);
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, id: reply.id }) }] };
     });
     server.tool('set_analysis', 'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. The review UI uses this to show priority indicators, file groupings, and a review strategy. Optionally adds a review guide document. Called by the analyze skill after agents have written their output.', {
@@ -128,6 +136,7 @@ function createMcpServer(manager) {
                 found.session.addItem('review-guide', 'Review Guide', reviewGuidePath);
                 found.session.broadcast('items_changed', { id: 'review-guide' });
             }
+            console.log(`MCP_SET_ANALYSIS slug=${found.slug} files=${Object.keys(files).length} groups=${synthesis.groups.length} reviewGuide=${!!reviewGuidePath}`);
             return {
                 content: [{ type: 'text', text: JSON.stringify({
                             ok: true,
@@ -138,10 +147,10 @@ function createMcpServer(manager) {
             };
         }
         catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.log(`MCP_SET_ANALYSIS_FAIL slug=${found.slug} error=${msg}`);
             return {
-                content: [{ type: 'text', text: JSON.stringify({
-                            error: err instanceof Error ? err.message : String(err),
-                        }) }],
+                content: [{ type: 'text', text: JSON.stringify({ error: msg }) }],
             };
         }
     });
@@ -158,6 +167,7 @@ function createMcpServer(manager) {
             parsed.generatedAt = new Date().toISOString();
             found.session.setWalkthrough(parsed);
             found.session.broadcast('walkthrough_changed', { stopCount: parsed.stops.length });
+            console.log(`MCP_SET_WALKTHROUGH slug=${found.slug} stops=${parsed.stops.length} diffHash=${parsed.diffHash.slice(0, 12)}`);
             return {
                 content: [{ type: 'text', text: JSON.stringify({
                             ok: true,
@@ -167,10 +177,10 @@ function createMcpServer(manager) {
             };
         }
         catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.log(`MCP_SET_WALKTHROUGH_FAIL slug=${found.slug} error=${msg}`);
             return {
-                content: [{ type: 'text', text: JSON.stringify({
-                            error: err instanceof Error ? err.message : String(err),
-                        }) }],
+                content: [{ type: 'text', text: JSON.stringify({ error: msg }) }],
             };
         }
     });
@@ -226,6 +236,7 @@ function claimDiffReviews(server, slug) {
 export function notifyChannel(content, meta) {
     const targetProject = meta.project;
     const targetItem = meta.item;
+    let delivered = 0;
     for (const { server, projectSlug, claimedDiff, itemIds } of activeMcpSessions.values()) {
         // Only notify sessions associated with the target project
         if (!projectSlug || projectSlug !== targetProject)
@@ -244,7 +255,9 @@ export function notifyChannel(content, meta) {
             method: 'notifications/claude/channel',
             params: { content, meta },
         });
+        delivered++;
     }
+    console.log(`CHANNEL_PUSH project=${targetProject} event=${meta.event ?? '-'} item=${targetItem ?? 'diff'} delivered=${delivered} bytes=${content.length}`);
 }
 /**
  * Test-only probe: returns the mcp-session-id that currently holds the diff-

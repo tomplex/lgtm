@@ -632,9 +632,12 @@ export function createApp(manager: SessionManager): express.Express {
     const comment = session.addComment({ author, text, item, file, line, side, block, parentId, mode });
     session.broadcast('comments_changed', { item, comment });
 
+    const slug = (req.params as Record<string, string>).slug;
+    const where = file ? `${file}${line != null ? `:${line}` : ''}` : (block != null ? `block=${block}` : '-');
+    console.log(`COMMENT_ADDED slug=${slug} item=${item} author=${author} mode=${mode ?? 'review'} reply=${parentId ? 'yes' : 'no'} where=${where} len=${text.length}`);
+
     // Push direct questions to Claude via channel notification
     if (mode === 'direct' && !parentId) {
-      const slug = (req.params as Record<string, string>).slug;
       let content = text;
       if (file && line != null) {
         content = `Question on ${file}:${line}:\n\n${text}`;
@@ -646,6 +649,7 @@ export function createApp(manager: SessionManager): express.Express {
       const meta: Record<string, string> = { event: 'question', project: slug, commentId: comment.id };
       if (file) meta.file = file;
       if (line != null) meta.line = String(line);
+      console.log(`QUESTION_TO_CLAUDE slug=${slug} where=${where} commentId=${comment.id} len=${content.length}`);
       notifyChannel(content, meta);
     }
 
@@ -681,10 +685,10 @@ export function createApp(manager: SessionManager): express.Express {
     const commentsText = req.body.comments ?? '';
     const item = req.body.item as string | undefined;
     const currentRound = await session.submitReview(commentsText, item);
-    console.log(`REVIEW_ROUND=${currentRound}${item ? ` item=${item}` : ''}`);
+    const slug = (req.params as Record<string, string>).slug;
+    console.log(`REVIEW_SUBMITTED slug=${slug} round=${currentRound} item=${item ?? 'diff'} len=${commentsText.length}`);
 
     // Push review feedback to Claude via channel notification
-    const slug = (req.params as Record<string, string>).slug;
     const meta: Record<string, string> = {
       event: 'review_submitted',
       project: slug,
@@ -742,6 +746,7 @@ export function createApp(manager: SessionManager): express.Express {
       comments: ghComments,
     });
 
+    const slug = (req.params as Record<string, string>).slug;
     try {
       const result = execFileSync('gh', [
         'api',
@@ -756,9 +761,11 @@ export function createApp(manager: SessionManager): express.Express {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       const review = JSON.parse(result);
+      console.log(`GITHUB_REVIEW_SUBMITTED slug=${slug} pr=${meta.pr.number} event=${event} comments=${ghComments.length} url=${review.html_url}`);
       res.json({ ok: true, reviewUrl: review.html_url });
     } catch (e: any) {
       const msg = e.stderr?.trim() || e.message || 'GitHub API call failed';
+      console.log(`GITHUB_REVIEW_FAIL slug=${slug} pr=${meta.pr.number} event=${event} error=${msg}`);
       res.status(502).json({ error: msg });
     }
   });
