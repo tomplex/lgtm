@@ -801,12 +801,15 @@ export function createApp(manager: SessionManager): express.Express {
 
   // --- Static files ---
 
-  const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend', 'dist');
+  // dist/server/app.js → ../.. → repo root → frontend/dist (vite root='frontend', outDir='dist').
+  // dotfiles: 'allow' is needed because plugin installs live under ~/.claude/plugins/...,
+  // and `send` rejects any path containing a dot-segment ('.claude') by default.
+  const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'frontend', 'dist');
   if (existsSync(distDir)) {
-    app.use(express.static(distDir));
+    app.use(express.static(distDir, { dotfiles: 'allow' }));
     // SPA fallback for project URLs
     app.get('/project/{*path}', (_req, res) => {
-      res.sendFile(join(distDir, 'index.html'));
+      res.sendFile(join(distDir, 'index.html'), { dotfiles: 'allow' });
     });
   }
 
