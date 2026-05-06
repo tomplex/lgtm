@@ -25,6 +25,8 @@ function buildPatterns(symbol: string): PatternGroup[] {
     { pattern: `^\\s*(export\\s+)?(async\\s+)?(function|class|interface|type|const|let)\\s+${escaped}\\b`, globs: ['*.ts', '*.tsx', '*.js', '*.jsx'] },
     // Arrow functions (TS/JS only): const foo = (...) => or foo = function
     { pattern: `^\\s*(export\\s+)?(const|let|var)\\s+${escaped}\\s*=`, globs: ['*.ts', '*.tsx', '*.js', '*.jsx'] },
+    // Go: func, type, var, const (top-level only — leading whitespace forbidden)
+    { pattern: `^(func(\\s+\\([^)]*\\))?\\s+${escaped}\\b|type\\s+${escaped}\\b|var\\s+${escaped}\\b|const\\s+${escaped}\\b)`, globs: ['*.go'] },
   ];
 }
 
@@ -102,6 +104,15 @@ export function detectKind(lineText: string): SymbolResult['kind'] {
     const raw = pyMatch[1];
     if (raw === 'def') return 'function';
     if (raw === 'class') return 'class';
+  }
+
+  // Go: func, type (no indentation — top-level decls only)
+  const goMatch = lineText.match(/^(func(?:\s+\([^)]*\))?|type|var|const)\s+/);
+  if (goMatch) {
+    const raw = goMatch[1].split(/\s+/)[0];
+    if (raw === 'func') return 'function';
+    if (raw === 'type') return 'type';
+    if (raw === 'var' || raw === 'const') return 'variable';
   }
 
   // TypeScript keywords
