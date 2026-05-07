@@ -9,7 +9,9 @@ import { createApp } from '../app.js';
 import { mountMcp } from '../mcp.js';
 import { createMcpClient } from './helpers/mcp-client.js';
 
-describe('refresh flow (end-to-end)', () => {
+// Tests do real git fixture setup + MCP transport round-trips; under full-suite
+// parallel contention the default 5s vitest timeout is too tight.
+describe('refresh flow (end-to-end)', { timeout: 30_000 }, () => {
   let tmpDir: string;
   let scratchDir: string;
   let repo: string;
