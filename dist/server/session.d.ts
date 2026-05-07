@@ -1,8 +1,10 @@
 import { type RepoMeta } from './git-ops.js';
+import { type AnalysisFreshness } from './freshness.js';
 import { type ProjectBlob } from './store.js';
 import type { Comment, CreateComment, CommentFilter } from './comment-types.js';
 import { LspManager } from './lsp/index.js';
 import type { Walkthrough } from './walkthrough-types.js';
+import type { FileAnalysis, AnalysisGroup } from './parse-analysis.js';
 interface SessionItem {
     id: string;
     type: 'diff' | 'document';
@@ -36,6 +38,7 @@ export declare class Session {
     private _groupModeUserTouched;
     private _collapsedFolders;
     private _metaCache;
+    private _freshnessCache;
     private _lsp;
     constructor(opts: {
         repoPath: string;
@@ -55,6 +58,41 @@ export declare class Session {
     get walkthrough(): Walkthrough | null;
     getItemData(itemId: string, commits?: string): Record<string, unknown>;
     setAnalysis(analysis: Record<string, unknown>): void;
+    getAnalysisWithFreshness(): {
+        analysis: Record<string, unknown>;
+        freshness: AnalysisFreshness;
+        computedAtHead: string;
+        computedAtBase: string;
+    } | null;
+    /** Returns the raw diff blob map alongside HEAD/base SHAs. Used by set_analysis call sites. */
+    getCurrentBlobMap(): {
+        blobsByPath: Record<string, {
+            oldBlob: string;
+            newBlob: string;
+        }>;
+        headSha: string;
+        baseSha: string;
+    };
+    /**
+     * Merge new file entries into the existing analysis, drop entries listed in
+     * removedFiles, and (if synthesisIfProvided is non-null) replace the synthesis.
+     * Stamps blob SHAs on every entry written.
+     */
+    mergeAnalysis(input: {
+        files: Record<string, FileAnalysis>;
+        synthesisIfProvided: {
+            overview: string;
+            reviewStrategy: string;
+            opinion?: string;
+            groups: AnalysisGroup[];
+            synthesizedAtFileSet: string[];
+        } | null;
+        blobsByPath: Record<string, {
+            oldBlob: string;
+            newBlob: string;
+        }>;
+        removedFiles: string[];
+    }): void;
     setWalkthrough(walkthrough: Walkthrough): void;
     clearWalkthrough(): void;
     addItem(itemId: string, title: string, filepath: string): Record<string, unknown>;

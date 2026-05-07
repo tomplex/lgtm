@@ -3,6 +3,8 @@ export interface FileAnalysis {
     phase: 'review' | 'skim' | 'rubber-stamp';
     summary: string;
     category: string;
+    analyzedAtBaseBlob?: string;
+    analyzedAtHeadBlob?: string;
 }
 export interface AnalysisGroup {
     name: string;

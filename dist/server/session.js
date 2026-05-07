@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { getBranchDiff, getSelectedCommitsDiff, getRepoMeta, getRepoMetaAsync, } from './git-ops.js';
+import { getBranchDiff, getSelectedCommitsDiff, getRepoMeta, getRepoMetaAsync, gitRun, getBranchDiffRaw, } from './git-ops.js';
+import { computeFreshness } from './freshness.js';
 import { storePut } from './store.js';
 import { CommentStore } from './comment-store.js';
 import { migrateBlob } from './comment-migration.js';
@@ -27,6 +28,7 @@ export class Session {
     _groupModeUserTouched = false;
     _collapsedFolders = {};
     _metaCache = null;
+    _freshnessCache = null;
     _lsp;
     constructor(opts) {
         this.repoPath = opts.repoPath;
@@ -153,6 +155,76 @@ export class Session {
     // --- Mutations ---
     setAnalysis(analysis) {
         this._analysis = analysis;
+        this._freshnessCache = null;
+        this.persist();
+    }
+    getAnalysisWithFreshness() {
+        if (!this._analysis)
+            return null;
+        const headSha = gitRun(this.repoPath, 'rev-parse', 'HEAD');
+        let baseSha = '';
+        try {
+            baseSha = gitRun(this.repoPath, 'rev-parse', this.baseBranch);
+        }
+        catch {
+            /* base may not be resolvable in some test setups */
+        }
+        const now = Date.now();
+        const cached = this._freshnessCache;
+        if (cached && cached.headSha === headSha && cached.baseSha === baseSha && now - cached.computedAt < 5000) {
+            return { analysis: this._analysis, freshness: cached.freshness, computedAtHead: headSha, computedAtBase: baseSha };
+        }
+        const stored = this._analysis;
+        const currentDiff = getBranchDiffRaw(this.repoPath, this.baseBranch);
+        const freshness = computeFreshness({
+            storedFiles: stored.files ?? {},
+            currentDiff,
+            synthesizedAtFileSet: stored.synthesizedAtFileSet ?? [],
+        });
+        this._freshnessCache = { headSha, baseSha, freshness, computedAt: now };
+        return { analysis: this._analysis, freshness, computedAtHead: headSha, computedAtBase: baseSha };
+    }
+    /** Returns the raw diff blob map alongside HEAD/base SHAs. Used by set_analysis call sites. */
+    getCurrentBlobMap() {
+        const headSha = gitRun(this.repoPath, 'rev-parse', 'HEAD');
+        let baseSha = '';
+        try {
+            baseSha = gitRun(this.repoPath, 'rev-parse', this.baseBranch);
+        }
+        catch { /* ignore */ }
+        const map = getBranchDiffRaw(this.repoPath, this.baseBranch);
+        const blobsByPath = {};
+        for (const [path, entry] of map)
+            blobsByPath[path] = { oldBlob: entry.oldBlob, newBlob: entry.newBlob };
+        return { blobsByPath, headSha, baseSha };
+    }
+    /**
+     * Merge new file entries into the existing analysis, drop entries listed in
+     * removedFiles, and (if synthesisIfProvided is non-null) replace the synthesis.
+     * Stamps blob SHAs on every entry written.
+     */
+    mergeAnalysis(input) {
+        const prev = (this._analysis ?? {});
+        const mergedFiles = { ...(prev.files ?? {}) };
+        for (const path of input.removedFiles)
+            delete mergedFiles[path];
+        for (const [path, entry] of Object.entries(input.files)) {
+            const blobs = input.blobsByPath[path];
+            mergedFiles[path] = {
+                ...entry,
+                analyzedAtBaseBlob: blobs?.oldBlob ?? entry.analyzedAtBaseBlob ?? '',
+                analyzedAtHeadBlob: blobs?.newBlob ?? entry.analyzedAtHeadBlob ?? '',
+            };
+        }
+        const synthesis = input.synthesisIfProvided;
+        this._analysis = {
+            overview: synthesis?.overview ?? prev.overview ?? '',
+            reviewStrategy: synthesis?.reviewStrategy ?? prev.reviewStrategy ?? '',
+            files: mergedFiles,
+            groups: synthesis?.groups ?? prev.groups ?? [],
+            synthesizedAtFileSet: synthesis?.synthesizedAtFileSet ?? prev.synthesizedAtFileSet ?? [],
+        };
+        this._freshnessCache = null;
         this.persist();
     }
     setWalkthrough(walkthrough) {

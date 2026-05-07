@@ -69,6 +69,45 @@ export function getBranchDiff(repoPath, baseBranch) {
         return '';
     return gitRun(repoPath, 'diff', mergeBase, '--', ...Array.from(branchFiles).sort());
 }
+/**
+ * One-shot branch diff metadata: returns blob SHAs and status code per file.
+ * Single git invocation — used to compute analysis freshness without N spawns.
+ *
+ * Output of `git diff --raw --no-abbrev <base>...HEAD` is one line per file:
+ *   :100644 100644 <40-hex-old> <40-hex-new> M\tpath/to/file.ts
+ *   :000000 100644 0000000...0 <40-hex-new> A\tnew/file.ts                 (added)
+ *   :100644 000000 <40-hex-old> 0000000...0 D\told/file.ts                 (deleted)
+ *   :100644 100644 <40-hex-old> <40-hex-new> R100\told/path\tnew/path      (rename)
+ *
+ * `--no-abbrev` forces full 40-char SHAs regardless of user's core.abbrev config.
+ */
+export function getBranchDiffRaw(repoPath, baseBranch) {
+    const result = new Map();
+    let output;
+    try {
+        output = gitRun(repoPath, 'diff', '--raw', '--no-abbrev', `${baseBranch}...HEAD`);
+    }
+    catch {
+        return result; // empty diff or invalid base
+    }
+    for (const line of output.split('\n')) {
+        if (!line.startsWith(':'))
+            continue;
+        const tabIdx = line.indexOf('\t');
+        if (tabIdx < 0)
+            continue;
+        const metaCols = line.slice(1, tabIdx).split(' ');
+        if (metaCols.length < 5)
+            continue;
+        const [, , oldBlob, newBlob, status] = metaCols;
+        const pathCols = line.slice(tabIdx + 1).split('\t');
+        // For renames, pathCols = [oldPath, newPath] — index analysis by newPath.
+        // For all other statuses, pathCols = [path].
+        const path = pathCols[pathCols.length - 1];
+        result.set(path, { oldBlob, newBlob, status });
+    }
+    return result;
+}
 export function getSelectedCommitsDiff(repoPath, shas) {
     return shas
         .map(sha => gitRun(repoPath, 'diff-tree', '-p', '--no-commit-id', sha))

@@ -20,6 +20,13 @@ function resolveProject(manager, repoPath, mcpServer) {
     }
     return { found };
 }
+function renderFileAnalysisMarkdown(files) {
+    const paths = Object.keys(files).sort();
+    return paths.map(path => {
+        const f = files[path];
+        return `## ${path}\n- priority: ${f.priority}\n- phase: ${f.phase}\n- category: ${f.category}\n\n${f.summary}\n`;
+    }).join('\n');
+}
 function createMcpServer(manager) {
     const server = new McpServer({ name: 'lgtm', version: '0.1.0' }, { capabilities: { experimental: { 'claude/channel': {} } } });
     server.tool('add_document', 'Add a document (spec, design doc, markdown file) as a reviewable tab alongside the diff. The user can comment on it in the review UI. Auto-registers the project if needed.', {
@@ -114,35 +121,69 @@ function createMcpServer(manager) {
         console.log(`MCP_REPLY slug=${found.slug} item=${parent.item} parent=${commentId} where=${where} len=${text.length}`);
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, id: reply.id }) }] };
     });
-    server.tool('set_analysis', 'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. The review UI uses this to show priority indicators, file groupings, and a review strategy. Optionally adds a review guide document. Called by the analyze skill after agents have written their output.', {
+    server.tool('set_analysis', 'Set file-level analysis data (priorities, summaries, groupings) from analyzer agent output files. mode="replace" (default) replaces the entire analysis; mode="merge" merges new file entries into the existing analysis, preserving entries not in the new payload (use `removedFiles` for explicit drops). Broadcasts analysis_changed on success.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
         fileAnalysisPath: z.string().describe('Absolute path to the file-analyzer markdown output'),
         synthesisPath: z.string().describe('Absolute path to the synthesis agent markdown output'),
         reviewGuidePath: z.string().optional().describe('Absolute path to a markdown review guide (overview, strategy, opinion) to add as a reviewable document'),
-    }, async ({ repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath }) => {
+        mode: z.enum(['replace', 'merge']).optional().describe('replace (default) or merge'),
+        removedFiles: z.array(z.string()).optional().describe('When mode=merge, paths to drop from the merged result'),
+    }, async ({ repoPath, fileAnalysisPath, synthesisPath, reviewGuidePath, mode, removedFiles }) => {
         const { found } = resolveProject(manager, repoPath, server);
         try {
-            const files = parseFileAnalysis(readFileSync(fileAnalysisPath, 'utf-8'));
+            const fileAnalysisRaw = readFileSync(fileAnalysisPath, 'utf-8');
+            const files = fileAnalysisRaw.trim() ? parseFileAnalysis(fileAnalysisRaw) : {};
             const synthesis = parseSynthesis(readFileSync(synthesisPath, 'utf-8'));
-            const analysis = {
-                overview: synthesis.overview,
-                reviewStrategy: synthesis.reviewStrategy,
-                files,
-                groups: synthesis.groups,
-            };
-            found.session.setAnalysis(analysis);
-            // Add review guide as a reviewable document
+            const { blobsByPath } = found.session.getCurrentBlobMap();
+            if (mode === 'merge') {
+                // Compute the post-merge file set for synthesizedAtFileSet.
+                const prev = found.session.analysis?.files ?? {};
+                const next = new Set(Object.keys(prev));
+                for (const r of removedFiles ?? [])
+                    next.delete(r);
+                for (const k of Object.keys(files))
+                    next.add(k);
+                const synthesizedAtFileSet = [...next].sort();
+                found.session.mergeAnalysis({
+                    files,
+                    synthesisIfProvided: { ...synthesis, synthesizedAtFileSet },
+                    blobsByPath,
+                    removedFiles: removedFiles ?? [],
+                });
+            }
+            else {
+                // Replace: stamp blobs on each entry, then setAnalysis.
+                const stampedFiles = {};
+                for (const [path, entry] of Object.entries(files)) {
+                    const blobs = blobsByPath[path];
+                    stampedFiles[path] = {
+                        ...entry,
+                        analyzedAtBaseBlob: blobs?.oldBlob ?? '',
+                        analyzedAtHeadBlob: blobs?.newBlob ?? '',
+                    };
+                }
+                found.session.setAnalysis({
+                    overview: synthesis.overview,
+                    reviewStrategy: synthesis.reviewStrategy,
+                    files: stampedFiles,
+                    groups: synthesis.groups,
+                    synthesizedAtFileSet: Object.keys(stampedFiles).sort(),
+                });
+            }
+            found.session.broadcast('analysis_changed', { mode: mode ?? 'replace' });
             if (reviewGuidePath) {
                 found.session.addItem('review-guide', 'Review Guide', reviewGuidePath);
                 found.session.broadcast('items_changed', { id: 'review-guide' });
             }
-            console.log(`MCP_SET_ANALYSIS slug=${found.slug} files=${Object.keys(files).length} groups=${synthesis.groups.length} reviewGuide=${!!reviewGuidePath}`);
+            console.log(`MCP_SET_ANALYSIS slug=${found.slug} mode=${mode ?? 'replace'} files=${Object.keys(files).length} removed=${(removedFiles ?? []).length} groups=${synthesis.groups.length}`);
             return {
                 content: [{ type: 'text', text: JSON.stringify({
                             ok: true,
                             fileCount: Object.keys(files).length,
+                            removedCount: (removedFiles ?? []).length,
                             groupCount: synthesis.groups.length,
                             reviewGuide: !!reviewGuidePath,
+                            mode: mode ?? 'replace',
                         }) }],
             };
         }
@@ -153,6 +194,32 @@ function createMcpServer(manager) {
                 content: [{ type: 'text', text: JSON.stringify({ error: msg }) }],
             };
         }
+    });
+    server.tool('read_analysis', 'Read the previous analysis for this project, including per-file freshness data. Returns JSON, the file analysis re-rendered as markdown (suitable for passing to file-classifier as prior context), and freshness metadata listing stale/missing/removed files. Used by the /lgtm refresh skill.', {
+        repoPath: z.string().describe('Absolute path to the git repository'),
+    }, async ({ repoPath }) => {
+        const { found } = resolveProject(manager, repoPath, server);
+        const result = found.session.getAnalysisWithFreshness();
+        if (!result) {
+            return { content: [{ type: 'text', text: JSON.stringify({ json: null, markdown: '', freshness: null }) }] };
+        }
+        const stored = result.analysis;
+        const markdown = renderFileAnalysisMarkdown(stored.files ?? {});
+        console.log(`MCP_READ_ANALYSIS slug=${found.slug} files=${Object.keys(stored.files ?? {}).length} stale=${result.freshness.staleFiles.length}`);
+        return {
+            content: [{ type: 'text', text: JSON.stringify({
+                        json: result.analysis,
+                        markdown,
+                        freshness: {
+                            staleFiles: result.freshness.staleFiles,
+                            missingFiles: result.freshness.missingFiles,
+                            removedFiles: result.freshness.removedFiles,
+                            staleSynthesis: result.freshness.staleSynthesis,
+                            computedAtHead: result.computedAtHead,
+                            computedAtBase: result.computedAtBase,
+                        },
+                    }) }],
+        };
     });
     server.tool('set_walkthrough', 'Set the narrated walkthrough for a review session. Accepts a markdown file authored by the walkthrough-author agent. The review UI renders this as an ordered walkthrough of logical changes, separate from the diff view. Called by the walkthrough skill after the agent writes its output.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
@@ -187,6 +254,25 @@ function createMcpServer(manager) {
     return server;
 }
 const activeMcpSessions = new Map();
+const projectClaims = new Map(); // keyed by slug
+function setProjectClaim(slug, sessionId) {
+    projectClaims.set(slug, { slug, sessionId, claimedAt: new Date().toISOString() });
+}
+function clearProjectClaimsForSession(sessionId) {
+    for (const [slug, claim] of projectClaims) {
+        if (claim.sessionId === sessionId)
+            projectClaims.delete(slug);
+    }
+}
+export function getProjectClaim(slug) {
+    return projectClaims.get(slug) ?? null;
+}
+export function isClaimAlive(slug) {
+    const claim = projectClaims.get(slug);
+    if (!claim)
+        return false;
+    return activeMcpSessions.has(claim.sessionId);
+}
 // Associate an MCP server instance with a project slug (called when tools use repoPath)
 export function associateMcpSession(server, slug) {
     for (const entry of activeMcpSessions.values()) {
@@ -213,9 +299,10 @@ function autoClaimDiffReviewsIfUnheld(server, slug) {
         if (entry.projectSlug === slug && entry.claimedDiff)
             return; // someone holds it
     }
-    for (const entry of activeMcpSessions.values()) {
+    for (const [sid, entry] of activeMcpSessions) {
         if (entry.server === server) {
             entry.claimedDiff = true;
+            setProjectClaim(slug, sid);
             return;
         }
     }
@@ -226,9 +313,10 @@ function claimDiffReviews(server, slug) {
         if (entry.projectSlug === slug)
             entry.claimedDiff = false;
     }
-    for (const entry of activeMcpSessions.values()) {
+    for (const [sid, entry] of activeMcpSessions) {
         if (entry.server === server) {
             entry.claimedDiff = true;
+            setProjectClaim(slug, sid);
             return;
         }
     }
@@ -284,8 +372,10 @@ export function mountMcp(app, manager) {
         });
         transport.onclose = () => {
             const sid = transport.sessionId;
-            if (sid)
+            if (sid) {
+                clearProjectClaimsForSession(sid);
                 activeMcpSessions.delete(sid);
+            }
         };
         await mcpServer.connect(transport);
         await transport.handleRequest(req, res, req.body);
