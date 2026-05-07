@@ -104,7 +104,11 @@ export const [sessionItems, setSessionItems] = createSignal<SessionItem[]>([]);
 export const [allCommits, setAllCommits] = createSignal<Commit[]>([]);
 export const [analysis, setAnalysis] = createSignal<Analysis | null>(null);
 export const [analysisFreshness, setAnalysisFreshness] = createSignal<AnalysisFreshness | null>(null);
-export const [connectionState, setConnectionState] = createSignal<ConnectionState>({ claimed: false, alive: false, claimedAt: null });
+export const [connectionState, setConnectionState] = createSignal<ConnectionState>({
+  claimed: false,
+  alive: false,
+  claimedAt: null,
+});
 
 export type SortMode = 'path' | 'priority';
 export type GroupMode = 'none' | 'phase';

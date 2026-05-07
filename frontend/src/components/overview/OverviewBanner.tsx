@@ -25,7 +25,10 @@ export default function OverviewBanner() {
               <div class="overview-label">
                 Overview
                 <Show when={staleCount() > 0}>
-                  <span class="stale-chip" title="Some file diffs have changed since the last analysis. Click 'Refresh' in the header to update.">
+                  <span
+                    class="stale-chip"
+                    title="Some file diffs have changed since the last analysis. Click 'Refresh' in the header to update."
+                  >
                     {staleCount()} stale
                   </span>
                 </Show>

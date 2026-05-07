@@ -1,16 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 import { renderMd } from '../../utils';
-import {
-  comments,
-  addLocalComment,
-  updateLocalComment,
-  removeLocalComment,
-  saveOrRetryComment,
-} from '../../state';
-import {
-  updateComment as apiUpdateComment,
-  deleteComment as apiDeleteComment,
-} from '../../comment-api';
+import { comments, addLocalComment, updateLocalComment, removeLocalComment, saveOrRetryComment } from '../../state';
+import { updateComment as apiUpdateComment, deleteComment as apiDeleteComment } from '../../comment-api';
 
 function logFailure(op: string) {
   return (err: unknown) => console.error(`${op} failed:`, err);
@@ -117,7 +108,9 @@ export default function CommentRow(props: Props) {
         </Show>
 
         <Show when={props.comment.error}>
-          <span class="comment-error-badge" title={props.comment.error}>not saved</span>
+          <span class="comment-error-badge" title={props.comment.error}>
+            not saved
+          </span>
           <span class="inline-actions">
             <a onClick={() => handleRetry(props.comment)}>retry</a>
           </span>
@@ -151,7 +144,9 @@ export default function CommentRow(props: Props) {
             <div class="claude-reply-header">
               <span class="reply-label">{reply.author === 'claude' ? 'Claude' : 'You'}</span>
               <Show when={reply.error}>
-                <span class="comment-error-badge" title={reply.error}>not saved</span>
+                <span class="comment-error-badge" title={reply.error}>
+                  not saved
+                </span>
                 <span class="inline-actions">
                   <a onClick={() => handleRetry(reply)}>retry</a>
                 </span>

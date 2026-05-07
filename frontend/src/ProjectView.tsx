@@ -389,10 +389,7 @@ export default function ProjectView() {
   }
 
   async function refetchAnalysisAndFreshness() {
-    const [a, f] = await Promise.all([
-      fetchAnalysis().catch(() => null),
-      fetchFreshness().catch(() => null),
-    ]);
+    const [a, f] = await Promise.all([fetchAnalysis().catch(() => null), fetchFreshness().catch(() => null)]);
     if (a) setAnalysis(a);
     setAnalysisFreshness(f);
   }
@@ -448,9 +445,7 @@ export default function ProjectView() {
 
     // Prime freshness and connection state for the UI.
     setAnalysisFreshness(await fetchFreshness().catch(() => null));
-    setConnectionState(
-      await fetchConnectionState().catch(() => ({ claimed: false, alive: false, claimedAt: null })),
-    );
+    setConnectionState(await fetchConnectionState().catch(() => ({ claimed: false, alive: false, claimedAt: null })));
 
     await loadWalkthrough();
 

@@ -76,7 +76,9 @@ export default function TreeFile(props: Props) {
         </span>
       </Show>
       <Show when={isStale()}>
-        <span class="stale-badge" title="Diff has changed since last analysis">●</span>
+        <span class="stale-badge" title="Diff has changed since last analysis">
+          ●
+        </span>
       </Show>
       <Show when={stopsByFile()[path()]?.length}>
         {(count) => (
