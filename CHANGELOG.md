@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-12
+
+### Added
+
+- Iterative analysis refresh: the new `/lgtm refresh` skill re-classifies only the files whose diff changed since the last analysis, and `/lgtm analyze` automatically delegates to it when a prior analysis exists.
+- `read_analysis` MCP tool — returns the stored analysis as JSON plus re-rendered markdown, with per-file freshness metadata (stale / missing / removed files, stale synthesis).
+- `set_analysis` merge mode — merges new file entries into the existing analysis, preserving untouched entries (with explicit `removedFiles` for drops) and blob-stamping each entry; broadcasts `analysis_changed`.
+- Managed-Claude connection awareness: a per-project claim record that's cleaned up when the MCP transport closes, `GET /project/:slug/connection-state` reporting claim + transport liveness, and `POST /project/:slug/refresh-analysis` which pushes a `refresh_analysis_requested` channel notification to the claimed Claude session. The UI gains a header connection indicator and a refresh-analysis button.
+- Per-file staleness badges in the file sidebar and a stale-count chip in the analysis overview banner; the UI refetches freshness on `analysis_changed` / `git_changed` SSE events.
+- `GET /project/:slug/analysis/freshness` REST endpoint.
+- GitHub Actions CI: lint, build, and test on push and pull request.
+
+### Changed
+
+- Frontend source reformatted to Prettier defaults; `npm run format:check` is now enforced in CI.
+
 ## [0.3.0] - 2026-05-06
 
 ### Added
