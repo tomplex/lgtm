@@ -50,7 +50,7 @@ function runRipgrep(repoPath, symbol) {
                 // instead of returning silently-empty results.
                 throw new Error('ripgrep (rg) not found on PATH. LGTM symbol lookup requires ripgrep. ' +
                     'Install with `brew install ripgrep` (macOS), `apt install ripgrep` (Debian/Ubuntu), ' +
-                    'or `apk add ripgrep` (Alpine).');
+                    'or `apk add ripgrep` (Alpine).', { cause: err });
             }
             else {
                 throw err;

@@ -17,7 +17,7 @@ import {
 } from './symbol-lookup.js';
 import { extensionToLanguage, getLanguageConfig } from './lsp/index.js';
 import type { Language } from './lsp/index.js';
-import { fromFileUri } from './lsp/uri.js';
+import { fromFileUri, realPath } from './lsp/uri.js';
 import {
   detectLanguagesInRepo,
   getInstaller,
@@ -344,7 +344,7 @@ export function createApp(manager: SessionManager): express.Express {
       }
       const results: SymbolResult[] = [];
       for (const loc of locs) {
-        const targetPath = fromFileUri(loc.uri);
+        const targetPath = realPath(fromFileUri(loc.uri));
         let content: string;
         try { content = readFileSync(targetPath, 'utf8'); } catch { continue; }
         const lines = content.split('\n');
@@ -427,7 +427,7 @@ export function createApp(manager: SessionManager): express.Express {
     try {
       const locs = await client.references(absPath, { line, character });
       const references = locs.map((loc: { uri: string; range: { start: { line: number } } }) => {
-        const target = fromFileUri(loc.uri);
+        const target = realPath(fromFileUri(loc.uri));
         let snippet = '';
         try {
           const lines = readFileSync(target, 'utf8').split('\n');

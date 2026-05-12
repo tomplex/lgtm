@@ -9,7 +9,7 @@ import { slugify } from './slugify.js';
 import { notifyChannel, getProjectClaim, isClaimAlive } from './mcp.js';
 import { findSymbol, sortResults, extractPythonBody, extractTypeScriptBody, extractPythonDocstring, extractJsDocstring, detectKind, } from './symbol-lookup.js';
 import { extensionToLanguage, getLanguageConfig } from './lsp/index.js';
-import { fromFileUri } from './lsp/uri.js';
+import { fromFileUri, realPath } from './lsp/uri.js';
 import { detectLanguagesInRepo, getInstaller, isInstallerAvailable, runInstaller, } from './lsp/bootstrap.js';
 /**
  * LSP hover content comes back as markdown. For TS / Rust / Python, common shapes are:
@@ -299,7 +299,7 @@ export function createApp(manager) {
             }
             const results = [];
             for (const loc of locs) {
-                const targetPath = fromFileUri(loc.uri);
+                const targetPath = realPath(fromFileUri(loc.uri));
                 let content;
                 try {
                     content = readFileSync(targetPath, 'utf8');
@@ -389,7 +389,7 @@ export function createApp(manager) {
         try {
             const locs = await client.references(absPath, { line, character });
             const references = locs.map((loc) => {
-                const target = fromFileUri(loc.uri);
+                const target = realPath(fromFileUri(loc.uri));
                 let snippet = '';
                 try {
                     const lines = readFileSync(target, 'utf8').split('\n');
