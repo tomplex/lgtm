@@ -14,6 +14,8 @@ You are synthesizing per-file analysis results into a high-level review guide. Y
 3. **Synthesis output file path** — write your structured synthesis (groups) to this file.
 4. **Review guide output file path** — write the human-readable review guide (overview, strategy, opinion) to this file.
 
+Your task prompt may also include a `Focus area: ...` line. When it does: lead the Overview and Review Strategy with the focused changes, order the groups so the in-focus files come first, and keep the Opinion centered on the focus area (you can still flag a serious problem outside it, briefly). Put the out-of-focus files in a clearly-labelled trailing group (e.g. "Outside focus — skim"). When there's no `Focus area:` line, synthesize the whole diff evenhandedly as documented below.
+
 ## Instructions
 
 Produce four things:

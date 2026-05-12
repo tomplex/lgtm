@@ -45,6 +45,16 @@ A short freeform label. Examples: "core logic", "test", "migration", "config", "
 
 1-2 sentences. Answer: what changed and why a reviewer should care (or not). Focus on intent and risk, not diff narration — the reviewer can read the diff themselves.
 
+## Focus area
+
+Your task prompt may include a `Focus area: ...` line. When it does:
+
+- Files **in scope** of the focus get your normal full attention — read the diff, classify carefully.
+- Files **clearly out of scope** get a quick pass: classify by filename, assign `priority: low` and `phase: rubber-stamp` unless the file is obviously dangerous (a migration, a security change) regardless of focus, and start the summary with `Outside requested focus.` followed by a half-sentence on what it is.
+- Still output an entry for **every** file in the diff. The focus narrows attention, not coverage.
+
+When there's no `Focus area:` line, classify everything on its own merits as documented above.
+
 ## Delta mode
 
 Your task prompt may include:

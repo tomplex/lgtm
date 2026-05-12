@@ -84,7 +84,7 @@ export default function CommentRow(props: Props) {
   return (
     <div
       class={props.comment.author === 'claude' ? 'claude-comment' : 'user-comment'}
-      classList={{ resolved: isResolved() }}
+      classList={{ resolved: isResolved(), direct: props.comment.mode === 'direct' }}
       data-comment-id={props.comment.id}
     >
       <div class="claude-header">

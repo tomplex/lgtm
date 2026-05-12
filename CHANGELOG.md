@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-12
+
+### Added
+
+- `/lgtm analyze` accepts an optional focus area (as skill arguments or stated conversationally, e.g. "analyze, I only care about the migration"). The file-classifier gives in-scope files full attention and rubber-stamps the rest with an "Outside requested focus." note; the synthesizer leads the overview, strategy, and groups with the focused changes.
+- Commit panel has a filter input — narrows the commit list by substring match against sha, message, author, and date. "Select all" / "Select none" act on the filtered subset.
+
+### Changed
+
+- `j` / `k` (and arrow-key) navigation now scrolls the active row into view in the file sidebar, so paging through a long file list keeps the selection visible.
+- Phase group headers in the sidebar get more breathing room (top border + margin) instead of butting against the preceding file rows.
+- "Asked Claude" comments are visually distinct from pending-review comments — accent-tinted background and a thicker accent left border.
+
+### Removed
+
+- Dead `.group-header` / `.phase-header` CSS left over from the pre-tree sidebar.
+
 ## [0.4.0] - 2026-05-12
 
 ### Added

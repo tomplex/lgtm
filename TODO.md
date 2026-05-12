@@ -10,13 +10,13 @@
 ## UI polish
 - [x] Page title and top bar should show repo/project name prominently, plus branch vs base
 - [ ] Too many horizontal bands at top (header, tabs, meta, commits, description) - consolidate; meta bar could fold into header or be on-demand
-- [ ] Grouped view group headers are too dense
+- [x] Grouped view group headers are too dense — phase headers got a top border + margin; dead `.group-header`/`.phase-header` CSS removed
 - [x] Phased review groups should be collapsible, auto-collapse when all items reviewed
 - [x] Flat file view: sort files with Claude comments to the top
 - [x] Button to dismiss/hide files in the sidebar
 - [x] Move comment save / delete buttons for inline interactions to the left hand side for easier access
-- [ ] using j to move down the file list should scroll the list 
-- [ ] direct to claude comments and pending review comments should appear differently
+- [x] using j to move down the file list should scroll the list
+- [x] direct to claude comments and pending review comments should appear differently — `.user-comment.direct` accent tint + left border
 
 ## Commenting
 - [x] Markdown rendering in comments (both user and Claude)
@@ -26,7 +26,7 @@
 
 ## Diff & commits
 - [x] Auto-reload diff when git state changes (SSE push or polling)
-- [ ] Filter commits by message, date, author
+- [x] Filter commits by message, date, author — commit-panel filter input (substring across sha/message/author/date)
 - [x] Commits window should auto-update as new commits land (git_changed SSE → handleRefresh → fetchCommits)
 - [ ] Base branch picker in the UI
 - [ ] Round-over-round diff (show what changed since last review submission)
@@ -44,7 +44,7 @@
 - [x] Plugin packaging (bundle MCP config, skills, hooks for `claude plugin add`)
 - [ ] Persistent review storage so review preferences can be learned from across sessions
 - [x] document review submissions should be connected to a specific claude instance rather than the project as a whole
-- [ ] Analysis skill should take a "focus area" - e.g. "I only care about the model_train" changes
+- [x] Analysis skill should take a "focus area" - e.g. "I only care about the model_train" changes
 
 ## Tech debt
 - [x] Comprehensive server tests (103 tests: store, git-ops, session, session manager, routes)

@@ -819,6 +819,7 @@ kbd {
 
 .commit-actions {
   display: flex;
+  align-items: center;
   gap: 16px;
   padding: 8px 20px;
   border-bottom: 1px solid var(--border);
@@ -835,6 +836,26 @@ kbd {
 }
 .commit-actions a:hover {
   background: var(--hover);
+}
+.commit-filter {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text);
+  font-family: inherit;
+}
+.commit-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.commit-empty {
+  padding: 12px 20px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* --- Tab bar --- */
@@ -1009,6 +1030,15 @@ kbd {
 .user-comment {
   background: var(--comment-bg);
   border: 1px solid var(--comment-border);
+}
+/* "Asked Claude" comments — sent directly to the session, not held for review submission. */
+.user-comment.direct {
+  background: rgba(88, 166, 255, 0.1);
+  border-color: var(--accent);
+  border-left-width: 3px;
+}
+.user-comment.direct .claude-label {
+  color: var(--accent);
 }
 .claude-comment .claude-header,
 .user-comment .claude-header {
@@ -1548,96 +1578,6 @@ tr.expand-row:hover td {
   color: var(--text-muted);
   margin-top: 4px;
   line-height: 1.5;
-}
-
-/* --- Group headers --- */
-.group-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  user-select: none;
-}
-.group-header:hover {
-  background: var(--hover);
-}
-.group-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.group-chevron {
-  font-size: 11px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  width: 10px;
-}
-.group-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-}
-.group-count {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-.group-desc {
-  font-size: 10px;
-  color: var(--text-muted);
-  font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.group-stats {
-  font-size: 10px;
-  flex-shrink: 0;
-}
-.group-stats .add {
-  color: var(--add-text);
-}
-.group-stats .del {
-  color: var(--del-text);
-}
-
-/* --- Phase headers --- */
-.phase-header {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  user-select: none;
-  cursor: pointer;
-}
-.phase-header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.phase-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.phase-progress-text {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-.phase-progress-bar {
-  height: 3px;
-  background: var(--border);
-  border-radius: 2px;
-  margin-top: 6px;
-  overflow: hidden;
-}
-.phase-progress-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s;
 }
 
 /* --- Peek Definition Panel --- */
@@ -2724,10 +2664,16 @@ body.cmd-held .line-content .hljs-type {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--text);
-  padding-top: 10px;
-  padding-bottom: 4px;
-  margin-top: 2px;
+  padding-top: 8px;
+  padding-bottom: 6px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
   font-family: inherit;
+}
+/* No separator/gap before the very first phase group. */
+.file-tree > .folder-item.phase-root:first-child {
+  margin-top: 2px;
+  border-top: none;
 }
 .folder-item.phase-root .folder-chevron {
   font-size: 10px;

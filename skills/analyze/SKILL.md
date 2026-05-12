@@ -20,6 +20,18 @@ None. `set_analysis` auto-registers the project if it isn't already. If you
 want the review UI open and claimed for notifications, call `claim_reviews`
 separately (via the `lgtm` skill).
 
+## Focus area (optional)
+
+The invocation may carry a **focus area** — either as skill arguments
+(`/lgtm analyze focus on the model_train changes`) or stated conversationally
+("analyze, I only care about the migration"). When present:
+
+- Capture it as a one-line **focus directive**, e.g. `Focus area: the model_train pipeline changes — classify everything else quickly.`
+- Pass that line verbatim into the prompts for **both** the `file-classifier` agent (Step 1) and the `synthesizer` agent (Step 2), in the spots marked below.
+- Do **not** narrow the file set — every file in the diff still gets classified. The focus only changes how much attention each file gets and what the review guide leads with.
+
+When there's no focus area, omit the line entirely (don't pass an empty `Focus area:`).
+
 ## Pipeline
 
 ### Step 0: Check for prior analysis
@@ -55,6 +67,7 @@ Prompt for the agent:
 Analyze the diff for the repository at <REPO_PATH>.
 The base branch is <BASE_BRANCH>.
 Use git commands to explore the diff and classify every file.
+<Focus area: ... — include this line only if the user gave a focus area>
 Write your analysis to /tmp/lgtm-analysis-files.md
 ```
 
@@ -70,6 +83,7 @@ Prompt for the agent:
 
 Read the file analysis at /tmp/lgtm-analysis-files.md.
 Session description: <DESCRIPTION or "No description provided.">
+<Focus area: ... — include this line only if the user gave a focus area>
 Write your synthesis to /tmp/lgtm-analysis-synthesis.md
 Write your review guide to /tmp/lgtm-analysis-review-guide.md
 ```

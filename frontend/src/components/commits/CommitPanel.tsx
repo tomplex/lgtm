@@ -1,4 +1,4 @@
-import { For } from 'solid-js';
+import { For, Show, createMemo, createSignal } from 'solid-js';
 import { allCommits, selectedShas, setSelectedShas } from '../../state';
 
 interface Props {
@@ -7,23 +7,38 @@ interface Props {
 }
 
 export default function CommitPanel(props: Props) {
+  const [filter, setFilter] = createSignal('');
+
+  const shown = createMemo(() => {
+    const q = filter().trim().toLowerCase();
+    if (!q) return allCommits();
+    return allCommits().filter((c) => `${c.sha} ${c.message} ${c.author} ${c.date}`.toLowerCase().includes(q));
+  });
+
   function selectAll() {
-    for (const c of allCommits()) setSelectedShas(c.sha, true);
+    for (const c of shown()) setSelectedShas(c.sha, true);
   }
 
   function selectNone() {
-    for (const c of allCommits()) setSelectedShas(c.sha, false);
+    for (const c of shown()) setSelectedShas(c.sha, false);
   }
 
   return (
     <div class="commit-panel" classList={{ open: props.visible }}>
       <div class="commit-actions">
+        <input
+          class="commit-filter"
+          type="text"
+          placeholder="Filter commits…"
+          value={filter()}
+          onInput={(e) => setFilter(e.currentTarget.value)}
+        />
         <a onClick={selectAll}>Select all</a>
         <a onClick={selectNone}>Select none</a>
         <a onClick={props.onApply}>Apply</a>
       </div>
       <div class="commit-list">
-        <For each={allCommits()}>
+        <For each={shown()}>
           {(c) => (
             <label class="commit-item">
               <input
@@ -39,6 +54,9 @@ export default function CommitPanel(props: Props) {
             </label>
           )}
         </For>
+        <Show when={shown().length === 0}>
+          <div class="commit-empty">No matching commits</div>
+        </Show>
       </div>
     </div>
   );

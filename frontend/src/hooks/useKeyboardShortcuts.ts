@@ -63,6 +63,11 @@ export function useKeyboardShortcuts(options: Options) {
       setWholeFileView(false);
       window.location.hash = 'file=' + encodeURIComponent(row.file.path);
     }
+    // Keep the active row visible in the sidebar as you page through it with j/k.
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`#file-tree [data-id="${CSS.escape(nextId)}"]`);
+      el?.scrollIntoView({ block: 'nearest' });
+    });
   }
 
   function handler(e: KeyboardEvent) {
