@@ -1,10 +1,30 @@
 #!/usr/bin/env node
+import { execSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import open from 'open';
 import { createApp } from './app.js';
 import { SessionManager } from './session-manager.js';
 import { mountMcp } from './mcp.js';
+function checkRipgrep() {
+    try {
+        execSync('rg --version', { stdio: 'ignore' });
+    }
+    catch {
+        // Symbol lookup is one feature among many. Don't refuse to start —
+        // log a prominent warning and let the runtime error from runRipgrep
+        // surface a clean error if/when the feature is invoked.
+        console.error('');
+        console.error('  ─────────────────────────────────────────────────────────────');
+        console.error('   WARNING: ripgrep (rg) not found on PATH.');
+        console.error('   LGTM symbol lookup will fail until ripgrep is installed.');
+        console.error('     macOS:           brew install ripgrep');
+        console.error('     Debian/Ubuntu:   apt install ripgrep');
+        console.error('     Alpine:          apk add ripgrep');
+        console.error('  ─────────────────────────────────────────────────────────────');
+        console.error('');
+    }
+}
 function parseArgs(argv) {
     const args = {};
     for (let i = 2; i < argv.length; i++) {
@@ -17,6 +37,7 @@ function parseArgs(argv) {
     return args;
 }
 function main() {
+    checkRipgrep();
     const args = parseArgs(process.argv);
     // Keep the process alive on stray rejections / exceptions and leave a stack
     // trace in the log. Without these, a single unawaited promise rejection

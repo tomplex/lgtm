@@ -68,9 +68,21 @@ function runRipgrep(repoPath: string, symbol: string): RgMatch[] {
         { cwd: repoPath, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
       );
     } catch (err: unknown) {
-      // rg exits 1 when no matches found
-      const anyErr = err as { stdout?: string };
-      output = anyErr.stdout ?? '';
+      const anyErr = err as { stdout?: string; status?: number; code?: string };
+      // rg exits 1 when no matches found — expected, treat as empty.
+      if (anyErr.status === 1) {
+        output = anyErr.stdout ?? '';
+      } else if (anyErr.status === 127 || anyErr.code === 'ENOENT') {
+        // Sub-shell couldn't find rg. Surface a clear, actionable error
+        // instead of returning silently-empty results.
+        throw new Error(
+          'ripgrep (rg) not found on PATH. LGTM symbol lookup requires ripgrep. ' +
+            'Install with `brew install ripgrep` (macOS), `apt install ripgrep` (Debian/Ubuntu), ' +
+            'or `apk add ripgrep` (Alpine).'
+        );
+      } else {
+        throw err;
+      }
     }
 
     for (const line of output.split('\n')) {
