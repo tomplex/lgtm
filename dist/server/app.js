@@ -779,6 +779,23 @@ export function createApp(manager) {
         session.broadcast('items_changed', { removed: req.params.itemId });
         res.json({ ok: true });
     });
+    app.get('/open', (req, res) => {
+        const filePath = typeof req.query.path === 'string' ? req.query.path : undefined;
+        if (!filePath) {
+            res.status(400).json({ error: 'path query parameter required' });
+            return;
+        }
+        let repoRoot;
+        try {
+            repoRoot = gitRun(filePath, 'rev-parse', '--show-toplevel');
+        }
+        catch {
+            res.status(400).json({ error: `${filePath} is not a git repository` });
+            return;
+        }
+        const { slug } = manager.register(repoRoot);
+        res.redirect(302, `/project/${slug}/`);
+    });
     // Mount project router
     app.use('/project/:slug', projectRouter);
     // JSON error handler — surfaces git and other errors as { error: message }
