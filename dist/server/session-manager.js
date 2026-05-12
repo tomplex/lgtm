@@ -1,9 +1,21 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { detectBaseBranch } from './git-ops.js';
 import { Session } from './session.js';
 import { storeList, storeDelete } from './store.js';
 const REVIEW_DIR = '/tmp/claude-review';
+// Canonicalize a repo path so callers that didn't pre-resolve symlinks (e.g.
+// macOS /var → /private/var) still hit the same session as callers that did.
+// Falls back to plain resolve() if the path doesn't exist on disk.
+function canonicalizeRepoPath(repoPath) {
+    const resolved = resolve(repoPath);
+    try {
+        return realpathSync(resolved);
+    }
+    catch {
+        return resolved;
+    }
+}
 export class SessionManager {
     _sessions = new Map();
     _port;
@@ -20,7 +32,7 @@ export class SessionManager {
         }
     }
     register(repoPath, opts) {
-        const absPath = resolve(repoPath);
+        const absPath = canonicalizeRepoPath(repoPath);
         // Check if this path is already registered
         for (const [slug, session] of this._sessions) {
             if (session.repoPath === absPath) {
@@ -58,7 +70,7 @@ export class SessionManager {
         return this._sessions.get(slug);
     }
     findByRepoPath(repoPath) {
-        const absPath = resolve(repoPath);
+        const absPath = canonicalizeRepoPath(repoPath);
         for (const [slug, session] of this._sessions) {
             if (session.repoPath === absPath) {
                 return { slug, session };
