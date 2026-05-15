@@ -105,3 +105,58 @@ describe('linesForArtifact', () => {
     }
   });
 });
+
+const NEW_FILE_DIFF = `diff --git a/new.ts b/new.ts
+new file mode 100644
+index 0..1
+--- /dev/null
++++ b/new.ts
+@@ -0,0 +1,10 @@
++l1
++l2
++l3
++l4
++l5
++l6
++l7
++l8
++l9
++l10
+`;
+
+describe('linesForArtifact — new-file hunk slicing', () => {
+  beforeEach(() => {
+    setFiles(parseDiff(NEW_FILE_DIFF));
+  });
+
+  it('clips a pure-add hunk to the declared span', () => {
+    const a: StopArtifact = { file: 'new.ts', hunks: [{ newStart: 3, newLines: 3 }] };
+    const indexed = linesForArtifact(a);
+    const contents = indexed.filter((x) => x.line.type === 'add').map((x) => x.line.content);
+    expect(contents).toEqual(['l3', 'l4', 'l5']);
+  });
+
+  it('synthesizes a header reflecting the slice', () => {
+    const a: StopArtifact = { file: 'new.ts', hunks: [{ newStart: 3, newLines: 3 }] };
+    const indexed = linesForArtifact(a);
+    const hunks = indexed.filter((x) => x.line.type === 'hunk');
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0].line.content).toBe('@@ lines 3–5 @@');
+  });
+
+  it('non-overlapping declared sub-ranges yield disjoint slices', () => {
+    const first = linesForArtifact({ file: 'new.ts', hunks: [{ newStart: 1, newLines: 4 }] });
+    const second = linesForArtifact({ file: 'new.ts', hunks: [{ newStart: 6, newLines: 5 }] });
+    const c1 = first.filter((x) => x.line.type === 'add').map((x) => x.line.content);
+    const c2 = second.filter((x) => x.line.type === 'add').map((x) => x.line.content);
+    expect(c1).toEqual(['l1', 'l2', 'l3', 'l4']);
+    expect(c2).toEqual(['l6', 'l7', 'l8', 'l9', 'l10']);
+  });
+
+  it('keeps the whole hunk (original header) when the declared span already covers it', () => {
+    const a: StopArtifact = { file: 'new.ts', hunks: [{ newStart: 1, newLines: 20 }] };
+    const indexed = linesForArtifact(a);
+    expect(indexed.filter((x) => x.line.type === 'add')).toHaveLength(10);
+    expect(indexed.find((x) => x.line.type === 'hunk')!.line.content).toBe('@@ -0,0 +1,10 @@');
+  });
+});
