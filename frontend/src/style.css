@@ -3035,3 +3035,19 @@ body.cmd-held .line-content .hljs-type {
   font-weight: 500;
   vertical-align: middle;
 }
+
+/* --- Embedded mode (iframed by an external host like periscope) ---
+   The host provides project navigation and connection state, so we
+   suppress LGTM's own chrome that would duplicate it: the project
+   name/branch/PR row, the in-app tab bar, and the project palette.
+   `.header-bottom` (stats + submit + walkthrough + refresh) stays
+   visible since none of those have a natural home outside LGTM. */
+body.embedded .header-top,
+body.embedded .tab-bar,
+body.embedded .project-palette-backdrop {
+  display: none !important;
+}
+/* Tighter top spacing without the .header-top row. */
+body.embedded header {
+  padding-top: 6px;
+}

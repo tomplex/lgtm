@@ -13,6 +13,9 @@ interface Props {
   filePath: string;
   lang: string | null;
   wordDiffHtml?: string;
+  /** Pre-highlighted HTML for this line; set when the parent highlighted the
+   * whole hunk/file as a block so multi-line tokens render correctly. */
+  highlightedHtml?: string;
 }
 
 export default function DiffLine(props: Props) {
@@ -32,6 +35,7 @@ export default function DiffLine(props: Props) {
 
   const codeHtml = () => {
     if (props.wordDiffHtml) return props.wordDiffHtml;
+    if (props.highlightedHtml != null) return `<code>${props.highlightedHtml}</code>`;
     if (props.lang) return `<code>${highlightLine(props.line.content, props.lang)}</code>`;
     return `<span class="diff-text">${escapeHtml(props.line.content)}</span>`;
   };

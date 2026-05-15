@@ -1,7 +1,7 @@
 import { createResource, For, Show, createMemo } from 'solid-js';
 import { activeFile, toggleWholeFileView } from '../../state';
 import { fetchFile } from '../../api';
-import { escapeHtml, detectLang } from '../../utils';
+import { escapeHtml, detectLang, highlightLines } from '../../utils';
 import DiffLine from './DiffLine';
 import type { DiffLine as DiffLineType } from '../../state';
 
@@ -41,6 +41,21 @@ export default function WholeFileView() {
     }));
   });
 
+  // Highlight the whole file as one block so multi-line tokens (docstrings,
+  // template literals, block comments) carry tokenizer state across lines.
+  const highlighted = createMemo(() => {
+    const l = lang();
+    const items = asDiffLines();
+    if (!l || items.length === 0) return null;
+    const html = highlightLines(
+      items.map((it) => it.line.content),
+      l,
+    );
+    const byIdx: Record<number, string> = {};
+    for (let i = 0; i < items.length; i++) byIdx[items[i].lineIdx] = html[i];
+    return byIdx;
+  });
+
   return (
     <Show when={file()}>
       {(f) => (
@@ -57,7 +72,15 @@ export default function WholeFileView() {
           <Show when={wholeFileLines()} fallback={<div class="empty-state">Loading...</div>}>
             <table class="diff-table">
               <For each={asDiffLines()}>
-                {(item) => <DiffLine line={item.line} lineIdx={item.lineIdx} filePath={f().path} lang={lang()} />}
+                {(item) => (
+                  <DiffLine
+                    line={item.line}
+                    lineIdx={item.lineIdx}
+                    filePath={f().path}
+                    lang={lang()}
+                    highlightedHtml={highlighted()?.[item.lineIdx]}
+                  />
+                )}
               </For>
             </table>
           </Show>

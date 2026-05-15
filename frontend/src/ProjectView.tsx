@@ -449,9 +449,14 @@ export default function ProjectView() {
 
     await loadWalkthrough();
 
+    // Initial item selection precedence: ?item= query param (lets an
+    // external host like periscope deep-link a specific tab) > the
+    // last-active item from localStorage > 'diff'.
+    const itemParam = new URLSearchParams(window.location.search).get('item');
+    const paramValid = itemParam && sessionItems().some((i) => i.id === itemParam);
     const savedItem = localStorage.getItem(activeItemKey);
-    const validItem = savedItem && sessionItems().some((i) => i.id === savedItem);
-    await switchToItem(validItem ? savedItem! : 'diff');
+    const savedValid = savedItem && sessionItems().some((i) => i.id === savedItem);
+    await switchToItem(paramValid ? itemParam! : savedValid ? savedItem! : 'diff');
 
     // Set page title
     const meta = repoMeta();

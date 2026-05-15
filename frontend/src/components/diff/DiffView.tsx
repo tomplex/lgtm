@@ -2,7 +2,7 @@ import { For, Show, createMemo } from 'solid-js';
 import { activeFile, analysis, wholeFileView, toggleWholeFileView } from '../../state';
 import type { DiffFile, DiffLine as DiffLineType } from '../../state';
 import { fetchContext } from '../../api';
-import { escapeHtml, detectLang, highlightLine } from '../../utils';
+import { escapeHtml, detectLang, highlightLine, highlightLines } from '../../utils';
 import { computeWordDiff, renderWordDiffHtml } from './WordDiff';
 import DiffLine from './DiffLine';
 import WholeFileView from './WholeFileView';
@@ -19,10 +19,53 @@ function precomputeWordDiffs(lines: DiffLineType[]): Record<number, string> {
   return result;
 }
 
+/**
+ * Highlight each hunk's old side (context + del) and new side (context + add)
+ * as a single block, so multi-line tokens (docstrings, template literals,
+ * block comments) stay correctly colored across line boundaries.
+ * Returns a map from line index → highlighted HTML for that line.
+ */
+function precomputeHighlights(lines: DiffLineType[], lang: string | null): Record<number, string> {
+  if (!lang) return {};
+  const result: Record<number, string> = {};
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].type === 'hunk') {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < lines.length && lines[j].type !== 'hunk') j++;
+    const oldIdx: number[] = [];
+    const oldText: string[] = [];
+    const newIdx: number[] = [];
+    const newText: string[] = [];
+    for (let k = i; k < j; k++) {
+      const t = lines[k].type;
+      if (t === 'del' || t === 'context') {
+        oldIdx.push(k);
+        oldText.push(lines[k].content);
+      }
+      if (t === 'add' || t === 'context') {
+        newIdx.push(k);
+        newText.push(lines[k].content);
+      }
+    }
+    const oldHtml = highlightLines(oldText, lang);
+    const newHtml = highlightLines(newText, lang);
+    for (let m = 0; m < oldIdx.length; m++) result[oldIdx[m]] = oldHtml[m];
+    // Context lines appear in both arrays with identical content; new-side wins.
+    for (let m = 0; m < newIdx.length; m++) result[newIdx[m]] = newHtml[m];
+    i = j;
+  }
+  return result;
+}
+
 export default function DiffView() {
   const file = activeFile;
   const lang = createMemo(() => (file() ? detectLang(file()!.path) : null));
   const wordDiffs = createMemo(() => (file() ? precomputeWordDiffs(file()!.lines) : {}));
+  const highlights = createMemo(() => (file() ? precomputeHighlights(file()!.lines, lang()) : {}));
 
   const fileAnalysis = createMemo(() => {
     const f = file();
@@ -74,6 +117,7 @@ export default function DiffView() {
                     filePath={f().path}
                     lang={lang()}
                     wordDiffHtml={wordDiffs()[lineIdx()]}
+                    highlightedHtml={highlights()[lineIdx()]}
                   />
                 </Show>
               )}

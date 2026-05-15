@@ -82,19 +82,21 @@ export default function Header(props: Props) {
         </h1>
       </div>
       <div class="header-bottom">
-        <div class="stats" id="stats">
-          {files().length} file{files().length !== 1 ? 's' : ''} &middot; <span class="add">+{totalAdd()}</span>{' '}
-          <span class="del">-{totalDel()}</span>
-          <Show when={reviewedCount() === files().length && files().length > 0}> &middot; All files reviewed</Show>
-          <Show when={reviewedCount() > 0 && reviewedCount() < files().length}>
-            {' '}
-            &middot; <span class="add">+{remainingAdd()}</span> <span class="del">-{remainingDel()}</span> to review
-          </Show>
-          <Show when={userCommentCount() > 0}>
-            {' '}
-            &middot; {userCommentCount()} comment{userCommentCount() !== 1 ? 's' : ''}
-          </Show>
-        </div>
+        <Show when={activeItemId() === 'diff'} fallback={<div class="stats" id="stats" />}>
+          <div class="stats" id="stats">
+            {files().length} file{files().length !== 1 ? 's' : ''} &middot; <span class="add">+{totalAdd()}</span>{' '}
+            <span class="del">-{totalDel()}</span>
+            <Show when={reviewedCount() === files().length && files().length > 0}> &middot; All files reviewed</Show>
+            <Show when={reviewedCount() > 0 && reviewedCount() < files().length}>
+              {' '}
+              &middot; <span class="add">+{remainingAdd()}</span> <span class="del">-{remainingDel()}</span> to review
+            </Show>
+            <Show when={userCommentCount() > 0}>
+              {' '}
+              &middot; {userCommentCount()} comment{userCommentCount() !== 1 ? 's' : ''}
+            </Show>
+          </div>
+        </Show>
         <div class="header-actions">
           <span class="header-status-group">
             <ConnectionIndicator />

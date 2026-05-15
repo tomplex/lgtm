@@ -94,6 +94,66 @@ export function highlightLine(code: string, lang: string): string {
   }
 }
 
+/**
+ * Highlight a sequence of lines as a single block so multi-line tokens
+ * (Python docstrings, JS template literals, C-style block comments, ...)
+ * carry tokenizer state across line boundaries. Returns one HTML string
+ * per input line; spans that cross newlines are closed at end-of-line and
+ * re-opened at start-of-next-line so each line stays valid HTML on its own.
+ */
+export function highlightLines(lines: string[], lang: string): string[] {
+  if (!lang || !hljs.getLanguage(lang)) return lines.map(escapeHtml);
+  try {
+    const joined = lines.join('\n');
+    const html = hljs.highlight(joined, { language: lang, ignoreIllegals: true }).value;
+    const split = splitHighlightedByLine(html);
+    // Defensive: if our splitter produced the wrong line count, fall back rather
+    // than mis-aligning content with diff line numbers.
+    if (split.length !== lines.length) return lines.map(escapeHtml);
+    return split;
+  } catch {
+    return lines.map(escapeHtml);
+  }
+}
+
+/**
+ * Split hljs HTML on raw newlines while keeping each line's <span> stack
+ * balanced. hljs preserves literal '\n' in its output (only the source
+ * characters are HTML-escaped), so we walk the string char-by-char, track
+ * the open span stack, and on each newline emit `</span>` for every open
+ * span, then reopen them on the next line.
+ */
+function splitHighlightedByLine(html: string): string[] {
+  const lines: string[] = [];
+  const openSpans: string[] = []; // raw opening tags (e.g. '<span class="hljs-string">')
+  let buf = '';
+  let i = 0;
+  while (i < html.length) {
+    const ch = html[i];
+    if (ch === '<') {
+      const end = html.indexOf('>', i);
+      if (end === -1) {
+        buf += html.slice(i);
+        break;
+      }
+      const tag = html.slice(i, end + 1);
+      if (tag.startsWith('</span')) openSpans.pop();
+      else if (tag.startsWith('<span')) openSpans.push(tag);
+      buf += tag;
+      i = end + 1;
+    } else if (ch === '\n') {
+      lines.push(buf + '</span>'.repeat(openSpans.length));
+      buf = openSpans.join('');
+      i++;
+    } else {
+      buf += ch;
+      i++;
+    }
+  }
+  lines.push(buf);
+  return lines;
+}
+
 export function showToast(msg: string, duration = 2500): void {
   const t = document.getElementById('toast')!;
   t.textContent = msg;
