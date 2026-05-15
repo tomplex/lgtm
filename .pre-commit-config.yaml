@@ -1,0 +1,31 @@
+# Install once per clone:
+#   pre-commit install --hook-type pre-commit --hook-type pre-push
+#
+# Pre-commit runs format + lint (fast).
+# Pre-push verifies the tracked build artifacts (dist/, frontend/dist/) match
+# what the current source would produce — this repo ships as a Claude plugin,
+# so the built files have to stay in sync with the source on `main`.
+
+repos:
+  - repo: local
+    hooks:
+      - id: prettier-check
+        name: prettier --check
+        entry: npm run format:check
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: eslint
+        name: eslint
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: build-in-sync
+        name: build is in sync with source
+        entry: scripts/check-build-in-sync.sh
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

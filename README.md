@@ -158,6 +158,17 @@ npm test             # run all tests
 
 `npm run dev:all` uses `concurrently` to run `tsx --watch` (server, auto-restarts on changes) and Vite (frontend HMR) in parallel.
 
+### Git hooks (once per clone)
+
+This repo ships built artifacts (`dist/`, `frontend/dist/`) because it's a Claude plugin, so they have to stay in sync with source on `main`. [`pre-commit`](https://pre-commit.com/) enforces that:
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+- **pre-commit:** `npm run format:check` + `npm run lint`
+- **pre-push:** `npm run build`, then aborts the push if the rebuilt `dist/` or `frontend/dist/` differs from what's tracked. Commit the rebuilt files and push again.
+
 ## Keyboard shortcuts
 
 ### Diff view
