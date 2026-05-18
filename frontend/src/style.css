@@ -191,12 +191,16 @@ header .stats {
   text-align: left;
   cursor: pointer;
 }
-.submit-dropdown-item:hover {
+.submit-dropdown-item:hover:not(:disabled) {
   background: var(--hover);
 }
 .submit-dropdown-item.active {
   color: var(--accent);
   font-weight: 600;
+}
+.submit-dropdown-item:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 .submit-dropdown-divider {
   height: 1px;

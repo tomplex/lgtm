@@ -6,16 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-18
+
 ### Added
 
 - `/lgtm analyze` accepts an optional focus area (as skill arguments or stated conversationally, e.g. "analyze, I only care about the migration"). The file-classifier gives in-scope files full attention and rubber-stamps the rest with an "Outside requested focus." note; the synthesizer leads the overview, strategy, and groups with the focused changes.
 - Commit panel has a filter input — narrows the commit list by substring match against sha, message, author, and date. "Select all" / "Select none" act on the filtered subset.
+- Embedded mode: `?embedded=1` hides project chrome for embedding in iframes; `?item=ID` deep-links to a specific file or document on load.
+- "Submit to GitHub PR" is now always visible in the submit dropdown — disabled with a tooltip when no PR is detected (or when on a non-diff view). The tooltip surfaces the specific `gh` failure reason ("gh CLI not installed", SAML enforcement error, etc.) when available, instead of a generic "no PR" message; the server logs the same reason under `[pr-detect]`.
+- `GET /open?path=<repo>` redirects to the matching project review URL — lets external tools deep-link by repo path without knowing the project slug.
 
 ### Changed
 
 - `j` / `k` (and arrow-key) navigation now scrolls the active row into view in the file sidebar, so paging through a long file list keeps the selection visible.
 - Phase group headers in the sidebar get more breathing room (top border + margin) instead of butting against the preceding file rows.
 - "Asked Claude" comments are visually distinct from pending-review comments — accent-tinted background and a thicker accent left border.
+- Symbol lookup requires ripgrep — the server fails loudly with an install hint if `rg` is missing, instead of returning empty results.
+- Pre-commit hook runs prettier + eslint; pre-push hook verifies `dist/` and `frontend/dist/` are in sync with source.
+
+### Fixed
+
+- New-file walkthrough stops now show distinct sections — pure-add hunks are sliced to their declared line span instead of bleeding into the next stop.
+- LSP "go to definition" / "find references" results from `tsserver` resolve correctly when the project lives under a symlinked path; location paths are canonicalized to match the session's repo root, and the underlying caught error is preserved for diagnostics.
+- `SessionManager` canonicalizes repoPath through symlinks before lookup, so projects opened via different but equivalent paths share a session.
 
 ### Removed
 

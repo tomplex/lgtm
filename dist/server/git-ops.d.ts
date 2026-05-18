@@ -43,6 +43,7 @@ export interface RepoMeta {
         owner: string;
         repo: string;
     };
+    prDetectionError?: string;
 }
 export declare function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta;
 export declare function getRepoMetaAsync(repoPath: string, baseBranch: string): Promise<RepoMeta>;

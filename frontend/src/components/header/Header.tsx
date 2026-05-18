@@ -34,6 +34,14 @@ export default function Header(props: Props) {
   const [githubEvent, setGithubEvent] = createSignal<GithubEvent>('COMMENT');
 
   const canSubmitGithub = createMemo(() => !!meta().pr && activeItemId() === 'diff');
+  const githubDisabledReason = createMemo(() => {
+    if (!meta().pr) {
+      const err = meta().prDetectionError;
+      return err ? `PR detection failed: ${err}` : 'No GitHub PR found for this branch';
+    }
+    if (activeItemId() !== 'diff') return 'Switch to Diff to submit to GitHub';
+    return '';
+  });
 
   const totalAdd = createMemo(() => files().reduce((s, f) => s + f.additions, 0));
   const totalDel = createMemo(() => files().reduce((s, f) => s + f.deletions, 0));
@@ -152,50 +160,50 @@ export default function Header(props: Props) {
                 >
                   Submit to Claude
                 </button>
-                <Show when={canSubmitGithub()}>
+                <button
+                  class="submit-dropdown-item"
+                  classList={{ active: submitTarget() === 'github' }}
+                  disabled={!canSubmitGithub()}
+                  title={githubDisabledReason() || undefined}
+                  onClick={() => {
+                    setSubmitTarget('github');
+                    setDropdownOpen(false);
+                  }}
+                >
+                  Submit to GitHub PR
+                </button>
+                <Show when={submitTarget() === 'github' && canSubmitGithub()}>
+                  <div class="submit-dropdown-divider" />
                   <button
                     class="submit-dropdown-item"
-                    classList={{ active: submitTarget() === 'github' }}
+                    classList={{ active: githubEvent() === 'COMMENT' }}
                     onClick={() => {
-                      setSubmitTarget('github');
+                      setGithubEvent('COMMENT');
                       setDropdownOpen(false);
                     }}
                   >
-                    Submit to GitHub PR
+                    Comment
                   </button>
-                  <Show when={submitTarget() === 'github'}>
-                    <div class="submit-dropdown-divider" />
-                    <button
-                      class="submit-dropdown-item"
-                      classList={{ active: githubEvent() === 'COMMENT' }}
-                      onClick={() => {
-                        setGithubEvent('COMMENT');
-                        setDropdownOpen(false);
-                      }}
-                    >
-                      Comment
-                    </button>
-                    <button
-                      class="submit-dropdown-item"
-                      classList={{ active: githubEvent() === 'APPROVE' }}
-                      onClick={() => {
-                        setGithubEvent('APPROVE');
-                        setDropdownOpen(false);
-                      }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      class="submit-dropdown-item"
-                      classList={{ active: githubEvent() === 'REQUEST_CHANGES' }}
-                      onClick={() => {
-                        setGithubEvent('REQUEST_CHANGES');
-                        setDropdownOpen(false);
-                      }}
-                    >
-                      Request Changes
-                    </button>
-                  </Show>
+                  <button
+                    class="submit-dropdown-item"
+                    classList={{ active: githubEvent() === 'APPROVE' }}
+                    onClick={() => {
+                      setGithubEvent('APPROVE');
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    class="submit-dropdown-item"
+                    classList={{ active: githubEvent() === 'REQUEST_CHANGES' }}
+                    onClick={() => {
+                      setGithubEvent('REQUEST_CHANGES');
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    Request Changes
+                  </button>
                 </Show>
               </div>
             </Show>
