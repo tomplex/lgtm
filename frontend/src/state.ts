@@ -34,6 +34,7 @@ export interface RepoMeta {
   repoPath?: string;
   repoName?: string;
   pr?: { url: string; number: number; title: string; owner: string; repo: string };
+  prDetectionError?: string;
 }
 
 export interface MdMeta {

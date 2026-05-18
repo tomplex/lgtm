@@ -177,6 +177,16 @@ export interface RepoMeta {
   repoPath: string;
   repoName: string;
   pr?: { url: string; number: number; title: string; owner: string; repo: string };
+  prDetectionError?: string;
+}
+
+function ghFailureReason(e: unknown): string {
+  const err = e as { stderr?: Buffer | string; code?: string; message?: string };
+  if (err.code === 'ENOENT') return 'gh CLI not installed (or not on PATH)';
+  if (err.code === 'ETIMEDOUT') return 'gh pr view timed out after 5s';
+  const stderr = err.stderr ? err.stderr.toString().trim() : '';
+  if (stderr) return stderr.split('\n')[0].slice(0, 240);
+  return err.message ?? 'unknown gh failure';
 }
 
 export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
@@ -200,8 +210,10 @@ export function getRepoMeta(repoPath: string, baseBranch: string): RepoMeta {
     if (ownerRepo) {
       meta.pr = { ...pr, ...ownerRepo };
     }
-  } catch {
-    // gh not installed or no PR
+  } catch (e) {
+    const reason = ghFailureReason(e);
+    meta.prDetectionError = reason;
+    console.warn(`[pr-detect] gh pr view failed for ${repoPath} (branch ${branch}): ${reason}`);
   }
   return meta;
 }
@@ -226,8 +238,10 @@ export async function getRepoMetaAsync(repoPath: string, baseBranch: string): Pr
     if (ownerRepo) {
       meta.pr = { ...pr, ...ownerRepo };
     }
-  } catch {
-    // gh not installed or no PR
+  } catch (e) {
+    const reason = ghFailureReason(e);
+    meta.prDetectionError = reason;
+    console.warn(`[pr-detect] gh pr view failed for ${repoPath} (branch ${meta.branch}): ${reason}`);
   }
   return meta;
 }

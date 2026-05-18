@@ -141,6 +141,17 @@ export function parseOwnerRepo(url) {
         return undefined;
     return { owner: match[1], repo: match[2] };
 }
+function ghFailureReason(e) {
+    const err = e;
+    if (err.code === 'ENOENT')
+        return 'gh CLI not installed (or not on PATH)';
+    if (err.code === 'ETIMEDOUT')
+        return 'gh pr view timed out after 5s';
+    const stderr = err.stderr ? err.stderr.toString().trim() : '';
+    if (stderr)
+        return stderr.split('\n')[0].slice(0, 240);
+    return err.message ?? 'unknown gh failure';
+}
 export function getRepoMeta(repoPath, baseBranch) {
     const branch = gitRun(repoPath, 'rev-parse', '--abbrev-ref', 'HEAD');
     const meta = {
@@ -163,8 +174,10 @@ export function getRepoMeta(repoPath, baseBranch) {
             meta.pr = { ...pr, ...ownerRepo };
         }
     }
-    catch {
-        // gh not installed or no PR
+    catch (e) {
+        const reason = ghFailureReason(e);
+        meta.prDetectionError = reason;
+        console.warn(`[pr-detect] gh pr view failed for ${repoPath} (branch ${branch}): ${reason}`);
     }
     return meta;
 }
@@ -189,8 +202,10 @@ export async function getRepoMetaAsync(repoPath, baseBranch) {
             meta.pr = { ...pr, ...ownerRepo };
         }
     }
-    catch {
-        // gh not installed or no PR
+    catch (e) {
+        const reason = ghFailureReason(e);
+        meta.prDetectionError = reason;
+        console.warn(`[pr-detect] gh pr view failed for ${repoPath} (branch ${meta.branch}): ${reason}`);
     }
     return meta;
 }
