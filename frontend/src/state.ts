@@ -367,10 +367,36 @@ export function watchActiveRowId(): void {
 
 // --- Walkthrough ---
 
+import type { Cursor } from './hooks/walkthrough-cursor-helpers';
+
 export const [walkthrough, setWalkthrough] = createSignal<Walkthrough | null>(null);
 export const [walkthroughStale, setWalkthroughStale] = createSignal(false);
-export const [walkthroughMode, setWalkthroughMode] = createSignal(false);
-export const [activeStopIdx, setActiveStopIdx] = createSignal(0);
+
+const [_walkthroughMode, _setWalkthroughMode] = createSignal(false);
+export const walkthroughMode = _walkthroughMode;
+
+const [_activeStopIdx, _setActiveStopIdx] = createSignal(0);
+export const activeStopIdx = _activeStopIdx;
+
+// Vim-style line cursor inside the active walkthrough stop. Null when the
+// cursor hasn't been initialized (e.g. before the first j/k keypress).
+export const [walkthroughCursor, setWalkthroughCursor] = createSignal<Cursor | null>(null);
+
+// One-shot trigger: when set, the matching DiffLine opens its comment composer.
+// Cleared by the consumer once handled. Used by the `c` keybinding in
+// walkthrough mode to open a comment on the focused line without a mouse click.
+export const [commentTrigger, setCommentTrigger] = createSignal<{ file: string; lineIdx: number } | null>(null);
+
+export function setActiveStopIdx(next: number): void {
+  _setActiveStopIdx(next);
+  // Reset the line cursor on every stop change so j/k starts at the top.
+  setWalkthroughCursor(null);
+}
+
+export function setWalkthroughMode(next: boolean): void {
+  _setWalkthroughMode(next);
+  if (!next) setWalkthroughCursor(null);
+}
 
 export const [visitedStops, setVisitedStops] = createStore<Record<string, boolean>>({});
 

@@ -1,6 +1,14 @@
-import { createSignal, Show, For, onCleanup } from 'solid-js';
+import { createSignal, createEffect, Show, For, onCleanup } from 'solid-js';
 import { escapeHtml, highlightLine } from '../../utils';
-import { comments, addLocalComment, peekState, setPeekState, saveOrRetryComment } from '../../state';
+import {
+  comments,
+  addLocalComment,
+  peekState,
+  setPeekState,
+  saveOrRetryComment,
+  commentTrigger,
+  setCommentTrigger,
+} from '../../state';
 import type { Comment } from '../../comment-types';
 import type { DiffLine as DiffLineType } from '../../state';
 import CommentRow from '../comments/CommentRow';
@@ -16,15 +24,26 @@ interface Props {
   /** Pre-highlighted HTML for this line; set when the parent highlighted the
    * whole hunk/file as a block so multi-line tokens render correctly. */
   highlightedHtml?: string;
+  /** True when the walkthrough cursor sits on this row. */
+  focused?: boolean;
 }
 
 export default function DiffLine(props: Props) {
   const [showNewComment, setShowNewComment] = createSignal(false);
 
+  // Open the comment composer when the walkthrough `c` shortcut targets this row.
+  createEffect(() => {
+    const t = commentTrigger();
+    if (!t) return;
+    if (t.file === props.filePath && t.lineIdx === props.lineIdx) {
+      setShowNewComment(true);
+      setCommentTrigger(null);
+    }
+  });
+
   const cls = () => {
-    if (props.line.type === 'add') return 'diff-add';
-    if (props.line.type === 'del') return 'diff-del';
-    return 'diff-context';
+    const base = props.line.type === 'add' ? 'diff-add' : props.line.type === 'del' ? 'diff-del' : 'diff-context';
+    return props.focused ? `${base} wt-line-focus` : base;
   };
 
   const prefix = () => {

@@ -4,6 +4,7 @@ import type { StopArtifact as Artifact } from '../../walkthrough-types';
 import type { DiffLine as DiffLineType } from '../../state';
 import { fetchFile } from '../../api';
 import { detectLang, escapeHtml } from '../../utils';
+import { walkthroughCursor } from '../../state';
 import { computeWordDiff, renderWordDiffHtml } from '../diff/WordDiff';
 import DiffLine from '../diff/DiffLine';
 import { linesForArtifact, type IndexedLine } from './lines-for-artifact';
@@ -23,10 +24,28 @@ function wordDiffsByIdx(lines: IndexedLine[]): Record<number, string> {
   return result;
 }
 
-export function StopArtifact(props: { artifact: Artifact }) {
+export function StopArtifact(props: { artifact: Artifact; artifactIdx: number }) {
   const indexed = () => linesForArtifact(props.artifact);
   const lang = () => detectLang(props.artifact.file);
   const wdiffs = () => wordDiffsByIdx(indexed());
+
+  // Map each non-hunk row's absolute lineIdx → its index within the artifact's
+  // focusable rows. Used to compare against the walkthrough cursor's rowIdx.
+  const focusableRowIdxByLineIdx = createMemo<Record<number, number>>(() => {
+    const map: Record<number, number> = {};
+    let i = 0;
+    for (const { line, lineIdx } of indexed()) {
+      if (line.type !== 'hunk') map[lineIdx] = i++;
+    }
+    return map;
+  });
+
+  function isFocused(lineIdx: number): boolean {
+    const c = walkthroughCursor();
+    if (!c) return false;
+    if (c.artifactIdx !== props.artifactIdx) return false;
+    return c.rowIdx === focusableRowIdxByLineIdx()[lineIdx];
+  }
 
   const [expanded, setExpanded] = createSignal(false);
 
@@ -98,6 +117,7 @@ export function StopArtifact(props: { artifact: Artifact }) {
                       filePath={props.artifact.file}
                       lang={lang()}
                       wordDiffHtml={wdiffs()[lineIdx]}
+                      focused={isFocused(lineIdx)}
                     />
                   </Show>
                 )}

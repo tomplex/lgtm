@@ -3051,3 +3051,11 @@ body.embedded .project-palette-backdrop {
 body.embedded header {
   padding-top: 6px;
 }
+
+/* Walkthrough line cursor (j/k navigation). Composites a gutter bar and a
+   faint accent tint over the existing diff-add/del/context background so the
+   cursor is visible on any row type. */
+.wt-line-focus {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+}

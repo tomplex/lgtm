@@ -19,9 +19,22 @@ import {
   walkthrough,
   activeStopIdx,
   setActiveStopIdx,
+  walkthroughCursor,
+  setWalkthroughCursor,
+  setCommentTrigger,
 } from '../state';
 import { collectFiles } from '../tree';
 import { nextRow, prevRow, nextFolder, prevFolder, folderOf } from './useKeyboardShortcuts-helpers';
+import {
+  nextRow as cursorNextRow,
+  prevRow as cursorPrevRow,
+  firstRow as cursorFirstRow,
+  lastRow as cursorLastRow,
+  jumpRows as cursorJumpRows,
+  type ArtifactLines,
+  type Cursor,
+} from './walkthrough-cursor-helpers';
+import { linesForArtifact } from '../components/walkthrough/lines-for-artifact';
 
 interface Options {
   onRefresh: () => void;
@@ -32,10 +45,56 @@ interface Options {
   onOpenHelp: () => void;
 }
 
+function currentStopArtifacts(): ArtifactLines[] {
+  const w = walkthrough();
+  if (!w) return [];
+  const stop = w.stops[activeStopIdx()];
+  if (!stop) return [];
+  return stop.artifacts.map((a) => {
+    const lines = linesForArtifact(a);
+    return {
+      rows: lines.map((l) => ({
+        focusable: l.line.type !== 'hunk',
+        lineIdx: l.lineIdx,
+      })),
+    };
+  });
+}
+
+function estimateViewportRows(): number {
+  const body = document.querySelector('.wt-body') as HTMLElement | null;
+  if (!body) return 20;
+  const rowHeight = 20; // matches .diff-table line-height in style.css
+  return Math.max(1, Math.floor(body.clientHeight / rowHeight));
+}
+
 export function useKeyboardShortcuts(options: Options) {
   let lastShiftUp = 0;
   let shiftDownClean = false;
   let _pendingJump = false;
+  let _pendingJumpTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearPendingJump() {
+    _pendingJump = false;
+    if (_pendingJumpTimer) {
+      clearTimeout(_pendingJumpTimer);
+      _pendingJumpTimer = null;
+    }
+  }
+
+  function armPendingJump() {
+    _pendingJump = true;
+    if (_pendingJumpTimer) clearTimeout(_pendingJumpTimer);
+    _pendingJumpTimer = setTimeout(clearPendingJump, 500);
+  }
+
+  function ensureCursor(arts: ArtifactLines[]): Cursor | null {
+    const c = walkthroughCursor();
+    if (c) return c;
+    const f = cursorFirstRow(arts);
+    if (f) setWalkthroughCursor(f);
+    return f;
+  }
 
   function onKeyDown(e: KeyboardEvent) {
     shiftDownClean = e.key === 'Shift';
@@ -91,30 +150,102 @@ export function useKeyboardShortcuts(options: Options) {
       const len = w?.stops.length ?? 0;
       if (e.key === 'd' && !e.metaKey && !e.ctrlKey) {
         setWalkthroughMode(false);
-        _pendingJump = false;
+        clearPendingJump();
         return;
       }
       if (e.key === 'Enter' && !e.shiftKey) {
         setActiveStopIdx(Math.min(activeStopIdx() + 1, Math.max(0, len - 1)));
-        _pendingJump = false;
+        clearPendingJump();
         return;
       }
       if (e.key === 'Enter' && e.shiftKey) {
         setActiveStopIdx(Math.max(activeStopIdx() - 1, 0));
-        _pendingJump = false;
+        clearPendingJump();
         return;
       }
-      if (e.key === 'g') {
-        _pendingJump = true;
-        return;
-      }
+      // g + digit → jump to stop N (existing behaviour, kept ahead of `gg`).
       if (_pendingJump && /^[0-9]$/.test(e.key)) {
         const target = parseInt(e.key, 10) - 1;
         if (target >= 0 && target < len) setActiveStopIdx(target);
-        _pendingJump = false;
+        clearPendingJump();
         return;
       }
-      _pendingJump = false;
+      // g then g → first focusable row of stop.
+      if (_pendingJump && e.key === 'g' && !e.metaKey && !e.ctrlKey) {
+        const arts = currentStopArtifacts();
+        const f = cursorFirstRow(arts);
+        if (f) setWalkthroughCursor(f);
+        clearPendingJump();
+        return;
+      }
+      if (e.key === 'g' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+        armPendingJump();
+        return;
+      }
+
+      // Vim line navigation.
+      if (e.key === 'j' && !e.metaKey && !e.ctrlKey) {
+        const arts = currentStopArtifacts();
+        const cur = ensureCursor(arts);
+        if (cur && walkthroughCursor()) {
+          const n = cursorNextRow(arts, cur);
+          if (n) setWalkthroughCursor(n);
+        }
+        clearPendingJump();
+        return;
+      }
+      if (e.key === 'k' && !e.metaKey && !e.ctrlKey) {
+        const arts = currentStopArtifacts();
+        const cur = ensureCursor(arts);
+        if (cur && walkthroughCursor()) {
+          const n = cursorPrevRow(arts, cur);
+          if (n) setWalkthroughCursor(n);
+        }
+        clearPendingJump();
+        return;
+      }
+      if (e.key === 'd' && e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const arts = currentStopArtifacts();
+        const cur = ensureCursor(arts);
+        if (cur) {
+          const half = Math.max(1, Math.floor(estimateViewportRows() / 2));
+          setWalkthroughCursor(cursorJumpRows(arts, cur, half));
+        }
+        clearPendingJump();
+        return;
+      }
+      if (e.key === 'u' && e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const arts = currentStopArtifacts();
+        const cur = ensureCursor(arts);
+        if (cur) {
+          const half = Math.max(1, Math.floor(estimateViewportRows() / 2));
+          setWalkthroughCursor(cursorJumpRows(arts, cur, -half));
+        }
+        clearPendingJump();
+        return;
+      }
+      if (e.key === 'G' && !e.metaKey && !e.ctrlKey) {
+        const arts = currentStopArtifacts();
+        const l = cursorLastRow(arts);
+        if (l) setWalkthroughCursor(l);
+        clearPendingJump();
+        return;
+      }
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
+        const arts = currentStopArtifacts();
+        const cur = ensureCursor(arts);
+        if (cur) {
+          const stop = walkthrough()?.stops[activeStopIdx()];
+          const art = stop?.artifacts[cur.artifactIdx];
+          const row = arts[cur.artifactIdx]?.rows[cur.rowIdx];
+          if (art && row) setCommentTrigger({ file: art.file, lineIdx: row.lineIdx });
+        }
+        clearPendingJump();
+        return;
+      }
+      clearPendingJump();
       return;
     }
 
