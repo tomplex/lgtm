@@ -8,8 +8,22 @@ import App from './App';
 // `?embedded=1` flags the body so style.css can hide the duplicated bits
 // (.header-top, the in-app tab bar, the project palette). Set before
 // render so there's no flash of full chrome on first paint.
-if (new URLSearchParams(window.location.search).get('embedded') === '1') {
+const isEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1';
+if (isEmbedded) {
   document.body.classList.add('embedded');
+  // Forward Escape to the parent window. When the iframe has focus the
+  // host can't observe keystrokes directly — without this, ESC inside
+  // the iframe never closes the modal that contains us.
+  //
+  // Skip forwarding when focus is on a text editor (textarea/input):
+  // LGTM uses ESC there to cancel comments / clear searches, and the
+  // user shouldn't lose their typing because the modal also closed.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const tag = (document.activeElement?.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+    window.parent?.postMessage({ type: 'lgtm-embedded-escape' }, '*');
+  });
 }
 
 // Track Cmd key for peek-definition underline hint
