@@ -36,6 +36,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // No content hashes in filenames: lgtm is served from a local Express server
+    // (not a CDN), so ETag/Last-Modified handle cache invalidation. Stable
+    // filenames keep frontend/dist/index.html out of every PR's merge conflicts.
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]',
+      },
+    },
   },
   server: {
     proxy: {
