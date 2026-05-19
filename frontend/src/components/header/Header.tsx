@@ -120,7 +120,7 @@ export default function Header(props: Props) {
           </Show>
           <Show when={walkthrough()}>
             <button
-              class="header-btn"
+              class="header-btn header-walkthrough-toggle"
               classList={{ 'header-btn-active': walkthroughMode() }}
               onClick={() => setWalkthroughMode(!walkthroughMode())}
               title="Walkthrough (W)"

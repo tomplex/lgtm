@@ -3055,6 +3055,13 @@ body.embedded .project-palette-backdrop {
 body.embedded header {
   padding-top: 6px;
 }
+/* In embedded mode the host (e.g. periscope) provides tab switching between
+   diff and walkthrough, so the in-frame mode-switch affordances are
+   redundant. Hide them so each iframe presents a single, focused surface. */
+body.embedded .wt-back,
+body.embedded .header-walkthrough-toggle {
+  display: none !important;
+}
 
 /* Walkthrough line cursor (j/k navigation). Composites a gutter bar and a
    faint accent tint over the existing diff-add/del/context background so the
