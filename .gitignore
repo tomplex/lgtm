@@ -2,3 +2,4 @@ node_modules/
 .superpowers/
 .private-journal/
 .DS_Store
+.claude/scheduled_tasks.lock
