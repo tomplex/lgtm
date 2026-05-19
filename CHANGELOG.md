@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-19
+
+### Added
+
+- Walkthrough embed mode: `?view=walkthrough` URL parameter deep-links into the walkthrough surface at boot, the iframe `postMessage`s walkthrough availability (`{type: 'lgtm-walkthrough-availability', has}`) to its parent so the host can conditionally show/hide its walkthrough tab, and in-frame mode-switch UI (the "← Back to diff" button and the header's "Walkthrough" toggle) is hidden when embedded. Lets tools like Periscope present LGTM's diff and walkthrough as separate tabs sharing one session.
+- Vim-style line cursor in the walkthrough surface — `j` / `k`, `Ctrl-d` / `Ctrl-u`, `gg` / `G`, and `c` (start comment) navigate within a stop.
+- Block-highlight on walkthrough artifact diff and whole-file views (#8) — the artifact's lines stand out in their surrounding context.
+- ESC inside an embedded iframe forwards to the parent window so the host's modal can close from focus inside LGTM.
+
+### Changed
+
+- Walkthrough-author agent (`agents/walkthrough-author/AGENT.md`) gained explicit **Hunk sizing** and **Narrative style** sections, and its stop-count guidance was relaxed — count now scales with logical complexity rather than fitting a soft 3–8 cap. Addresses #10 by steering the agent toward tighter declared ranges and more (smaller) stops instead of list-shaped narratives.
+- Vite bundle filenames no longer include content hashes — `dist/assets/index.js` and `dist/assets/index.css` are stable across builds, which keeps the build-sync pre-push hook honest and cuts noise in `git diff` between branches.
+
 ## [0.5.0] - 2026-05-18
 
 ### Added
