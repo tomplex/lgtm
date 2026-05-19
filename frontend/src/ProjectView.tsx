@@ -332,6 +332,19 @@ export default function ProjectView() {
     if (walkthrough()) ensureDiffLoaded();
   });
 
+  // When embedded (iframed by another tool, e.g. periscope), tell the parent
+  // window whether this session has a walkthrough. The host uses this to
+  // conditionally show or hide its walkthrough tab. Fires on the initial
+  // reactive flush (likely `has: false` because `loadWalkthrough()` hasn't
+  // resolved yet) and on every subsequent walkthrough change (SSE
+  // walkthrough_changed, git_changed). The host MUST treat the most recent
+  // message as authoritative, not the first one.
+  createEffect(() => {
+    if (!document.body.classList.contains('embedded')) return;
+    const has = walkthrough() !== null;
+    window.parent?.postMessage({ type: 'lgtm-walkthrough-availability', has }, '*');
+  });
+
   // --- LSP status ---
 
   function languagesFromFiles(): Language[] {
