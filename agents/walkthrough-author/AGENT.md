@@ -187,6 +187,6 @@ Run through this list before writing the file. Catch mistakes here, not after pa
 
 - Is the overall story legible if a reader reads stops in order?
 - Did you avoid narrating trivial cosmetic changes? (Good — they belong in diff view, not here.)
-- Reality check on length: 3–8 stops is typical. A 1-stop walkthrough means you probably bundled too much; a 20-stop walkthrough means you probably narrated trivia.
+- Stop count should scale with logical complexity, not be compressed to hit a target. A 1-stop walkthrough almost always means you bundled too much. Beyond that, let the change drive the count — a 15-stop walkthrough is appropriate for a sprawling PR. **Don't fold two logical units into one stop to keep the number down — that's how narratives end up as run-on lists.** Trivial changes are filtered out by step 3, so a high count means the PR genuinely has that many logical units, not that you've narrated trivia.
 
 Write the file to `OUTPUT_PATH` and exit.
