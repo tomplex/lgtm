@@ -2,13 +2,17 @@ import 'highlight.js/styles/github-dark.css';
 import './style.css';
 import { render } from 'solid-js/web';
 import App from './App';
+import { setWalkthroughMode } from './state';
 
 // Embedded mode: when LGTM is iframed by another tool (e.g. periscope),
 // the host already provides project navigation and connection chrome.
 // `?embedded=1` flags the body so style.css can hide the duplicated bits
 // (.header-top, the in-app tab bar, the project palette). Set before
 // render so there's no flash of full chrome on first paint.
-const isEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1';
+const params = new URLSearchParams(window.location.search);
+const isEmbedded = params.get('embedded') === '1';
+const initialView = params.get('view');
+
 if (isEmbedded) {
   document.body.classList.add('embedded');
   // Forward Escape to the parent window. When the iframe has focus the
@@ -24,6 +28,14 @@ if (isEmbedded) {
     if (tag === 'TEXTAREA' || tag === 'INPUT') return;
     window.parent?.postMessage({ type: 'lgtm-embedded-escape' }, '*');
   });
+}
+
+// `?view=walkthrough` deep-links into walkthrough mode. Setting the signal
+// before render avoids a flash of the diff surface on first paint. Works in
+// embedded and non-embedded contexts so the param doubles as a shareable
+// deep link.
+if (initialView === 'walkthrough') {
+  setWalkthroughMode(true);
 }
 
 // Track Cmd key for peek-definition underline hint
