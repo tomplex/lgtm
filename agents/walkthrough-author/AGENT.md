@@ -65,6 +65,22 @@ The walkthrough explains what the code does. It does **not** narrate the project
 
 A reader who knows nothing about the project plan should still understand each stop. Code-level reasons only.
 
+## Narrative style
+
+- **Narratives render as a single paragraph.** Markdown lists, bold, and code spans are NOT rendered — they appear as literal text. If you want a list, that's a signal to split into multiple stops, not to add bullets.
+- Keep sentences ≤ 25 words. Each one should land a single point.
+- Lead with the verb (what changed), then the why. Don't open with "This stop covers…" or "We're now…"
+- 30–100 words total. Under 30 is usually too thin; over 100 means you're explaining the project, not the code.
+
+## Hunk sizing
+
+Each `- hunk: START-END` should be the **smallest contiguous span** that contains the change you're narrating. Tight hunks keep the walkthrough focused; loose hunks dilute it.
+
+- **For modified hunks** (the diff contains both `-` and `+` lines), align `START-END` with the actual diff hunk boundaries. The renderer keeps the whole diff hunk intact so deletions stay visible — padding `END` past the real hunk end just expands what gets shown.
+- **For new-file artifacts** (pure-add hunks: a file added in this PR), the renderer clips to your declared `START-END`. Pick the narrowest range that contains the lines your narrative actually discusses. If you're narrating one function inside a new 500-line file, your hunk is that function's range, not the whole file.
+- **If a single logical change spans 100+ lines** in one file, consider splitting it into two stops (one per sub-concept) rather than giving one stop a huge hunk.
+- **Discontiguous chunks of the same file in one stop** are fine — use multiple `- hunk:` lines.
+
 ## Strict format rules
 
 The server parses your file with a deliberately simple markdown parser. **It rejects any deviation from the rules below.** Past agents have tripped on these — read carefully.
