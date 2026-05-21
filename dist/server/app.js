@@ -615,7 +615,10 @@ export function createApp(manager) {
         const slug = req.params.slug;
         const where = file ? `${file}${line != null ? `:${line}` : ''}` : (block != null ? `block=${block}` : '-');
         console.log(`COMMENT_ADDED slug=${slug} item=${item} author=${author} mode=${mode ?? 'review'} reply=${parentId ? 'yes' : 'no'} where=${where} len=${text.length}`);
-        // Push direct questions to Claude via channel notification
+        // Direct-mode questions push to Claude via the channel. When an
+        // embedding host (periscope) can deliver to Claude itself, hand back the
+        // payload instead of using our own flaky MCP push.
+        let channel;
         if (mode === 'direct' && !parentId) {
             let content = text;
             if (file && line != null) {
@@ -631,9 +634,14 @@ export function createApp(manager) {
             if (line != null)
                 meta.line = String(line);
             console.log(`QUESTION_TO_CLAUDE slug=${slug} where=${where} commentId=${comment.id} len=${content.length}`);
-            notifyChannel(content, meta);
+            if (req.get('X-LGTM-Host') === 'periscope') {
+                channel = { content, meta };
+            }
+            else {
+                notifyChannel(content, meta);
+            }
         }
-        res.json({ ok: true, comment });
+        res.json({ ok: true, comment, ...(channel ? { channel } : {}) });
     });
     projectRouter.patch('/comments/:id', (req, res) => {
         const session = res.locals.session;
@@ -664,7 +672,9 @@ export function createApp(manager) {
         const currentRound = await session.submitReview(commentsText, item);
         const slug = req.params.slug;
         console.log(`REVIEW_SUBMITTED slug=${slug} round=${currentRound} item=${item ?? 'diff'} len=${commentsText.length}`);
-        // Push review feedback to Claude via channel notification
+        // Channel notification. When an embedding host (periscope) can deliver
+        // to Claude over its own reliable channel, hand it the payload and skip
+        // our own MCP push — that push rides a flaky long-lived SSE stream.
         const meta = {
             event: 'review_submitted',
             project: slug,
@@ -672,6 +682,10 @@ export function createApp(manager) {
         };
         if (item)
             meta.item = item;
+        if (req.get('X-LGTM-Host') === 'periscope') {
+            res.json({ ok: true, round: currentRound, channel: { content: commentsText, meta } });
+            return;
+        }
         notifyChannel(commentsText, meta);
         res.json({ ok: true, round: currentRound });
     });
@@ -683,19 +697,27 @@ export function createApp(manager) {
             res.status(404).json({ delivered: false, reason: 'No analysis set' });
             return;
         }
-        const claim = getProjectClaim(slug);
-        if (!claim || !isClaimAlive(slug)) {
-            res.json({ delivered: false, reason: 'No live Claude claim' });
-            return;
-        }
         const content = JSON.stringify({
             staleFiles: result.freshness.staleFiles,
             missingFiles: result.freshness.missingFiles,
             removedFiles: result.freshness.removedFiles,
             staleSynthesis: result.freshness.staleSynthesis,
         });
-        notifyChannel(content, { event: 'refresh_analysis_requested', project: slug });
+        const meta = { event: 'refresh_analysis_requested', project: slug };
         console.log(`REFRESH_ANALYSIS_REQUESTED slug=${slug} stale=${result.freshness.staleFiles.length}`);
+        // An embedding host (periscope) delivers to Claude itself, so it has no
+        // need of a live MCP claim — that claim is exactly the unreliable thing
+        // we are routing around here.
+        if (req.get('X-LGTM-Host') === 'periscope') {
+            res.json({ delivered: true, channel: { content, meta } });
+            return;
+        }
+        const claim = getProjectClaim(slug);
+        if (!claim || !isClaimAlive(slug)) {
+            res.json({ delivered: false, reason: 'No live Claude claim' });
+            return;
+        }
+        notifyChannel(content, meta);
         res.json({ delivered: true });
     });
     projectRouter.post('/submit-github', (req, res) => {
