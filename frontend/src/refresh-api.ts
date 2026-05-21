@@ -1,5 +1,5 @@
 import type { AnalysisFreshness, ConnectionState } from './state';
-import { baseUrl } from './api';
+import { baseUrl, hostHeaders, forwardChannelToHost, type ChannelPayload } from './api';
 
 /** Returns null on 404 (no analysis set). Throws on other errors. */
 export async function fetchFreshness(): Promise<AnalysisFreshness | null> {
@@ -16,6 +16,11 @@ export async function fetchConnectionState(): Promise<ConnectionState> {
 }
 
 export async function postRefreshAnalysis(): Promise<{ delivered: boolean; reason?: string }> {
-  const res = await fetch(`${baseUrl()}/refresh-analysis`, { method: 'POST' });
-  return res.json();
+  const res = await fetch(`${baseUrl()}/refresh-analysis`, {
+    method: 'POST',
+    headers: { ...hostHeaders() },
+  });
+  const data = (await res.json()) as { delivered: boolean; reason?: string; channel?: ChannelPayload };
+  forwardChannelToHost(data.channel);
+  return data;
 }

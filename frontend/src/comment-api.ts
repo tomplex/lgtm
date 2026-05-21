@@ -1,5 +1,5 @@
 import type { Comment } from './comment-types';
-import { baseUrl } from './api';
+import { baseUrl, hostHeaders, forwardChannelToHost, type ChannelPayload } from './api';
 
 async function checkedJson<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
@@ -35,10 +35,11 @@ export async function createComment(input: {
 }): Promise<Comment> {
   const resp = await fetch(`${baseUrl()}/comments`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...hostHeaders() },
     body: JSON.stringify(input),
   });
-  const data = await checkedJson<{ ok: boolean; comment: Comment }>(resp);
+  const data = await checkedJson<{ ok: boolean; comment: Comment; channel?: ChannelPayload }>(resp);
+  forwardChannelToHost(data.channel);
   return data.comment;
 }
 

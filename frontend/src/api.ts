@@ -11,6 +11,41 @@ export function baseUrl(): string {
   return slug ? `/project/${slug}` : '';
 }
 
+/**
+ * When LGTM runs embedded in a host that can deliver channel events to
+ * Claude over its own reliable channel, this returns the host id —
+ * currently only 'periscope'. Empty string means no host-delivery: LGTM
+ * uses its own MCP channel push.
+ */
+export function embeddedHost(): string {
+  return new URLSearchParams(window.location.search).get('host') ?? '';
+}
+
+/**
+ * Request header that tells the server to skip its own MCP channel push and
+ * return the channel payload in the response body, so the embedding host
+ * can deliver it instead.
+ */
+export function hostHeaders(): Record<string, string> {
+  return embeddedHost() === 'periscope' ? { 'X-LGTM-Host': 'periscope' } : {};
+}
+
+/** Channel payload the server hands back when host-delivery is active. */
+export interface ChannelPayload {
+  content: string;
+  meta: Record<string, string>;
+}
+
+/**
+ * Forward a server-returned channel payload to the embedding host via
+ * postMessage; the host delivers `content` to its wrapped Claude session.
+ * No-op when not host-embedded or when the response carried no payload.
+ */
+export function forwardChannelToHost(channel: ChannelPayload | undefined): void {
+  if (!channel || embeddedHost() !== 'periscope') return;
+  window.parent?.postMessage({ type: 'lgtm-notify-claude', content: channel.content }, '*');
+}
+
 async function checkedJson<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     let message = `HTTP ${resp.status}`;
@@ -136,10 +171,12 @@ export async function submitReview(
 ): Promise<{ ok: boolean; round: number }> {
   const resp = await fetch(`${baseUrl()}/submit`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...hostHeaders() },
     body: JSON.stringify({ comments, raw, item }),
   });
-  return checkedJson<{ ok: boolean; round: number }>(resp);
+  const data = await checkedJson<{ ok: boolean; round: number; channel?: ChannelPayload }>(resp);
+  forwardChannelToHost(data.channel);
+  return data;
 }
 
 export async function submitGithub(
