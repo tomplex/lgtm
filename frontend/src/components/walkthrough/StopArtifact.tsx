@@ -3,7 +3,7 @@ import { createMemo, createResource, createSignal, For, Show } from 'solid-js';
 import type { StopArtifact as Artifact } from '../../walkthrough-types';
 import type { DiffLine as DiffLineType } from '../../state';
 import { fetchFile } from '../../api';
-import { detectLang, escapeHtml, highlightLines } from '../../utils';
+import { detectLang, escapeHtml, highlightLines, highlightDiffLines } from '../../utils';
 import { walkthroughCursor } from '../../state';
 import { computeWordDiff, renderWordDiffHtml } from '../diff/WordDiff';
 import DiffLine from '../diff/DiffLine';
@@ -24,53 +24,30 @@ function wordDiffsByIdx(lines: IndexedLine[]): Record<number, string> {
   return result;
 }
 
-/**
- * Highlight each hunk's old side (context + del) and new side (context + add)
- * as a single block so multi-line tokens (docstrings, template literals,
- * block comments) stay correctly colored across line boundaries. Mirrors the
- * pattern used by DiffView; same shape, scoped to one artifact's lines.
- */
-function highlightsByIdx(lines: IndexedLine[], lang: string | null): Record<number, string> {
-  if (!lang) return {};
-  const result: Record<number, string> = {};
-  let i = 0;
-  while (i < lines.length) {
-    if (lines[i].line.type === 'hunk') {
-      i++;
-      continue;
-    }
-    let j = i;
-    while (j < lines.length && lines[j].line.type !== 'hunk') j++;
-    const oldIdx: number[] = [];
-    const oldText: string[] = [];
-    const newIdx: number[] = [];
-    const newText: string[] = [];
-    for (let k = i; k < j; k++) {
-      const { line, lineIdx } = lines[k];
-      if (line.type === 'del' || line.type === 'context') {
-        oldIdx.push(lineIdx);
-        oldText.push(line.content);
-      }
-      if (line.type === 'add' || line.type === 'context') {
-        newIdx.push(lineIdx);
-        newText.push(line.content);
-      }
-    }
-    const oldHtml = highlightLines(oldText, lang);
-    const newHtml = highlightLines(newText, lang);
-    for (let m = 0; m < oldIdx.length; m++) result[oldIdx[m]] = oldHtml[m];
-    // Context lines appear on both sides with identical content; new-side wins.
-    for (let m = 0; m < newIdx.length; m++) result[newIdx[m]] = newHtml[m];
-    i = j;
-  }
-  return result;
-}
-
 export function StopArtifact(props: { artifact: Artifact; artifactIdx: number }) {
   const indexed = () => linesForArtifact(props.artifact);
   const lang = () => detectLang(props.artifact.file);
   const wdiffs = () => wordDiffsByIdx(indexed());
-  const highlights = createMemo(() => highlightsByIdx(indexed(), lang()));
+
+  // Fetched eagerly: the whole-file content backs both the expanded view and
+  // the lexical context the highlighter needs for the artifact's diff lines.
+  const [wholeFileLines] = createResource(
+    () => props.artifact.file,
+    (path) => fetchFile(path),
+  );
+  const newFileContent = () => wholeFileLines()?.map((l) => l.content) ?? null;
+
+  const highlights = createMemo<Record<number, string>>(() => {
+    const items = indexed();
+    const hl = highlightDiffLines(
+      items.map((x) => x.line),
+      lang(),
+      newFileContent(),
+    );
+    const map: Record<number, string> = {};
+    for (let i = 0; i < items.length; i++) map[items[i].lineIdx] = hl[i];
+    return map;
+  });
 
   // Map each non-hunk row's absolute lineIdx → its index within the artifact's
   // focusable rows. Used to compare against the walkthrough cursor's rowIdx.
@@ -91,12 +68,6 @@ export function StopArtifact(props: { artifact: Artifact; artifactIdx: number })
   }
 
   const [expanded, setExpanded] = createSignal(false);
-
-  // Lazily fetch the whole file when expanded. Resource memoizes on path.
-  const [wholeFileLines] = createResource(
-    () => (expanded() ? props.artifact.file : null),
-    async (path) => (path ? fetchFile(path) : []),
-  );
 
   // Set of new-side line numbers that are additions in the artifact's diff —
   // used to colour the matching lines in the whole-file view.

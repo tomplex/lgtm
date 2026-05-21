@@ -154,6 +154,90 @@ function splitHighlightedByLine(html: string): string[] {
   return lines;
 }
 
+interface DiffLineLike {
+  type: 'add' | 'del' | 'context' | 'hunk';
+  content: string;
+  newLine: number | null;
+}
+
+/**
+ * Highlight diff lines for display, returning one HTML string per input line
+ * (hunk rows → '').
+ *
+ * New-side lines (`add`/`context`) are highlighted against the full new-file
+ * content when `newFileLines` is supplied. This is what keeps multi-line tokens
+ * correct: a hunk often begins partway through a `"""` docstring or template
+ * literal that opened in an elided region above it. Highlighting the hunk in
+ * isolation makes hljs read that first delimiter as an *opening* quote, which
+ * inverts string/code coloring for the rest of the hunk. Highlighting the whole
+ * file gives hljs the true lexical context, so the delimiter reads correctly.
+ *
+ * Old-side lines (`del`) are highlighted per-hunk as a block — the base-revision
+ * file isn't fetched, so a deletion that opens mid-string is a known minor
+ * limitation. `context` lines take the new-side highlight (identical content).
+ *
+ * Falls back to per-hunk block highlighting for any new-side line when
+ * `newFileLines` is absent or its content doesn't match the diff (stale file).
+ */
+export function highlightDiffLines(
+  lines: DiffLineLike[],
+  lang: string | null,
+  newFileLines: string[] | null,
+): string[] {
+  const out = new Array<string>(lines.length).fill('');
+  if (!lang) {
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].type !== 'hunk') out[i] = escapeHtml(lines[i].content);
+    }
+    return out;
+  }
+
+  const fileHl = newFileLines ? highlightLines(newFileLines, lang) : null;
+
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].type === 'hunk') {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < lines.length && lines[j].type !== 'hunk') j++;
+
+    // Old side (context + del): one per-hunk block.
+    const oldIdx: number[] = [];
+    const oldText: string[] = [];
+    // New side (context + add): one per-hunk block, used as a fallback.
+    const newIdx: number[] = [];
+    const newText: string[] = [];
+    for (let k = i; k < j; k++) {
+      const ln = lines[k];
+      if (ln.type === 'del' || ln.type === 'context') {
+        oldIdx.push(k);
+        oldText.push(ln.content);
+      }
+      if (ln.type === 'add' || ln.type === 'context') {
+        newIdx.push(k);
+        newText.push(ln.content);
+      }
+    }
+    const oldHtml = highlightLines(oldText, lang);
+    for (let m = 0; m < oldIdx.length; m++) out[oldIdx[m]] = oldHtml[m];
+
+    const newBlock = highlightLines(newText, lang);
+    for (let m = 0; m < newIdx.length; m++) {
+      const ln = lines[newIdx[m]];
+      const idx = ln.newLine != null ? ln.newLine - 1 : -1;
+      // Use the whole-file highlight only when the file line matches the diff
+      // line — a mismatch means the file moved on; fall back rather than show
+      // a highlight for the wrong text.
+      const fromFile = fileHl && idx >= 0 && newFileLines![idx] === ln.content ? fileHl[idx] : undefined;
+      out[newIdx[m]] = fromFile ?? newBlock[m];
+    }
+    i = j;
+  }
+  return out;
+}
+
 export function showToast(msg: string, duration = 2500): void {
   const t = document.getElementById('toast')!;
   t.textContent = msg;
