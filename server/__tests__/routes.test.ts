@@ -217,6 +217,30 @@ describe('routes', () => {
         .send({ text: 'Updated' })
         .expect(404);
     });
+
+    it('POST /comments direct mode with X-LGTM-Host: periscope returns a channel payload', async () => {
+      const res = await request(app)
+        .post(`/project/${slug}/comments`)
+        .set('X-LGTM-Host', 'periscope')
+        .send({ author: 'user', text: 'Why this approach?', item: 'diff', mode: 'direct' })
+        .expect(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.channel).toBeDefined();
+      expect(res.body.channel.content).toContain('Why this approach?');
+      expect(res.body.channel.meta.event).toBe('question');
+    });
+
+    // Guard test: review-mode comments must never carry a channel payload.
+    // Note this passes against an unimplemented server too — the test that
+    // actually proves the feature is the direct-mode one above.
+    it('POST /comments review mode does not return a channel payload', async () => {
+      const res = await request(app)
+        .post(`/project/${slug}/comments`)
+        .set('X-LGTM-Host', 'periscope')
+        .send({ author: 'user', text: 'nit', item: 'diff' })
+        .expect(200);
+      expect(res.body.channel).toBeUndefined();
+    });
   });
 
   describe('user state', () => {
@@ -299,6 +323,29 @@ describe('routes', () => {
         .expect(200);
       expect(res.body.ok).toBe(true);
       expect(res.body.round).toBe(1);
+    });
+
+    it('POST /submit with X-LGTM-Host: periscope returns a channel payload', async () => {
+      const res = await request(app)
+        .post(`/project/${slug}/submit`)
+        .set('X-LGTM-Host', 'periscope')
+        .send({ comments: 'Periscope-routed feedback' })
+        .expect(200);
+      expect(res.body.ok).toBe(true);
+      expect(typeof res.body.round).toBe('number');
+      expect(res.body.channel).toBeDefined();
+      expect(res.body.channel.content).toBe('Periscope-routed feedback');
+      expect(res.body.channel.meta.event).toBe('review_submitted');
+      expect(res.body.channel.meta.round).toBe(String(res.body.round));
+    });
+
+    it('POST /submit without the host header omits the channel payload', async () => {
+      const res = await request(app)
+        .post(`/project/${slug}/submit`)
+        .send({ comments: 'Normal feedback' })
+        .expect(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.channel).toBeUndefined();
     });
   });
 
@@ -458,6 +505,35 @@ describe('routes', () => {
         expect(res.status).toBe(404);
         expect(res.body.delivered).toBe(false);
         expect(typeof res.body.reason).toBe('string');
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('POST /refresh-analysis with X-LGTM-Host: periscope returns a channel payload and bypasses the claim check', async () => {
+      const f = createGitFixture();
+      try {
+        const reg = manager.register(f.repoPath);
+        const session = manager.get(reg.slug)!;
+        const blobMap = session.getCurrentBlobMap();
+        const paths = Object.keys(blobMap.blobsByPath);
+        if (paths.length === 0) return; // skip in fixtures with no diff
+        const path = paths[0];
+        session.setAnalysis({
+          overview: 'o', reviewStrategy: 's',
+          files: { [path]: { priority: 'normal', phase: 'review', summary: '', category: '' } },
+          groups: [],
+          synthesizedAtFileSet: [path],
+        });
+
+        const res = await request(app)
+          .post(`/project/${reg.slug}/refresh-analysis`)
+          .set('X-LGTM-Host', 'periscope');
+        expect(res.status).toBe(200);
+        expect(res.body.delivered).toBe(true);
+        expect(res.body.channel).toBeDefined();
+        expect(res.body.channel.meta.event).toBe('refresh_analysis_requested');
+        expect(typeof res.body.channel.content).toBe('string');
       } finally {
         f.cleanup();
       }
