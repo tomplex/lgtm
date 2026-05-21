@@ -8,8 +8,11 @@ A browser-based code review UI for collaborating with Claude Code. Claude regist
 
 The simplest way to use LGTM is as a Claude Code plugin. This gives you the `/lgtm` command, auto-starts the server, and connects MCP tools automatically.
 
-```bash
-claude plugin add tomplex/lgtm
+In a Claude Code session, register the marketplace and install the plugin:
+
+```
+/plugin marketplace add tomplex/lgtm
+/plugin install lgtm@tomplex-lgtm
 ```
 
 Once installed, the server starts automatically when you open a Claude Code session (via a SessionStart hook). No manual MCP configuration needed - the plugin bundles its own `.mcp.json`. Just type `/lgtm` or ask Claude to review your changes.
