@@ -64,5 +64,8 @@
       "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/stop-server.sh /Users/tom/dev/claude-review/.superpowers/brainstorm/25848-1776961709)",
       "Bash(/Users/tom/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.6/skills/brainstorming/scripts/stop-server.sh /Users/tom/dev/claude-review/.superpowers/brainstorm/78806-1776976057)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "lgtm"
+  ]
 }
