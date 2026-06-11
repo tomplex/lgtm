@@ -1,6 +1,6 @@
 {
   "name": "lgtm",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Web-based review UI for collaborating with Claude Code",
   "private": true,
   "type": "module",

@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-11
+
+### Added
+
+- Host-delivered channel routing: when an embedding host identifies itself with the `X-LGTM-Host: periscope` header, the comment, review-submit, and refresh-analysis endpoints return the channel payload (`{content, meta}`) in the REST response instead of pushing it over LGTM's own MCP channel — letting the host deliver events to Claude over its own reliable channel rather than LGTM's long-lived SSE stream.
+- When embedded in periscope, the frontend sends the `X-LGTM-Host` header and forwards returned channel payloads to the embedding host.
+
+### Fixed
+
+- The plugin is installable from the marketplace again — added `marketplace.json` and corrected the README install commands.
+- Diff line highlighting now runs against the full file, so hunks that open mid-string (or mid-comment) keep correct syntax coloring.
+
 ## [0.6.0] - 2026-05-19
 
 ### Added
