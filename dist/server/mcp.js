@@ -43,6 +43,20 @@ function createMcpServer(manager) {
         console.log(`MCP_ADD_DOCUMENT slug=${found.slug} item=${itemId} title="${itemTitle}" path=${path}`);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     });
+    server.tool('remove_document', 'Remove a document tab (and its comments) from the review UI. Pass the item id as returned by add_document / listed in its items array. The diff tab cannot be removed.', {
+        repoPath: z.string().describe('Absolute path to the git repository'),
+        item: z.string().describe('Item ID of the document tab to remove'),
+    }, async ({ repoPath, item }) => {
+        const { found } = resolveProject(manager, repoPath, server);
+        const ok = found.session.removeItem(item);
+        if (ok)
+            found.session.broadcast('items_changed', { removed: item });
+        console.log(`MCP_REMOVE_DOCUMENT slug=${found.slug} item=${item} ok=${ok}`);
+        const payload = ok
+            ? { ok: true, removed: item, items: found.session.items }
+            : { ok: false, error: 'Item not found or not removable ("diff" cannot be removed).', items: found.session.items };
+        return { content: [{ type: 'text', text: JSON.stringify(payload) }] };
+    });
     server.tool('comment', 'Add comments from Claude to a review item (diff or document). Comments appear inline in the review UI for the user to reply to, resolve, or dismiss. Use the file+line fields for diff comments, or the block field for document comments.', {
         repoPath: z.string().describe('Absolute path to the git repository'),
         item: z.string().optional().describe('Item ID to comment on (default: "diff")'),
