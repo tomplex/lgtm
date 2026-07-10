@@ -153,7 +153,10 @@ function HunkRow(props: { file: DiffFile; line: DiffLineType; lineIdx: number })
   return (
     <>
       <Show when={isSmallGap()}>
-        <tr class="expand-row">
+        <tr
+          class="expand-row"
+          onClick={(e) => expandContext(hunkNewStart(), 'up', e.currentTarget as HTMLElement, gap())}
+        >
           <td colspan="3" style="color:var(--text-muted)">
             &#8943; {gap()} line{gap() !== 1 ? 's' : ''} hidden
           </td>
