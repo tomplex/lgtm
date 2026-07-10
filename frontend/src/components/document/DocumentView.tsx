@@ -3,6 +3,7 @@ import { comments, activeItemId, mdMeta, addLocalComment } from '../../state';
 import { renderMd } from '../../utils';
 import { createComment as apiCreateComment } from '../../comment-api';
 import CommentRow from '../comments/CommentRow';
+import ResolvedSection from '../comments/ResolvedSection';
 import CommentTextarea from '../comments/CommentTextarea';
 
 export default function DocumentView() {
@@ -37,7 +38,10 @@ export default function DocumentView() {
   });
 
   const totalComments = createMemo(
-    () => comments.list.filter((c) => c.item === activeItemId() && !c.parentId && c.status !== 'dismissed').length,
+    () =>
+      comments.list.filter(
+        (c) => c.item === activeItemId() && !c.parentId && c.status !== 'dismissed' && c.status !== 'resolved',
+      ).length,
   );
 
   return (
@@ -62,6 +66,8 @@ function DocumentBlock(props: { html: string; blockIdx: number }) {
       (c) => c.item === activeItemId() && c.block === props.blockIdx && !c.parentId && c.status !== 'dismissed',
     ),
   );
+  const activeBlockComments = createMemo(() => blockComments().filter((c) => c.status !== 'resolved'));
+  const resolvedBlockComments = createMemo(() => blockComments().filter((c) => c.status === 'resolved'));
 
   function handleBlockClick(e: MouseEvent) {
     if ((e.target as HTMLElement).closest('.comment-box') || (e.target as HTMLElement).closest('.reply-textarea-wrap'))
@@ -96,7 +102,7 @@ function DocumentBlock(props: { html: string; blockIdx: number }) {
         onClick={handleBlockClick}
         innerHTML={props.html}
       />
-      <For each={blockComments()}>
+      <For each={activeBlockComments()}>
         {(comment) => (
           <div class="md-comment" style="margin:4px 0">
             <div class="comment-box" style="max-width:100%">
@@ -105,6 +111,13 @@ function DocumentBlock(props: { html: string; blockIdx: number }) {
           </div>
         )}
       </For>
+      <Show when={resolvedBlockComments().length > 0}>
+        <div class="md-comment" style="margin:4px 0">
+          <div class="comment-box" style="max-width:100%">
+            <ResolvedSection comments={resolvedBlockComments()} />
+          </div>
+        </div>
+      </Show>
       <Show when={showNewComment()}>
         <div class="md-comment">
           <CommentTextarea onSave={handleSave} onCancel={() => setShowNewComment(false)} />

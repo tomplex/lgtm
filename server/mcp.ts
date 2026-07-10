@@ -3,6 +3,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { readFileSync } from 'node:fs';
 import type express from 'express';
+import type { Comment } from './comment-types.js';
+import type { Session } from './session.js';
 import type { SessionManager } from './session-manager.js';
 import { slugify } from './slugify.js';
 import { parseFileAnalysis, parseSynthesis, type FileAnalysis } from './parse-analysis.js';
@@ -34,6 +36,70 @@ function renderFileAnalysisMarkdown(files: Record<string, FileAnalysis>): string
     const f = files[path];
     return `## ${path}\n- priority: ${f.priority}\n- phase: ${f.phase}\n- category: ${f.category}\n\n${f.summary}\n`;
   }).join('\n');
+}
+
+// Select the user's top-level review comments for read_feedback. Pending
+// (status "active") only by default; includeResolved keeps resolved ones too.
+function selectFeedback(session: Session, includeResolved: boolean, item?: string): Comment[] {
+  const feedback = session
+    .listComments(item !== undefined ? { item } : undefined)
+    .filter(c => c.author === 'user' && !c.parentId && c.mode !== 'direct' && c.status !== 'dismissed');
+  return includeResolved ? feedback : feedback.filter(c => c.status === 'active');
+}
+
+// Render review comments as markdown, one heading per file/document, each
+// comment tagged with its id so it can be passed to resolve_comments.
+function renderCommentGroups(wanted: Comment[]): string {
+  const groups = new Map<string, Comment[]>();
+  for (const c of wanted) {
+    const key = c.file ?? c.item;
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(c);
+  }
+
+  let out = '';
+  for (const [scope, cs] of groups) {
+    out += `## ${scope}\n\n`;
+    cs.sort((a, b) => (a.line ?? a.block ?? 0) - (b.line ?? b.block ?? 0));
+    for (const c of cs) {
+      const where = c.line != null ? `Line ${c.line}` : (c.block != null ? `Block ${c.block}` : 'General');
+      const status = c.status === 'resolved' ? ' [resolved]' : '';
+      out += `${where} (id: ${c.id})${status}\n`;
+      out += `> ${c.text}\n`;
+      if (c.status === 'resolved' && c.resolution) out += `Resolution: ${c.resolution}\n`;
+      out += '\n';
+    }
+  }
+  return out;
+}
+
+// Split feedback around the current review claim so the reading session can
+// tell fresh comments from a backlog left before it claimed the review.
+// Comments without createdAt (persisted before timestamps existed) are always
+// treated as earlier.
+function renderFeedbackMarkdown(session: Session, includeResolved: boolean, slug: string, item?: string): string {
+  const wanted = selectFeedback(session, includeResolved, item);
+  if (wanted.length === 0) {
+    return includeResolved ? 'No feedback submitted yet.' : 'No pending feedback.';
+  }
+
+  const claim = getProjectClaim(slug);
+  if (!claim) return renderCommentGroups(wanted);
+
+  const isFresh = (c: Comment): boolean => c.createdAt !== undefined && c.createdAt > claim.claimedAt;
+  const fresh = wanted.filter(isFresh);
+  const earlier = wanted.filter(c => !isFresh(c));
+  if (earlier.length === 0) return renderCommentGroups(fresh);
+
+  const earlierNote =
+    `Submitted before this session claimed the review (${claim.claimedAt}) — ` +
+    'possibly stale or left for a previous session. Confirm with the user before answering or resolving these.';
+  if (fresh.length === 0) {
+    return `# Earlier pending comments (${earlier.length})\n\n${earlierNote}\n\n${renderCommentGroups(earlier)}`;
+  }
+  return (
+    `# New since this session claimed the review (${fresh.length})\n\n${renderCommentGroups(fresh)}\n` +
+    `# Earlier pending comments (${earlier.length})\n\n${earlierNote}\n\n${renderCommentGroups(earlier)}`
+  );
 }
 
 function createMcpServer(manager: SessionManager): McpServer {
@@ -87,20 +153,36 @@ function createMcpServer(manager: SessionManager): McpServer {
 
   server.tool(
     'read_feedback',
-    'Read the review feedback the user submitted via the review UI. Returns markdown-formatted comments with file paths, line numbers, and the user\'s notes. Call this after the user says they submitted a review.',
+    'Read the review feedback the user submitted via the review UI. Returns markdown-formatted comments with file paths, line numbers, the user\'s notes, and each comment\'s id (pass those ids to resolve_comments once addressed). By default returns only pending (unresolved) comments; pass includeResolved=true to also see resolved comments with their resolution notes. Comments submitted before this session claimed the review are listed under a separate "Earlier pending comments" section — treat those as a backlog from previous sessions and confirm with the user before answering or resolving them. Call this after the user says they submitted a review.',
     {
       repoPath: z.string().describe('Absolute path to the git repository'),
+      includeResolved: z.boolean().optional().describe('Include resolved comments and their resolution notes (default false)'),
+      item: z.string().optional().describe('Only return feedback on this item/tab: "diff" or a document id from add_document (default: all items)'),
     },
-    async ({ repoPath }) => {
+    async ({ repoPath, includeResolved, item }) => {
       const { found } = resolveProject(manager, repoPath, server);
-      let feedback = '';
-      try {
-        feedback = readFileSync(found.session.outputPath, 'utf-8');
-      } catch {
-        // no feedback yet
-      }
-      console.log(`MCP_READ_FEEDBACK slug=${found.slug} bytes=${feedback.length}`);
-      return { content: [{ type: 'text' as const, text: feedback || 'No feedback submitted yet.' }] };
+      const feedback = renderFeedbackMarkdown(found.session, includeResolved ?? false, found.slug, item);
+      console.log(`MCP_READ_FEEDBACK slug=${found.slug} includeResolved=${includeResolved ?? false} item=${item ?? '-'} bytes=${feedback.length}`);
+      return { content: [{ type: 'text' as const, text: feedback }] };
+    },
+  );
+
+  server.tool(
+    'resolve_comments',
+    'Mark review comments as resolved after addressing them in code. For each comment id (from read_feedback), record a short note describing how it was addressed. Resolved comments drop out of read_feedback by default and collapse into a "Resolved" section in the review UI.',
+    {
+      repoPath: z.string().describe('Absolute path to the git repository'),
+      resolutions: z.array(z.object({
+        id: z.string().describe('The comment id to resolve (from read_feedback)'),
+        note: z.string().describe('How the comment was addressed'),
+      })).describe('Comments to resolve, each with a resolution note'),
+    },
+    async ({ repoPath, resolutions }) => {
+      const { found } = resolveProject(manager, repoPath, server);
+      const { resolved, notFound } = found.session.resolveComments(resolutions);
+      if (resolved.length) found.session.broadcast('comments_changed', { resolved: resolved.length });
+      console.log(`MCP_RESOLVE_COMMENTS slug=${found.slug} resolved=${resolved.length} notFound=${notFound.length}`);
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, resolved: resolved.length, notFound }) }] };
     },
   );
 
