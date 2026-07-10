@@ -1393,6 +1393,33 @@ tr.expand-row:hover td {
   padding-left: 8px;
 }
 
+/* HTML documents (a .html file added via add_document) are authored assuming a
+   light page. Render them on a white page with dark default text so unstyled
+   content stays legible against the dark app chrome. No !important is used, so
+   the document's own inline styles and <style> rules cascade on top. Scoped to
+   .md-content.html-doc, so markdown docs and the diff view are untouched. */
+.md-content.html-doc {
+  background: #ffffff;
+  color: #1a1a1a;
+  border-radius: 8px;
+  /* HTML docs are author-laid-out (wide tables, diagrams) — give them the pane
+     instead of the 860px prose column markdown uses. */
+  max-width: 1400px;
+}
+/* Re-point the app's dark-theme tokens to light values inside the authored
+   content only. The existing `.md-content X { color: var(--…) }` rules then
+   resolve legibly (DRY — no per-element re-declaration). Comment UI lives in
+   sibling .md-comment nodes, so it keeps the app theme. */
+.md-content.html-doc .md-block {
+  --text: #1a1a1a;
+  --text-muted: #57606a;
+  --accent: #0969da;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --border: #d0d7de;
+  --hover: rgba(0, 0, 0, 0.04);
+}
+
 /* --- Overview banner --- */
 .overview-banner {
   display: flex;
