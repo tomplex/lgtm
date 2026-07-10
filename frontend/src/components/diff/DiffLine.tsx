@@ -12,6 +12,7 @@ import {
 import type { Comment } from '../../comment-types';
 import type { DiffLine as DiffLineType } from '../../state';
 import CommentRow from '../comments/CommentRow';
+import ResolvedSection from '../comments/ResolvedSection';
 import CommentTextarea from '../comments/CommentTextarea';
 import PeekPanel from './PeekPanel';
 
@@ -77,6 +78,9 @@ export default function DiffLine(props: Props) {
         !c.parentId &&
         c.status !== 'dismissed',
     );
+
+  const activeLineComments = () => lineComments().filter((c) => c.status !== 'resolved');
+  const resolvedLineComments = () => lineComments().filter((c) => c.status === 'resolved');
 
   function getWordAtClick(e: MouseEvent): { word: string; character: number } | null {
     const sel =
@@ -190,7 +194,7 @@ export default function DiffLine(props: Props) {
         <PeekPanel />
       </Show>
 
-      <For each={lineComments()}>
+      <For each={activeLineComments()}>
         {(comment) => (
           <tr class={comment.author === 'claude' ? 'claude-comment-row' : 'comment-row'}>
             <td colspan="3">
@@ -199,6 +203,14 @@ export default function DiffLine(props: Props) {
           </tr>
         )}
       </For>
+
+      <Show when={resolvedLineComments().length > 0}>
+        <tr class="comment-row">
+          <td colspan="3">
+            <ResolvedSection comments={resolvedLineComments()} />
+          </td>
+        </tr>
+      </Show>
 
       <Show when={showNewComment()}>
         {(() => {

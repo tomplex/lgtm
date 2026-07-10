@@ -116,7 +116,7 @@ export function createApp(manager: SessionManager): express.Express {
         .listComments()
         .filter((c) => c.parentId == null && c.status !== 'dismissed');
       const claudeCommentCount = topLevel.filter((c) => c.author === 'claude').length;
-      const userCommentCount = topLevel.filter((c) => c.author === 'user').length;
+      const userCommentCount = topLevel.filter((c) => c.author === 'user' && c.status !== 'resolved').length;
 
       return { ...p, repoName, branch, baseBranch, pr, claudeCommentCount, userCommentCount };
     }));

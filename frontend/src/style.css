@@ -1110,6 +1110,69 @@ kbd {
   flex-shrink: 0;
 }
 
+/* Resolution note (how a resolved comment was addressed) */
+.resolution-note {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--add-text);
+  background: var(--add-bg);
+  border-radius: 0 4px 4px 0;
+}
+.resolution-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--add-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+.resolution-text {
+  font-size: 13px;
+  color: var(--text);
+}
+.resolution-text > *:first-child {
+  margin-top: 0;
+}
+.resolution-text > *:last-child {
+  margin-bottom: 0;
+}
+
+/* GitHub-style collapsible "Resolved (N)" section */
+.resolved-section {
+  margin: 4px 0;
+}
+.resolved-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.resolved-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.resolved-caret {
+  font-size: 10px;
+  width: 10px;
+  flex-shrink: 0;
+}
+.resolved-body {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .ask-claude-badge {
   font-size: 10px;
   font-weight: 600;

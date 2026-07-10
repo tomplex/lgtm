@@ -305,6 +305,21 @@ export class Session {
             this.persist();
         return result;
     }
+    /** Mark comments resolved with a note describing how each was addressed. Persists once. */
+    resolveComments(resolutions) {
+        const resolved = [];
+        const notFound = [];
+        for (const { id, note } of resolutions) {
+            const updated = this._commentStore.update(id, { status: 'resolved', resolution: note });
+            if (updated)
+                resolved.push(id);
+            else
+                notFound.push(id);
+        }
+        if (resolved.length)
+            this.persist();
+        return { resolved, notFound };
+    }
     deleteComment(itemId, commentId) {
         const result = this._commentStore.delete(commentId);
         if (result)

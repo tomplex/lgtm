@@ -10,6 +10,7 @@ export class CommentStore {
       ...input,
       id: crypto.randomUUID(),
       status: 'active',
+      createdAt: input.createdAt ?? new Date().toISOString(),
     };
     this._comments.push(comment);
     return comment;
@@ -19,11 +20,12 @@ export class CommentStore {
     return this._comments.find(c => c.id === id);
   }
 
-  update(id: string, fields: Partial<Pick<Comment, 'text' | 'status'>>): Comment | undefined {
+  update(id: string, fields: Partial<Pick<Comment, 'text' | 'status' | 'resolution'>>): Comment | undefined {
     const comment = this.get(id);
     if (!comment) return undefined;
     if (fields.text !== undefined) comment.text = fields.text;
     if (fields.status !== undefined) comment.status = fields.status;
+    if (fields.resolution !== undefined) comment.resolution = fields.resolution;
     return comment;
   }
 

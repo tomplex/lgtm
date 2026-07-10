@@ -372,10 +372,23 @@ export class Session {
     return this._commentStore.list(filter);
   }
 
-  updateComment(id: string, fields: Partial<Pick<Comment, 'text' | 'status'>>): Comment | undefined {
+  updateComment(id: string, fields: Partial<Pick<Comment, 'text' | 'status' | 'resolution'>>): Comment | undefined {
     const result = this._commentStore.update(id, fields);
     if (result) this.persist();
     return result;
+  }
+
+  /** Mark comments resolved with a note describing how each was addressed. Persists once. */
+  resolveComments(resolutions: { id: string; note: string }[]): { resolved: string[]; notFound: string[] } {
+    const resolved: string[] = [];
+    const notFound: string[] = [];
+    for (const { id, note } of resolutions) {
+      const updated = this._commentStore.update(id, { status: 'resolved', resolution: note });
+      if (updated) resolved.push(id);
+      else notFound.push(id);
+    }
+    if (resolved.length) this.persist();
+    return { resolved, notFound };
   }
 
   deleteComment(itemId: string, commentId: string): boolean {

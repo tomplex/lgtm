@@ -95,8 +95,8 @@ describe('routes', () => {
 
       const res = await request(app).get('/projects').expect(200);
       const project = res.body.projects.find((p: { slug: string }) => p.slug === slug);
-      // userCommentCount: a1 active, a2 resolved → counted; a3 dismissed → excluded; reply → excluded. Count = 2.
-      expect(project.userCommentCount).toBe(2);
+      // userCommentCount: a1 active → counted; a2 resolved and a3 dismissed → excluded; reply → excluded. Count = 1.
+      expect(project.userCommentCount).toBe(1);
       expect(project.claudeCommentCount).toBe(1);
 
       // Cleanup so later tests in the file see the original state.

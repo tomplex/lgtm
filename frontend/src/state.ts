@@ -339,7 +339,10 @@ export const commentsByFile = createMemo(() => {
 });
 
 export const userCommentCount = createMemo(
-  () => comments.list.filter((c) => c?.author === 'user' && !c.parentId && c.status !== 'dismissed').length,
+  () =>
+    comments.list.filter(
+      (c) => c?.author === 'user' && !c.parentId && c.status !== 'dismissed' && c.status !== 'resolved',
+    ).length,
 );
 
 /** Resolves a file path to its current tree row id, then sets active row. */

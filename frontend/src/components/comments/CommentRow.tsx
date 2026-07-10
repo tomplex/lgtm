@@ -92,7 +92,14 @@ export default function CommentRow(props: Props) {
         <Show when={props.comment.mode === 'direct'}>
           <span class="ask-claude-badge">Asked Claude</span>
         </Show>
-        <Show when={props.comment.author === 'user' && props.comment.mode !== 'direct' && !props.comment.parentId}>
+        <Show
+          when={
+            props.comment.author === 'user' &&
+            props.comment.mode !== 'direct' &&
+            !props.comment.parentId &&
+            !isResolved()
+          }
+        >
           <span class="pending-badge">Pending</span>
         </Show>
 
@@ -136,6 +143,13 @@ export default function CommentRow(props: Props) {
 
       <Show when={editing()} fallback={<div class="claude-text" innerHTML={renderMd(props.comment.text)} />}>
         <CommentTextarea initialText={props.comment.text} onSave={handleEdit} onCancel={() => setEditing(false)} />
+      </Show>
+
+      <Show when={isResolved() && props.comment.resolution}>
+        <div class="resolution-note">
+          <span class="resolution-label">Resolution</span>
+          <div class="resolution-text" innerHTML={renderMd(props.comment.resolution!)} />
+        </div>
       </Show>
 
       <For each={replies()}>
