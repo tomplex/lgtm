@@ -3,7 +3,7 @@ export declare class CommentStore {
     private _comments;
     add(input: CreateComment): Comment;
     get(id: string): Comment | undefined;
-    update(id: string, fields: Partial<Pick<Comment, 'text' | 'status'>>): Comment | undefined;
+    update(id: string, fields: Partial<Pick<Comment, 'text' | 'status' | 'resolution'>>): Comment | undefined;
     delete(id: string): boolean;
     list(filter?: CommentFilter): Comment[];
     toJSON(): Comment[];

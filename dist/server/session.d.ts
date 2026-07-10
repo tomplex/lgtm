@@ -107,7 +107,15 @@ export declare class Session {
     }[]): number;
     getComment(id: string): Comment | undefined;
     listComments(filter?: CommentFilter): Comment[];
-    updateComment(id: string, fields: Partial<Pick<Comment, 'text' | 'status'>>): Comment | undefined;
+    updateComment(id: string, fields: Partial<Pick<Comment, 'text' | 'status' | 'resolution'>>): Comment | undefined;
+    /** Mark comments resolved with a note describing how each was addressed. Persists once. */
+    resolveComments(resolutions: {
+        id: string;
+        note: string;
+    }[]): {
+        resolved: string[];
+        notFound: string[];
+    };
     deleteComment(itemId: string, commentId: string): boolean;
     clearComments(itemId?: string): void;
     get userReviewedFiles(): string[];

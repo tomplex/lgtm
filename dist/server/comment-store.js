@@ -6,6 +6,7 @@ export class CommentStore {
             ...input,
             id: crypto.randomUUID(),
             status: 'active',
+            createdAt: input.createdAt ?? new Date().toISOString(),
         };
         this._comments.push(comment);
         return comment;
@@ -21,6 +22,8 @@ export class CommentStore {
             comment.text = fields.text;
         if (fields.status !== undefined)
             comment.status = fields.status;
+        if (fields.resolution !== undefined)
+            comment.resolution = fields.resolution;
         return comment;
     }
     delete(id) {
